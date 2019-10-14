@@ -7,7 +7,7 @@
 - 数据保存函数WritePoints
 - 采集数据的转换函数ConvertValue
 - 日志函数LogError、LogWarn、LogInfo、LogDebug
-- 实现Driver接口，实现启动、重启、指令操作等函数
+- 实现Driver接口，实现Start、Reload、Run等函数。Start根据配置实现采集驱动的业务逻辑，Reload重新加载配置后实现采集驱动的业务逻辑，Run实现控制指令操作
 
 ## 安装
 
@@ -24,6 +24,7 @@ go get -v github.com/casic-iot/sdk-go
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -35,76 +36,15 @@ import (
 	"github.com/casic-iot/sdk-go"
 )
 
-type (
-	// 驱动配置信息，不同的驱动生成不同的配置信息,不同驱动配置信息主要区别为tags及commands结构不同
-	config []model
-
-	// model 模型信息
-	model struct {
-		ID      string `json:"id"`     // 模型id，模型唯一标识
-		Device  Device `json:"device"` // 模型驱动信息
-		Devices []struct {
-			ID     string `json:"id"`     // 资产id，资产唯一标识
-			Uid    string `json:"uid"`    // 资产的唯一编号
-			Device Device `json:"device"` // 资产驱动信息
-		} `json:"devices"`             // 所属模型的资产配置信息
-	}
-
-	// 驱动信息
-	Device struct {
-		Driver string `json:"driver"` // 驱动名称
-		Tags   []struct {
-			ID   string `json:"id"`   // 数据点唯一标识
-			Name string `json:"name"` // 数据点名称
-		} `json:"tags"`               // 驱动数据点
-		Commands []struct {
-			ID   string `json:"id"`   // 指令唯一标识
-			Name string `json:"name"` // 指令名称
-		} `json:"commands"`           // 指令配置
-	}
-)
-
 // TestDriver 定义测试驱动结构体
-type TestDriver struct{}
+type TestDriver struct{
+	ctx    context.Context
+	cancel context.CancelFunc
+}
 
 // Start 驱动执行，实现Driver的Start函数
 func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
 	log.Println("开始", string(models))
-	ms := config{}
-	err := json.Unmarshal(models, &ms)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-	go func() {
-		for {
-			for _, m1 := range ms {
-				if m1.Devices == nil {
-					continue
-				}
-				for _, n1 := range m1.Devices {
-					if n1.Device.Tags == nil {
-						continue
-					}
-					fields := make(map[string]interface{})
-					if m1.Device.Tags != nil {
-						for _, t1 := range m1.Device.Tags {
-							fields[t1.ID] = rand.Intn(100)
-						}
-					}
-					for _, t1 := range n1.Device.Tags {
-						fields[t1.ID] = rand.Intn(100)
-					}
-					log.Println(n1.Uid, m1.ID, n1.ID, fields)
-					if err := dg.WritePoints(n1.Uid, m1.ID, n1.ID, fields); err != nil {
-						dg.LogError(n1.Uid, "保存数据错误")
-					}
-
-				}
-			}
-			time.Sleep(time.Second * 10)
-		}
-	}()
 	return nil
 }
 
@@ -125,7 +65,7 @@ func main() {
 	dg := sdk.NewDG(sdk.ServiceConfig{
 		Schema: ``,
 		Consul: &sdk.GCConfig{
-			Host: "iot.tmis.top",
+			Host: "localhost",
 			Port: 8500,
 		},
 		Service: &sdk.RegistryConfig{
@@ -137,11 +77,11 @@ func main() {
 			Name: "测试",
 		},
 		Gateway: &sdk.GCConfig{
-			Host: "iot.tmis.top",
+			Host: "localhost",
 			Port: 8010,
 		},
 		Mqtt: &sdk.EmqttConfig{
-			Host: "iot.tmis.top",
+			Host: "localhost",
 			Port: 1883,
 		},
 	})

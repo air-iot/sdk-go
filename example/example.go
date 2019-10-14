@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -13,7 +14,10 @@ import (
 )
 
 // TestDriver 定义测试驱动结构体
-type TestDriver struct{}
+type TestDriver struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
 
 type (
 	// 驱动配置信息，不同的驱动生成不同的配置信息
@@ -45,7 +49,7 @@ type (
 )
 
 // Start 驱动执行，实现Driver的Start函数
-func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
+func (p *TestDriver) Start(dg *sdk.DG, models []byte) error {
 	log.Println("start", string(models))
 	ms := config{}
 	err := json.Unmarshal(models, &ms)
@@ -53,51 +57,54 @@ func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
 		log.Println(err)
 		return err
 	}
-	log.Println(ms)
 	go func() {
 		for {
-			for _, m1 := range ms {
-				if m1.Devices == nil {
-					continue
-				}
-				for _, n1 := range m1.Devices {
-					if n1.Device.Tags == nil {
+			select {
+			case <-p.ctx.Done():
+				log.Println("退出")
+				return
+			case <-time.After(time.Second * 10):
+				log.Println("循环")
+				for _, m1 := range ms {
+					if m1.Devices == nil {
 						continue
 					}
-					fields := make(map[string]interface{})
-					if m1.Device.Tags != nil {
-						for _, t1 := range m1.Device.Tags {
+					for _, n1 := range m1.Devices {
+						if n1.Device.Tags == nil {
+							continue
+						}
+						fields := make(map[string]interface{})
+						if m1.Device.Tags != nil {
+							for _, t1 := range m1.Device.Tags {
+								fields[t1.ID] = rand.Intn(100)
+							}
+						}
+						for _, t1 := range n1.Device.Tags {
 							fields[t1.ID] = rand.Intn(100)
 						}
-					}
-					for _, t1 := range n1.Device.Tags {
-						fields[t1.ID] = rand.Intn(100)
-					}
-					log.Println(n1.Uid, m1.ID, n1.ID, fields)
-					if err := dg.WritePoints(n1.Uid, m1.ID, n1.ID, fields); err != nil {
-						dg.LogError(n1.Uid, "写数据错误")
-					}
+						log.Println(n1.Uid, m1.ID, n1.ID, fields)
+						if err := dg.WritePoints(n1.Uid, m1.ID, n1.ID, fields); err != nil {
+							dg.LogError(n1.Uid, "写数据错误")
+						}
 
+					}
 				}
 			}
-			time.Sleep(time.Second * 10)
 		}
 	}()
 	return nil
 }
 
 // Reload 驱动重启，实现Driver的Reload函数
-func (*TestDriver) Reload(dg *sdk.DG, models []byte) error {
+func (p *TestDriver) Reload(dg *sdk.DG, models []byte) error {
 	log.Println("reload", string(models))
-	go func() {
-		time.Sleep(time.Millisecond * 100)
-		os.Exit(0)
-	}()
-	return nil
+	p.cancel()
+	p.ctx, p.cancel = context.WithCancel(context.Background())
+	return p.Start(dg, models)
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (*TestDriver) Run(dg *sdk.DG, deviceID string, cmd []byte) error {
+func (p *TestDriver) Run(dg *sdk.DG, deviceID string, cmd []byte) error {
 	log.Println("run", deviceID, string(cmd))
 	return nil
 }
@@ -136,8 +143,10 @@ func main() {
 		}
 	}()
 
+	d := new(TestDriver)
+	d.ctx, d.cancel = context.WithCancel(context.Background())
 	// 创建测试驱动并开始执行
-	err := dg.Start(new(TestDriver))
+	err := dg.Start(d)
 	if err != nil {
 		panic("服务启动失败" + err.Error())
 	}
