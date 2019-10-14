@@ -1,19 +1,26 @@
 # sdk
-支持用户通过go开发驱动，并接入平台
 
-## 支持的Go版本
-支持1.11+版本使用sdk
+支持用户通过go开发数据采集驱动，并接入云组态监控平台
 
 ## 功能概述
 
-- 数据点保存WritePoints
+- 数据保存函数WritePoints
 - 采集数据的转换函数ConvertValue
-- LogError、LogWarn、LogInfo、LogDebug等等级日志输出
+- 日志函数LogError、LogWarn、LogInfo、LogDebug
 - 实现Driver接口，实现启动、重启、指令操作等函数
 
-## 例子
+## 安装
+
+```
+go get -v github.com/casic-iot/sdk-go
+```
+
+要求 Go >= 1.11
+
+## 使用
 
 ```go
+// 这个例子展示如何使用go开发工具包开发驱动
 package main
 
 import (
@@ -25,14 +32,11 @@ import (
 	"syscall"
 	"time"
 
-	"sdk"
+	"github.com/casic-iot/sdk-go"
 )
 
-// TestDriver 定义测试驱动结构体
-type TestDriver struct{}
-
 type (
-	// 驱动配置信息，不同的驱动生成不同的配置信息
+	// 驱动配置信息，不同的驱动生成不同的配置信息,不同驱动配置信息主要区别为tags及commands结构不同
 	config []model
 
 	// model 模型信息
@@ -60,16 +64,18 @@ type (
 	}
 )
 
+// TestDriver 定义测试驱动结构体
+type TestDriver struct{}
+
 // Start 驱动执行，实现Driver的Start函数
 func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
-	log.Println("start", string(models))
+	log.Println("开始", string(models))
 	ms := config{}
 	err := json.Unmarshal(models, &ms)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
-	log.Println(ms)
 	go func() {
 		for {
 			for _, m1 := range ms {
@@ -91,7 +97,7 @@ func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
 					}
 					log.Println(n1.Uid, m1.ID, n1.ID, fields)
 					if err := dg.WritePoints(n1.Uid, m1.ID, n1.ID, fields); err != nil {
-						dg.LogError(n1.Uid, "写数据错误")
+						dg.LogError(n1.Uid, "保存数据错误")
 					}
 
 				}
@@ -104,14 +110,13 @@ func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
 
 // Reload 驱动重启，实现Driver的Reload函数
 func (*TestDriver) Reload(dg *sdk.DG, models []byte) error {
-	log.Println("reload", string(models))
-
+	log.Println("重启", string(models))
 	return nil
 }
 
 // Run 执行指令，实现Driver的Run函数
 func (*TestDriver) Run(dg *sdk.DG, deviceID string, cmd []byte) error {
-	log.Println("run", deviceID, string(cmd))
+	log.Println("指令", deviceID, string(cmd))
 	return nil
 }
 
@@ -161,7 +166,34 @@ func main() {
 	select {
 	// wait on kill signal
 	case sig := <-ch:
-		log.Printf("Received signal %s\n", sig)
+		log.Printf("接收信号 %s\n", sig)
 	}
 }
 ```
+
+## 消息工具
+
+### 基本介绍
+MQTTBox 是一个带有可视化的界面的 MQTT 的客户端工具，它具有如下特点：
+
+- 支持 TCP、TLS、Web Sockets 和安全的 Web Sockets 连接 MQTT 服务器
+- 支持各种 MQTT 客户端的设置
+- 支持发布和订阅多个主题
+- 支持主题的单级和多级订阅
+- 复制/重新发布有效负载
+- 支持查看每个主题已发布/已订阅消息的历史记录
+
+### 下载安装
+软件支持在 Windows、Mac 和 Linux 上面运行，我们到其官网选择合适的版本下载安装即可，下载 [MQTTBox](http://workswithweb.com/html/mqttbox/downloads.html)
+
+### 消息订阅
+#### 数据
+
+- data/#
+
+#### 日志
+
+- Debug: logs/debug/资产唯一编号
+- Info: logs/info/资产唯一编号
+- Warn: logs/warn/资产唯一编号
+- Error: logs/error/资产唯一编号

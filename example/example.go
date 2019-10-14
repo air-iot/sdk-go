@@ -27,7 +27,7 @@ type (
 			ID     string `json:"id"`     // 资产id，资产唯一标识
 			Uid    string `json:"uid"`    // 资产的唯一编号
 			Device Device `json:"device"` // 资产驱动信息
-		} `json:"devices"` // 所属模型的资产配置信息
+		} `json:"devices"`             // 所属模型的资产配置信息
 	}
 
 	// 驱动信息
@@ -36,11 +36,11 @@ type (
 		Tags   []struct {
 			ID   string `json:"id"`   // 数据点唯一标识
 			Name string `json:"name"` // 数据点名称
-		} `json:"tags"` // 驱动数据点
+		} `json:"tags"`               // 驱动数据点
 		Commands []struct {
 			ID   string `json:"id"`   // 指令唯一标识
 			Name string `json:"name"` // 指令名称
-		} `json:"commands"` // 指令配置
+		} `json:"commands"`           // 指令配置
 	}
 )
 
@@ -89,7 +89,10 @@ func (*TestDriver) Start(dg *sdk.DG, models []byte) error {
 // Reload 驱动重启，实现Driver的Reload函数
 func (*TestDriver) Reload(dg *sdk.DG, models []byte) error {
 	log.Println("reload", string(models))
-
+	go func() {
+		time.Sleep(time.Millisecond * 100)
+		os.Exit(0)
+	}()
 	return nil
 }
 
