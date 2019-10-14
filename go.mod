@@ -1,4 +1,4 @@
-module sdk
+module github.com/casic-iot/sdk-go
 
 go 1.12
 

@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"sdk"
 	"syscall"
+
+	"github.com/casic-iot/sdk-go"
 )
 
 type TestDriver1 struct{}

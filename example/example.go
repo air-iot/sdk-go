@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"sdk"
+	"github.com/casic-iot/sdk-go"
 )
 
 // TestDriver 定义测试驱动结构体
