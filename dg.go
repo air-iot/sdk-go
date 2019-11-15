@@ -405,17 +405,20 @@ func (p *DG) ConvertValue(tagTemp, raw interface{}) (interface{}, error) {
 	if err != nil {
 		return raw, err
 	}
-
 	var value float64
+	var valueRaw float64
 	vType := reflect.TypeOf(raw).String()
 
 	switch vType {
 	case "float32", "float64":
 		value = reflect.ValueOf(raw).Float()
+		valueRaw = reflect.ValueOf(raw).Float()
 	case "uint", "uintptr", "uint8", "uint16", "uint32", "uint64":
 		value = float64(reflect.ValueOf(raw).Uint())
+		valueRaw = float64(reflect.ValueOf(raw).Uint())
 	case "int", "int8", "int16", "int32", "int64":
 		value = float64(reflect.ValueOf(raw).Int())
+		valueRaw = float64(reflect.ValueOf(raw).Int())
 	default:
 		return raw, errors.New("值非数字")
 	}
@@ -450,7 +453,7 @@ func (p *DG) ConvertValue(tagTemp, raw interface{}) (interface{}, error) {
 	minRaw, ok3 := tagValue[minRawKey]
 	maxRaw, ok4 := tagValue[maxRawKey]
 	if ok1 && ok2 && ok3 && ok4 && (maxRaw != minRaw) {
-		value = (((value - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+		value = (((valueRaw - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
 	}
 
 	if fixed, ok := tag["fixed"]; ok {
