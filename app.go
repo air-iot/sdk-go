@@ -294,18 +294,21 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	var c *websocket.Conn
 	go func() {
 		//maxReconnectAttempts := 5
-		var i = 1
+		var i = 4
+		var timeConnect = 0
 		for {
 			var err error
 			c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
 			if err != nil {
-				//if i > maxReconnectAttempts {
-				//	logrus.Errorln("尝试连接WebSocket失败")
-				//	os.Exit(1)
-				//}
-				log.Printf("尝试重新连接WebSocket第 %d 次失败 \n", i)
-				time.Sleep(time.Second * time.Duration(5*i))
-				i++
+				timeConnect++
+				i--
+				if i <= 0 {
+					logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
+					logrus.Errorln("TCP连接已超时")
+					os.Exit(1)
+				}
+				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
+				time.Sleep(time.Second * 5)
 				continue
 			}
 			var handler = func() {
@@ -365,7 +368,8 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					}
 				}
 			}
-			i = 1
+			i = 4
+			timeConnect = 0
 			handler()
 		}
 	}()
