@@ -426,7 +426,11 @@ func (p *app) WritePoints(point Point) error {
 		if err != nil {
 			return err
 		}
-
+		defer func() {
+			if err := ch.Close(); err != nil {
+				logrus.Warnln("关闭管道,", err.Error())
+			}
+		}()
 		return ch.Publish(
 			"data",                            // exchange
 			fmt.Sprintf("data.%s", point.Uid), // routing key
