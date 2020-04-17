@@ -1,7 +1,6 @@
 package sdk
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -18,11 +17,14 @@ import (
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gorilla/websocket"
 	consulApi "github.com/hashicorp/consul/api"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/streadway/amqp"
 	"gopkg.in/resty.v1"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type App interface {
 	Start(driver Driver, handlers ...Handler)
@@ -69,9 +71,9 @@ type Point struct {
 }
 
 type wsRequest struct {
-	RequestId string `json:"requestId"`
-	Action    string `json:"action"`
-	Data      []byte `json:"data"`
+	RequestId string      `json:"requestId"`
+	Action    string      `json:"action"`
+	Data      interface{} `json:"data"`
 }
 
 type wsResponse struct {
@@ -85,8 +87,8 @@ type result struct {
 }
 
 type command struct {
-	NodeId  string `json:"nodeId"`
-	Command []byte `json:"command"`
+	NodeId  string      `json:"nodeId"`
+	Command interface{} `json:"command"`
 }
 
 type resultMsg struct {
@@ -329,22 +331,29 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							}
 						}
 					case "run":
+						cmdByte, _ := json.Marshal(msg1.Data)
 						cmd := new(command)
-						err := json.Unmarshal(msg1.Data, cmd)
+						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: err.Error()}
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
-							if err := driver.Run(p, cmd.NodeId, cmd.Command); err != nil {
+							cmdByte, _ := json.Marshal(cmd.Command)
+							if err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								r = result{Code: http.StatusOK, Result: resultMsg{"指令写入成功"}}
 							}
 						}
 					case "debug":
-						if r1, err := driver.Debug(p, msg1.Data); err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+						debugByte, err := json.Marshal(msg1.Data)
+						if err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("序列化数据错误,%s", err.Error())}}
 						} else {
-							r = result{Code: http.StatusOK, Result: r1}
+							if r1, err := driver.Debug(p, debugByte); err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+							} else {
+								r = result{Code: http.StatusOK, Result: r1}
+							}
 						}
 					default:
 						r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: "未找到执行动作"}}
