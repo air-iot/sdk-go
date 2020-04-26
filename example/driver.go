@@ -99,6 +99,7 @@ func (p *TestDriver) Debug(a sdk.App, b []byte) (interface{}, error) {
 }
 
 func (p *TestDriver) Stop(a sdk.App) error {
+	log.Println("stop")
 	return nil
 }
 

@@ -386,6 +386,10 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	sig := <-ch
 	p.stop()
 	close(ch)
+
+	if err := driver.Stop(p); err != nil {
+		logrus.Warnln("驱动停止,", err.Error())
+	}
 	for _, handler := range handlers {
 		handler.Stop()
 	}
