@@ -41,6 +41,7 @@ type Driver interface {
 	Reload(App, []byte) error
 	Run(App, string, []byte) error
 	Debug(App, []byte) (interface{}, error)
+	Stop(App) error
 }
 
 type Handler interface {
@@ -387,6 +388,9 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	close(ch)
 	for _, handler := range handlers {
 		handler.Stop()
+	}
+	if err := c.Close(); err != nil {
+		logrus.Warnln("关闭TCP服务器错误,", err.Error())
 	}
 	logrus.Debugln("关闭服务,", sig)
 	os.Exit(0)

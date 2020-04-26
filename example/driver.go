@@ -98,6 +98,10 @@ func (p *TestDriver) Debug(a sdk.App, b []byte) (interface{}, error) {
 	return []int{1, 2, 3}, nil
 }
 
+func (p *TestDriver) Stop(a sdk.App) error {
+	return nil
+}
+
 func main() {
 	// 创建采集主程序
 	sdk.NewApp().Start(new(TestDriver))
