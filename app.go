@@ -432,6 +432,9 @@ func (p *app) send(topic string, b []byte) error {
 
 // WritePoints 写数据点数据
 func (p *app) WritePoints(point Point) error {
+	if point.Uid == "" || point.NodeId == "" || point.ModelId == "" || point.Fields == nil || len(point.Fields) == 0 {
+		return errors.New("数据点字段有空值")
+	}
 	b, err := json.Marshal(point)
 	if err != nil {
 		return err
