@@ -303,7 +303,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			if err != nil {
 				timeConnect++
 				i--
-				if i <= 0 {
+				if i < 0 {
 					logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
 					logrus.Errorln("TCP连接已超时")
 					os.Exit(1)
