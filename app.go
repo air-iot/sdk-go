@@ -295,21 +295,25 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	var c *websocket.Conn
 	go func() {
 		//maxReconnectAttempts := 5
-		var i = 4
+		//var i = 4
 		var timeConnect = 0
+		var timeOut = 10
 		for {
 			var err error
 			c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
 			if err != nil {
 				timeConnect++
-				i--
-				if i < 0 {
-					logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
-					logrus.Errorln("TCP连接已超时")
-					os.Exit(1)
+				//i--
+				//if i < 0 {
+				//	logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
+				//	logrus.Errorln("TCP连接已超时")
+				//	os.Exit(1)
+				//}
+				if timeConnect > 5 {
+					timeOut = 60
 				}
 				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
-				time.Sleep(time.Second * 10)
+				time.Sleep(time.Second * time.Duration(timeOut))
 				continue
 			}
 			var handler = func() {
@@ -369,8 +373,9 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					}
 				}
 			}
-			i = 4
+			//i = 4
 			timeConnect = 0
+			timeOut = 10
 			handler()
 		}
 	}()
@@ -385,6 +390,11 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	}()
 	sig := <-ch
 	p.stop()
+	if c != nil {
+		if err := c.Close(); err != nil {
+			logrus.Warnln("关闭TCP连接,", err.Error())
+		}
+	}
 	close(ch)
 
 	if err := driver.Stop(p); err != nil {
@@ -392,9 +402,6 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	}
 	for _, handler := range handlers {
 		handler.Stop()
-	}
-	if err := c.Close(); err != nil {
-		logrus.Warnln("关闭TCP服务器错误,", err.Error())
 	}
 	logrus.Debugln("关闭服务,", sig)
 	os.Exit(0)
