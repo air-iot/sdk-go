@@ -309,7 +309,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					os.Exit(1)
 				}
 				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
-				time.Sleep(time.Second * 5)
+				time.Sleep(time.Second * 10)
 				continue
 			}
 			var handler = func() {
