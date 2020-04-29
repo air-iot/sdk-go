@@ -130,15 +130,22 @@ func init() {
 // NewDG 创建DG
 func NewApp() App {
 	var (
-		driverId   = viper.GetString("driver.id")
-		driverName = viper.GetString("driver.name")
+		driverId    = viper.GetString("driver.id")
+		driverName  = viper.GetString("driver.name")
+		serviceID   = viper.GetString("service.id")
+		serviceName = viper.GetString("service.name")
 	)
 	if driverId == "" || driverName == "" {
 		logrus.Panic("驱动id或name不能为空")
 	}
+	if serviceID == "" || serviceName == "" {
+		logrus.Panic("服务id或name不能为空")
+	}
 	a := new(app)
 	a.driverId = driverId
 	a.driverName = driverName
+	a.serviceId = serviceID
+	a.serviceName = serviceName
 	a.traefikAddress = fmt.Sprintf("%s:%d", viper.GetString("traefik.host"), viper.GetInt("traefik.port"))
 	a.dataAction = viper.GetString("data.action")
 	a.consulInit()
@@ -217,8 +224,6 @@ func (p *app) rabbitInit() {
 // Register 服务注册
 func (p *app) register() error {
 	var (
-		serviceID   = viper.GetString("service.id")
-		serviceName = viper.GetString("service.name")
 		serviceHost = viper.GetString("service.host")
 		servicePort = viper.GetInt("service.port")
 		serviceTag  = viper.GetString("service.tag")
@@ -227,14 +232,6 @@ func (p *app) register() error {
 	if servicePort == 0 {
 		servicePort = 9000
 	}
-	if serviceName == "" {
-		serviceName = p.driverName
-	}
-	if serviceID == "" {
-		logrus.Panic("服务id不能为空")
-	}
-	p.serviceId = serviceID
-	p.serviceName = serviceName
 	var err error
 	serviceHost, err = extract(serviceHost)
 	if err != nil {
@@ -247,7 +244,7 @@ func (p *app) register() error {
 		tags = append(tags, fmt.Sprintf("driver.id=%s", p.driverId), fmt.Sprintf("driver.name=%s", p.driverName))
 	}
 	var check = &consulApi.AgentServiceCheck{
-		CheckID:                        serviceID,
+		CheckID:                        p.serviceId,
 		TCP:                            fmt.Sprintf("%s:%d", serviceHost, servicePort),
 		Interval:                       fmt.Sprintf("%v", 10*time.Second),
 		Timeout:                        fmt.Sprintf("%v", 30*time.Second),
@@ -256,8 +253,8 @@ func (p *app) register() error {
 
 	// register the service
 	asr := &consulApi.AgentServiceRegistration{
-		ID:      serviceID,
-		Name:    serviceName,
+		ID:      p.serviceId,
+		Name:    p.serviceName,
 		Tags:    tags,
 		Port:    servicePort,
 		Address: serviceHost,
@@ -270,7 +267,7 @@ func (p *app) register() error {
 	if err := p.consul.Agent().ServiceRegister(asr); err != nil {
 		return err
 	}
-	return p.consul.Agent().CheckDeregister("service:" + serviceID)
+	return p.consul.Agent().CheckDeregister("service:" + p.serviceId)
 }
 
 func (p *app) getConfig() ([]byte, error) {
@@ -291,7 +288,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	for _, handler := range handlers {
 		handler.Start()
 	}
-	u := url.URL{Scheme: "ws", Host: p.traefikAddress, Path: "/driver/ws/" + p.driverId}
+	u := url.URL{Scheme: "ws", Host: p.traefikAddress, Path: fmt.Sprintf("/driver/ws/%s/%s", p.driverId, p.serviceId)}
 	var c *websocket.Conn
 	go func() {
 		//maxReconnectAttempts := 5
