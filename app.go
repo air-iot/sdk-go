@@ -271,7 +271,7 @@ func (p *app) register() error {
 }
 
 func (p *app) getConfig() ([]byte, error) {
-	res, err := resty.R().Get(fmt.Sprintf("http://%s/driver/driver/%s/config", p.traefikAddress, p.driverId))
+	res, err := resty.R().Get(fmt.Sprintf("http://%s/driver/driver/%s/%s/config", p.traefikAddress, p.driverId, p.serviceId))
 	if err != nil {
 		return nil, err
 	}
