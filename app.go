@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"reflect"
@@ -61,6 +60,7 @@ type app struct {
 	serviceId      string
 	serviceName    string
 	traefikAddress string
+	distributed    string
 }
 
 type Point struct {
@@ -134,6 +134,7 @@ func NewApp() App {
 		driverName  = viper.GetString("driver.name")
 		serviceID   = viper.GetString("service.id")
 		serviceName = viper.GetString("service.name")
+		distributed = viper.GetString("data.distributed")
 	)
 	if driverId == "" || driverName == "" {
 		logrus.Panic("驱动id或name不能为空")
@@ -146,6 +147,7 @@ func NewApp() App {
 	a.driverName = driverName
 	a.serviceId = serviceID
 	a.serviceName = serviceName
+	a.distributed = distributed
 	a.traefikAddress = fmt.Sprintf("%s:%d", viper.GetString("traefik.host"), viper.GetInt("traefik.port"))
 	a.dataAction = viper.GetString("data.action")
 	a.consulInit()
@@ -288,28 +290,20 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	for _, handler := range handlers {
 		handler.Start()
 	}
-	u := url.URL{Scheme: "ws", Host: p.traefikAddress, Path: fmt.Sprintf("/driver/ws/%s/%s", p.driverId, p.serviceId)}
+
 	var c *websocket.Conn
 	go func() {
-		//maxReconnectAttempts := 5
-		//var i = 4
 		var timeConnect = 0
 		var timeOut = 10
 		for {
 			var err error
-			c, _, err = websocket.DefaultDialer.Dial(u.String(), nil)
+			c, _, err = websocket.DefaultDialer.Dial(fmt.Sprintf(`ws://%s/driver/ws?driverId=%s&serviceId=%s&distributed=%s`, p.traefikAddress, p.driverId, p.serviceId, p.distributed), nil)
 			if err != nil {
 				timeConnect++
-				//i--
-				//if i < 0 {
-				//	logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
-				//	logrus.Errorln("TCP连接已超时")
-				//	os.Exit(1)
-				//}
 				if timeConnect > 5 {
 					timeOut = 60
 				}
-				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败", timeConnect)
+				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
 				time.Sleep(time.Second * time.Duration(timeOut))
 				continue
 			}
@@ -324,6 +318,17 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 
 					var r result
 					switch msg1.Action {
+					case "start":
+						c, err := p.getConfig()
+						if err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
+						} else {
+							if err := driver.Start(p, c); err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+							} else {
+								r = result{Code: http.StatusOK, Result: resultMsg{Message: "驱动启动成功"}}
+							}
+						}
 					case "reload":
 						c, err := p.getConfig()
 						if err != nil {
@@ -376,15 +381,24 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			handler()
 		}
 	}()
-	go func() {
-		c, err := p.getConfig()
-		if err != nil {
-			logrus.Panic("查询配置错误,", err.Error())
-		}
-		if err := driver.Start(p, c); err != nil {
-			logrus.Panic("驱动启动错误,", err.Error())
-		}
-	}()
+	if p.distributed == "" {
+		go func() {
+			var c1 []byte
+			for {
+				c, err := p.getConfig()
+				if err != nil {
+					logrus.Warnln("查询配置错误,", err.Error())
+					time.Sleep(time.Second * 5)
+					continue
+				}
+				c1 = c
+				break
+			}
+			if err := driver.Start(p, c1); err != nil {
+				logrus.Panic("驱动启动错误,", err.Error())
+			}
+		}()
+	}
 	sig := <-ch
 	p.stop()
 	if c != nil {
@@ -393,7 +407,6 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		}
 	}
 	close(ch)
-
 	if err := driver.Stop(p); err != nil {
 		logrus.Warnln("驱动停止,", err.Error())
 	}
