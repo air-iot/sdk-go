@@ -139,8 +139,12 @@ func NewApp() App {
 	if driverId == "" || driverName == "" {
 		logrus.Panic("驱动id或name不能为空")
 	}
-	if serviceID == "" || serviceName == "" {
-		logrus.Panic("服务id或name不能为空")
+	if serviceName == "" {
+		logrus.Panic("服务name不能为空")
+	}
+
+	if serviceID == "" {
+		serviceID = fmt.Sprintf("%s_%s", serviceName, GetRandomString(8))
 	}
 	a := new(app)
 	a.driverId = driverId
