@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/sirupsen/logrus"
 	"log"
 	"math/rand"
 
@@ -57,14 +58,16 @@ func (p *TestDriver) Start(a sdk.App, models []byte) error {
 			if n1.Device.Tags == nil {
 				continue
 			}
-			fields := make(map[string]interface{})
+			fields := make([]sdk.Field, 0)
 			if m1.Device.Tags != nil {
 				for _, t1 := range m1.Device.Tags {
-					fields[t1.ID] = rand.Intn(100)
+					//fields[t1.ID] = rand.Intn(100)
+					fields = append(fields, sdk.Field{Tag:t1, Value: rand.Intn(100)})
 				}
 			}
 			for _, t1 := range n1.Device.Tags {
-				fields[t1.ID] = rand.Intn(100)
+				//fields[t1.ID] = rand.Intn(100)
+				fields = append(fields, sdk.Field{Tag:t1, Value: rand.Intn(100)})
 			}
 			point := sdk.Point{
 				Uid:      n1.Uid,
@@ -74,7 +77,8 @@ func (p *TestDriver) Start(a sdk.App, models []byte) error {
 				UnixTime: 0,
 			}
 			if err := a.WritePoints(point); err != nil {
-				a.LogError(n1.Uid, "写数据错误")
+				//a.LogError(n1.Uid, "写数据错误")
+				logrus.Errorln("写数据,",err)
 			}
 
 		}

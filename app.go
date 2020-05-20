@@ -32,7 +32,7 @@ type App interface {
 	LogInfo(uid string, msg interface{})
 	LogWarn(uid string, msg interface{})
 	LogError(uid string, msg interface{})
-	ConvertValue(tagTemp, raw interface{}) (interface{}, error)
+	ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
 }
 
 type Driver interface {
@@ -64,6 +64,19 @@ type app struct {
 }
 
 type Point struct {
+	Uid      string  `json:"uid"`
+	ModelId  string  `json:"modelId"`
+	NodeId   string  `json:"nodeId"`
+	Fields   []Field `json:"fields"`
+	UnixTime int64   `json:"time"`
+}
+
+type Field struct {
+	Tag   interface{} `json:"tag"`
+	Value interface{} `json:"value"`
+}
+
+type pointTmp struct {
 	Uid      string                 `json:"uid"`
 	ModelId  string                 `json:"modelId"`
 	NodeId   string                 `json:"nodeId"`
@@ -447,9 +460,33 @@ func (p *app) send(topic string, b []byte) error {
 // WritePoints 写数据点数据
 func (p *app) WritePoints(point Point) error {
 	if point.Uid == "" || point.NodeId == "" || point.ModelId == "" || point.Fields == nil || len(point.Fields) == 0 {
-		return errors.New("数据点字段有空值")
+		return errors.New("数据有空值")
 	}
-	b, err := json.Marshal(point)
+	fields := make(map[string]interface{})
+	for _, field := range point.Fields {
+		if field.Tag == nil {
+			continue
+		}
+
+		tag, val, err := p.ConvertValue(field.Tag, field.Value)
+		if err != nil {
+			logrus.Warnln("转换值错误,", err)
+			continue
+		}
+
+		if id1, ok := tag["id"]; ok {
+			if id, ok := id1.(string); ok {
+				fields[id] = val
+			}
+		}
+
+	}
+
+	if len(fields) == 0 {
+		return errors.New("数据点为空值")
+	}
+
+	b, err := json.Marshal(&pointTmp{Uid: point.Uid, ModelId: point.ModelId, NodeId: point.NodeId, UnixTime: point.UnixTime, Fields: fields})
 	if err != nil {
 		return err
 	}
@@ -547,17 +584,17 @@ func (p *app) LogError(uid string, msg interface{}) {
 }
 
 // ConvertValue 数据点值转换
-func (p *app) ConvertValue(tagTemp, raw interface{}) (interface{}, error) {
+func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}, val interface{}, err error) {
 
-	tag := make(map[string]interface{})
+	tag = make(map[string]interface{})
 
 	b, err := json.Marshal(tagTemp)
 	if err != nil {
-		return raw, err
+		return tag, raw, err
 	}
 	err = json.Unmarshal(b, &tag)
 	if err != nil {
-		return raw, err
+		return tag, raw, err
 	}
 
 	var value float64
@@ -570,22 +607,8 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (interface{}, error) {
 		value = float64(reflect.ValueOf(raw).Uint())
 	case "int", "int8", "int16", "int32", "int64":
 		value = float64(reflect.ValueOf(raw).Int())
-	case "string":
-		rawString := reflect.ValueOf(raw).String()
-		if strings.Contains(rawString, ".") {
-			value, err = strconv.ParseFloat(rawString, 64)
-			if err != nil {
-				return raw, errors.New("值非数字")
-			}
-		} else {
-			vInt64, err := strconv.ParseInt(rawString, 0, 64)
-			if err != nil {
-				return raw, errors.New("值非数字")
-			}
-			value = float64(vInt64)
-		}
 	default:
-		return raw, errors.New("值非数字")
+		return tag, raw, nil
 	}
 
 	const (
@@ -652,7 +675,7 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (interface{}, error) {
 		}
 	}
 
-	return value, nil
+	return tag, value, nil
 }
 
 func (p *app) convertValue(tagValue *map[string]float64, key string, tagValueMap map[string]interface{}) {
