@@ -1,4 +1,4 @@
-module github.com/air-iot/sdk
+module github.com/air-iot/sdk-go
 
 go 1.14
 

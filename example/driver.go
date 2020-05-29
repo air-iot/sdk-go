@@ -6,7 +6,7 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/air-iot/sdk"
+	"github.com/air-iot/sdk-go"
 )
 
 type (
