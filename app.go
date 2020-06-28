@@ -314,7 +314,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		var timeOut = 10
 		for {
 			var err error
-			c, _, err = websocket.DefaultDialer.Dial(fmt.Sprintf(`ws://%s/driver/ws?driverId=%s&serviceId=%s&distributed=%s`, p.traefikAddress, p.driverId, p.serviceId, p.distributed), nil)
+			c, _, err = websocket.DefaultDialer.Dial(fmt.Sprintf(`ws://%s/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.traefikAddress, p.driverId, p.driverName, p.serviceId, p.distributed), nil)
 			if err != nil {
 				timeConnect++
 				if timeConnect > 5 {
