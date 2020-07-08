@@ -113,6 +113,7 @@ func init() {
 	viper.SetDefault("traefik.host", "traefik")
 	viper.SetDefault("traefik.port", 80)
 
+	viper.SetDefault("consul.enable", false)
 	viper.SetDefault("consul.host", "consul")
 	viper.SetDefault("consul.port", 8500)
 
@@ -150,10 +151,10 @@ func NewApp() App {
 		distributed = viper.GetString("data.distributed")
 	)
 	if driverId == "" || driverName == "" {
-		logrus.Panic("驱动id或name不能为空")
+		panic("驱动id或name不能为空")
 	}
 	if serviceName == "" {
-		logrus.Panic("服务name不能为空")
+		panic("服务name不能为空")
 	}
 
 	if serviceID == "" {
@@ -174,16 +175,19 @@ func NewApp() App {
 }
 
 func (p *app) consulInit() {
+	if !viper.GetBool("consul.enable") {
+		logrus.Debugln("未注册consul")
+		return
+	}
 	cc := consulApi.DefaultConfig()
 	cc.Address = fmt.Sprintf("%s:%d", viper.GetString("consul.host"), viper.GetInt("consul.port"))
 	client, err := consulApi.NewClient(cc)
 	if err != nil {
-		log.Panic("consul客户端初始化,", err)
-
+		panic(fmt.Sprintf("consul客户端初始化,%s", err.Error()))
 	}
 	p.consul = client
 	if err := p.register(); err != nil {
-		logrus.Panic("注册服务,", err)
+		panic(fmt.Sprintf("注册服务,%s", err.Error()))
 	}
 }
 
@@ -444,8 +448,10 @@ func (p *app) stop() {
 			logrus.Errorln("关闭MQ错误,", err.Error())
 		}
 	}
-	if err := p.consul.Agent().ServiceDeregister(p.serviceId); err != nil {
-		logrus.Errorln("注销服务错误,", err.Error())
+	if viper.GetBool("consul.enable") {
+		if err := p.consul.Agent().ServiceDeregister(p.serviceId); err != nil {
+			logrus.Errorln("注销服务错误,", err.Error())
+		}
 	}
 }
 

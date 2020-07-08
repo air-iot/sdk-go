@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/sirupsen/logrus"
+	"github.com/air-iot/sdk-go"
 	"log"
 	"math/rand"
-
-	"github.com/air-iot/sdk-go"
 )
 
 type (
@@ -62,24 +60,28 @@ func (p *TestDriver) Start(a sdk.App, models []byte) error {
 			if m1.Device.Tags != nil {
 				for _, t1 := range m1.Device.Tags {
 					//fields[t1.ID] = rand.Intn(100)
-					fields = append(fields, sdk.Field{Tag:t1, Value: rand.Intn(100)})
+					fields = append(fields, sdk.Field{Tag: t1, Value: rand.Intn(100)})
 				}
 			}
 			for _, t1 := range n1.Device.Tags {
 				//fields[t1.ID] = rand.Intn(100)
-				fields = append(fields, sdk.Field{Tag:t1, Value: rand.Intn(100)})
+				fields = append(fields, sdk.Field{Tag: t1, Value: rand.Intn(100)})
 			}
-			point := sdk.Point{
-				Uid:      n1.Uid,
-				ModelId:  m1.ID,
-				NodeId:   n1.ID,
-				Fields:   fields,
-				UnixTime: 0,
-			}
-			if err := a.WritePoints(point); err != nil {
-				//a.LogError(n1.Uid, "写数据错误")
-				logrus.Errorln("写数据,",err)
-			}
+			//for i := 0; i < 20000; i++ {
+			//	point := sdk.Point{
+			//		Uid:      n1.Uid,
+			//		ModelId:  m1.ID,
+			//		NodeId:   n1.ID,
+			//		Fields:   fields,
+			//		UnixTime: time.Now().UnixNano()/10e6,
+			//	}
+			//	if err := a.WritePoints(point); err != nil {
+			//		//a.LogError(n1.Uid, "写数据错误")
+			//		logrus.Errorln("写数据,", err)
+			//	}
+			//	logrus.Debugf("%d 写数据成功,%+v", i, point)
+			//	time.Sleep(time.Millisecond)
+			//}
 
 		}
 	}
