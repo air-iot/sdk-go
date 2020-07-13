@@ -50,8 +50,9 @@ type Handler interface {
 
 // DG 数据采集类
 type app struct {
-	dataAction     string
-	mqtt           MQTT.Client
+	dataAction string
+	//mqtt           MQTT.Client
+	pool           Pool
 	rabbit         *amqp.Connection
 	consul         *consulApi.Client
 	ws             *websocket.Conn
@@ -123,6 +124,10 @@ func init() {
 	viper.SetDefault("mqtt.port", 1883)
 	viper.SetDefault("mqtt.username", "admin")
 	viper.SetDefault("mqtt.password", "public")
+	viper.SetDefault("mqtt.initialCap", 4)
+	viper.SetDefault("mqtt.maxIdleConn", 5)
+	viper.SetDefault("mqtt.maxOpenConn", 10)
+	viper.SetDefault("mqtt.idleTimeout", 15)
 
 	viper.SetDefault("rabbit.host", "rabbit")
 	viper.SetDefault("rabbit.port", 5672)
@@ -169,7 +174,8 @@ func NewApp() App {
 	a.traefikAddress = fmt.Sprintf("%s:%d", viper.GetString("traefik.host"), viper.GetInt("traefik.port"))
 	a.dataAction = viper.GetString("data.action")
 	a.consulInit()
-	a.mqttInit()
+	//a.mqttInit()
+	a.mqttPool()
 	a.rabbitInit()
 	return a
 }
@@ -191,38 +197,100 @@ func (p *app) consulInit() {
 	}
 }
 
-func (p *app) mqttInit() {
-	opts := MQTT.NewClientOptions()
-	var host = viper.GetString("mqtt.host")
-	var port = viper.GetInt("mqtt.port")
-	var username = viper.GetString("mqtt.username")
-	var password = viper.GetString("mqtt.password")
-	var clientID = viper.GetString("mqtt.clientId")
-	if clientID == "" {
-		clientID = p.serviceId
-	}
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
-	opts.SetAutoReconnect(true)
-	opts.SetCleanSession(true)
-	opts.SetUsername(username)
-	opts.SetPassword(password)
-	opts.SetConnectTimeout(time.Second * 20)
-	opts.SetKeepAlive(time.Second * 60)
-	opts.SetProtocolVersion(4)
-	opts.SetClientID(clientID)
-	//opts.SetConnectionLostHandler()
-	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
-		if e != nil {
-			logrus.Panic(e)
+//func (p *app) mqttInit() {
+//	opts := MQTT.NewClientOptions()
+//	var host = viper.GetString("mqtt.host")
+//	var port = viper.GetInt("mqtt.port")
+//	var username = viper.GetString("mqtt.username")
+//	var password = viper.GetString("mqtt.password")
+//	var clientID = viper.GetString("mqtt.clientId")
+//	if clientID == "" {
+//		clientID = p.serviceId
+//	}
+//	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
+//	opts.SetAutoReconnect(true)
+//	opts.SetCleanSession(true)
+//	opts.SetUsername(username)
+//	opts.SetPassword(password)
+//	opts.SetConnectTimeout(time.Second * 20)
+//	opts.SetKeepAlive(time.Second * 60)
+//	opts.SetProtocolVersion(4)
+//	opts.SetClientID(clientID)
+//	//opts.SetConnectionLostHandler()
+//	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
+//		if e != nil {
+//			logrus.Panic(e)
+//		}
+//	})
+//	opts.SetOrderMatters(false)
+//	// Start the connection
+//	client := MQTT.NewClient(opts)
+//	if token := client.Connect(); token.Wait() && token.Error() != nil {
+//		logrus.Panic(token.Error())
+//	}
+//	p.mqtt = client
+//}
+
+func (p *app) mqttPool() {
+	var (
+		initialCap  = viper.GetInt("mqtt.initialCap")
+		maxIdleConn = viper.GetInt("mqtt.maxIdleConn")
+		maxOpenConn = viper.GetInt("mqtt.maxOpenConn")
+		idleTimeout = viper.GetInt("mqtt.idleTimeout")
+	)
+
+	factory := func() (MQTT.Client, error) {
+		opts := MQTT.NewClientOptions()
+		var host = viper.GetString("mqtt.host")
+		var port = viper.GetInt("mqtt.port")
+		var username = viper.GetString("mqtt.username")
+		var password = viper.GetString("mqtt.password")
+		var clientID = viper.GetString("mqtt.clientId")
+		if clientID == "" {
+			clientID = p.serviceId + GetRandomString(10)
 		}
-	})
-	opts.SetOrderMatters(false)
-	// Start the connection
-	client := MQTT.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		logrus.Panic(token.Error())
+		opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
+		opts.SetAutoReconnect(true)
+		opts.SetCleanSession(true)
+		opts.SetUsername(username)
+		opts.SetPassword(password)
+		opts.SetConnectTimeout(time.Second * 20)
+		opts.SetKeepAlive(time.Second * 60)
+		opts.SetProtocolVersion(4)
+		opts.SetClientID(clientID)
+		//opts.SetConnectionLostHandler()
+		opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
+			if e != nil {
+				panic(e)
+			}
+		})
+		opts.SetOrderMatters(false)
+		// Start the connection
+		client := MQTT.NewClient(opts)
+		if token := client.Connect(); token.Wait() && token.Error() != nil {
+			return nil, token.Error()
+		}
+		return client, nil
 	}
-	p.mqtt = client
+	close := func(v MQTT.Client) error {
+		v.Disconnect(250)
+		return nil
+	}
+	poolConfig := &Config{
+		InitialCap: initialCap,
+		MaxIdle:    maxIdleConn,
+		MaxCap:     maxOpenConn,
+		Factory:    factory,
+		Close:      close,
+		//连接最大空闲时间，超过该时间的连接 将会关闭，可避免空闲时连接EOF，自动失效的问题
+		IdleTimeout: time.Duration(idleTimeout) * time.Second,
+	}
+
+	pool, err := NewChannelPool(poolConfig)
+	if err != nil {
+		panic(err)
+	}
+	p.pool = pool
 }
 
 func (p *app) rabbitInit() {
@@ -440,8 +508,11 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 
 // Stop 服务停止
 func (p *app) stop() {
-	if p.mqtt != nil {
-		p.mqtt.Disconnect(250)
+	//if p.mqtt != nil {
+	//	p.mqtt.Disconnect(250)
+	//}
+	if p.pool != nil {
+		p.pool.Release()
 	}
 	if p.rabbit != nil && !p.rabbit.IsClosed() {
 		if err := p.rabbit.Close(); err != nil {
@@ -457,7 +528,12 @@ func (p *app) stop() {
 
 // SendMsg 发送消息
 func (p *app) send(topic string, b []byte) error {
-	if token := p.mqtt.Publish(topic, 0, false, string(b)); token.Wait() && token.Error() != nil {
+	m1, err := p.pool.Get()
+	if err != nil {
+		return err
+	}
+	defer p.pool.Put(m1)
+	if token := m1.Publish(topic, 0, false, string(b)); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
@@ -517,7 +593,12 @@ func (p *app) WritePoints(point Point) error {
 				Body:         b,
 			})
 	} else {
-		if token := p.mqtt.Publish(fmt.Sprintf("data/%s", point.Uid), 0, false, string(b)); token.Wait() && token.Error() != nil {
+		m1, err := p.pool.Get()
+		if err != nil {
+			return err
+		}
+		defer p.pool.Put(m1)
+		if token := m1.Publish(fmt.Sprintf("data/%s", point.Uid), 0, false, string(b)); token.Wait() && token.Error() != nil {
 			return token.Error()
 		}
 	}
