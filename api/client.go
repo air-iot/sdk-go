@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -15,6 +14,19 @@ import (
 	"github.com/air-iot/sdk-go/model"
 	"github.com/air-iot/sdk-go/traefik"
 )
+
+type client struct {
+	url url.URL
+	AuthToken
+}
+
+func NewClient() Client {
+	cli := new(client)
+	u := url.URL{Host: net.JoinHostPort(traefik.Host, strconv.Itoa(traefik.Port))}
+	u.Scheme = traefik.Proto
+	cli.url = u
+	return cli
+}
 
 type AuthToken struct {
 	Token   string
@@ -41,7 +53,7 @@ func (p *AuthToken) FindToken() {
 		SetResult(auth).
 		Get(u.String())
 	if err != nil {
-		logrus.Warnf("token查询错误,", err.Error())
+		logrus.Warnf("token查询错误:%s", err.Error())
 		return
 	}
 	if resp.StatusCode() != 200 {

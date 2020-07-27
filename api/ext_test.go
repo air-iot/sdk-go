@@ -1,8 +1,9 @@
-package ext
+package api
 
 import (
-	"github.com/air-iot/sdk-go/traefik"
 	"testing"
+
+	"github.com/air-iot/sdk-go/traefik"
 )
 
 func init() {
@@ -13,10 +14,10 @@ func init() {
 	traefik.AppSecret = "c5de1068-79fd-b32b-a4f8-291c337111fa"
 }
 
-func TestModelClient_FindById(t *testing.T) {
-	cli := NewExtClient("新表")
+func TestExtClient_FindById(t *testing.T) {
+	cli := NewClient()
 	var r = make(map[string]interface{})
-	err := cli.FindById("5f1aa80eac624e29f1678fd3", &r)
+	err := cli.FindExtById("新表", "5f1aa80eac624e29f1678fd3", &r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +25,7 @@ func TestModelClient_FindById(t *testing.T) {
 }
 
 func TestExtClient_SaveMany(t *testing.T) {
-	cli := NewExtClient("新表")
+	cli := NewClient()
 	var r = make(map[string]interface{}, 0)
 	dataMap := []map[string]interface{}{
 		{
@@ -35,7 +36,7 @@ func TestExtClient_SaveMany(t *testing.T) {
 			"text-DCD9":    "diyig1e",
 		},
 	}
-	err := cli.SaveMany(dataMap, &r)
+	err := cli.SaveManyExt("新表", dataMap, &r)
 	if err != nil {
 		t.Fatal(err)
 	}
