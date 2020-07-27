@@ -27,8 +27,8 @@ type ExtClient interface {
 }
 
 type extClient struct {
-	url   url.URL
-	token string
+	url url.URL
+	api.AuthToken
 }
 
 func NewExtClient(collection string) ExtClient {
@@ -36,23 +36,21 @@ func NewExtClient(collection string) ExtClient {
 	u := url.URL{Host: net.JoinHostPort(traefik.Host, strconv.Itoa(traefik.Port)), Path: fmt.Sprintf("core/ext/%s", collection)}
 	u.Scheme = traefik.Proto
 	cli.url = u
-	cli.token = api.FindToken()
-
 	return cli
 }
 
 func (p *extClient) FindQuery(query, result interface{}) error {
-	return api.Get(p.url, p.token, query, result)
+	return p.Get(p.url, query, result)
 }
 
 func (p *extClient) Save(data, result interface{}) error {
-	return api.Post(p.url, p.token, data, result)
+	return p.Post(p.url, data, result)
 }
 
 func (p *extClient) SaveMany(data, result interface{}) error {
 	resp, err := resty.R().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("Authorization", p.token).
+		SetHeader("Authorization", p.Token).
 		SetResult(result).
 		SetBody(data).
 		Post(fmt.Sprintf(`%s/many`, p.url.String()))
@@ -66,17 +64,17 @@ func (p *extClient) SaveMany(data, result interface{}) error {
 }
 
 func (p *extClient) FindById(id string, result interface{}) error {
-	return api.GetById(p.url, p.token, id, result)
+	return p.GetById(p.url, id, result)
 }
 
 func (p *extClient) DelById(id string, result interface{}) error {
-	return api.Delete(p.url, p.token, id, result)
+	return p.Delete(p.url, id, result)
 }
 
 func (p *extClient) UpdateById(id string, data, result interface{}) error {
-	return api.Patch(p.url, p.token, id, data, result)
+	return p.Patch(p.url, id, data, result)
 }
 
 func (p *extClient) ReplaceById(id string, data, result interface{}) error {
-	return api.Put(p.url, p.token, id, data, result)
+	return p.Put(p.url, id, data, result)
 }

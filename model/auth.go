@@ -1,6 +1,6 @@
 package model
 
 type Auth struct {
-	Expires int    `json:"expires"`
+	Expires int64  `json:"expires"`
 	Token   string `json:"token"`
 }
