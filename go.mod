@@ -31,4 +31,5 @@ require (
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
+	gopkg.in/resty.v1 v1.12.0
 )
