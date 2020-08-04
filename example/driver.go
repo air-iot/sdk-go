@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/air-iot/sdk-go"
+	"github.com/air-iot/sdk-go/driver"
 	"log"
 	"math/rand"
 )
@@ -40,7 +40,7 @@ type (
 type TestDriver struct{}
 
 // Start 驱动执行，实现Driver的Start函数
-func (p *TestDriver) Start(a sdk.App, models []byte) error {
+func (p *TestDriver) Start(a driver.App, models []byte) error {
 	log.Println("start", string(models))
 	ms := config{}
 	err := json.Unmarshal(models, &ms)
@@ -56,16 +56,16 @@ func (p *TestDriver) Start(a sdk.App, models []byte) error {
 			if n1.Device.Tags == nil {
 				continue
 			}
-			fields := make([]sdk.Field, 0)
+			fields := make([]driver.Field, 0)
 			if m1.Device.Tags != nil {
 				for _, t1 := range m1.Device.Tags {
 					//fields[t1.ID] = rand.Intn(100)
-					fields = append(fields, sdk.Field{Tag: t1, Value: rand.Intn(100)})
+					fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
 				}
 			}
 			for _, t1 := range n1.Device.Tags {
 				//fields[t1.ID] = rand.Intn(100)
-				fields = append(fields, sdk.Field{Tag: t1, Value: rand.Intn(100)})
+				fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
 			}
 			//for i := 0; i < 20000; i++ {
 			//	point := sdk.Point{
@@ -89,27 +89,27 @@ func (p *TestDriver) Start(a sdk.App, models []byte) error {
 }
 
 // Reload 驱动重启，实现Driver的Reload函数
-func (p *TestDriver) Reload(a sdk.App, models []byte) error {
+func (p *TestDriver) Reload(a driver.App, models []byte) error {
 	return p.Start(a, models)
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(a sdk.App, deviceID string, cmd []byte) error {
+func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) error {
 	log.Println("run", deviceID, string(cmd))
 	return nil
 }
 
-func (p *TestDriver) Debug(a sdk.App, b []byte) (interface{}, error) {
+func (p *TestDriver) Debug(a driver.App, b []byte) (interface{}, error) {
 	log.Println("debug", string(b))
 	return []int{1, 2, 3}, nil
 }
 
-func (p *TestDriver) Stop(a sdk.App) error {
+func (p *TestDriver) Stop(a driver.App) error {
 	log.Println("stop")
 	return nil
 }
 
 func main() {
 	// 创建采集主程序
-	sdk.NewApp().Start(new(TestDriver))
+	driver.NewApp().Start(new(TestDriver))
 }
