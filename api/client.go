@@ -8,52 +8,43 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/resty.v1"
-
-	"github.com/air-iot/sdk-go/model"
-	"github.com/air-iot/sdk-go/traefik"
 )
 
 type client struct {
-	url url.URL
-	AuthToken
+	protocol string
+	host     string
+	ak       string
+	sk       string
+	Token    string
+	expires  int64
 }
 
-func NewClient() Client {
-	cli := new(client)
-	u := url.URL{Host: net.JoinHostPort(traefik.Host, strconv.Itoa(traefik.Port))}
-	u.Scheme = traefik.Proto
-	cli.url = u
-	return cli
-}
-
-type AuthToken struct {
-	Token   string
-	Expires int64
+func NewClient(protocol, host string, port int, ak, sk string) Client {
+	return &client{
+		protocol: protocol,
+		host:     net.JoinHostPort(host, strconv.Itoa(port)),
+		ak:       ak,
+		sk:       sk,
+	}
 }
 
 // 根据 app appkey和appsecret 获取token
-func (p *AuthToken) FindToken() {
-
-	if traefik.AppKey == "" || traefik.AppSecret == "" {
-		logrus.Warn("app key或者secret为空")
-		return
-	}
+func (p *client) findToken() {
 	// 生成要访问的url
-	u := url.URL{Host: net.JoinHostPort(traefik.Host, strconv.Itoa(traefik.Port)), Path: "core/auth/token"}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/auth/token"}
 	v := url.Values{}
-	v.Set("appkey", traefik.AppKey)
-	v.Set("appsecret", traefik.AppSecret)
-	u.Scheme = traefik.Proto
+	v.Set("appkey", p.ak)
+	v.Set("appsecret", p.sk)
 	u.RawQuery = v.Encode()
-	auth := new(model.Auth)
-	resp, err := resty.R().
+	auth := new(AuthToken)
+	resp, err := resty.New().SetTimeout(time.Second*30).R().
 		SetHeader("Content-Type", "application/json").
 		SetResult(auth).
 		Get(u.String())
 	if err != nil {
-		logrus.Warnf("token查询错误:%s", err.Error())
+		logrus.Errorf("token查询错误:%s", err.Error())
 		return
 	}
 	if resp.StatusCode() != 200 {
@@ -61,57 +52,31 @@ func (p *AuthToken) FindToken() {
 		return
 	}
 	p.Token = auth.Token
-	p.Expires = auth.Expires + time.Now().UnixNano()
-
-	return
+	p.expires = auth.Expires/10e9 + time.Now().Unix()
 }
 
-func (p *AuthToken) Get(url1 url.URL, query, result interface{}) error {
-	p.CheckToken()
-	b, err := json.Marshal(query)
-	if err != nil {
-		return err
-	}
-	v := url.Values{}
-	v.Set("query", string(b))
-	u := fmt.Sprintf(`%s?%s`, url1.String(), v.Encode())
-	logrus.Debugf("查询请求url:%s", u)
-	resp, err := resty.R().
+func (p *client) Get(url url.URL, result interface{}) error {
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
 		SetResult(result).
-		Get(u)
+		Get(url.String())
 
 	if err != nil {
 		return err
 	}
 
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
+	if resp.StatusCode() >= 200 && resp.StatusCode() <= 204 {
+		return nil
 	}
+	return errors.New(resp.String())
 
-	return nil
 }
 
-func (p *AuthToken) GetById(url url.URL, id string, result interface{}) error {
-	p.CheckToken()
-	resp, err := resty.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Authorization", p.Token).
-		SetResult(result).
-		Get(fmt.Sprintf(`%s/%s`, url.String(), id))
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
-	}
-	return nil
-}
-
-func (p *AuthToken) Post(url url.URL, data, result interface{}) error {
-	p.CheckToken()
-	resp, err := resty.R().
+func (p *client) Post(url url.URL, data, result interface{}) error {
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
 		SetResult(result).
@@ -120,65 +85,421 @@ func (p *AuthToken) Post(url url.URL, data, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
+	if resp.StatusCode() >= 200 && resp.StatusCode() <= 204 {
+		return nil
 	}
-	return nil
+	return errors.New(resp.String())
 }
 
-func (p *AuthToken) Delete(url url.URL, id string, result interface{}) error {
-	p.CheckToken()
-	resp, err := resty.R().
+func (p *client) Delete(url url.URL, result interface{}) error {
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
 		SetResult(result).
-		Delete(fmt.Sprintf(`%s/%s`, url.String(), id))
+		Delete(url.String())
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
+	if resp.StatusCode() >= 200 && resp.StatusCode() <= 204 {
+		return nil
 	}
-	return nil
+	return errors.New(resp.String())
 }
 
-func (p *AuthToken) Put(url url.URL, id string, data, result interface{}) error {
-	p.CheckToken()
-	resp, err := resty.R().
-		SetHeader("Content-Type", "application/json").
-		SetHeader("Authorization", p.Token).
-		SetResult(result).
-		SetBody(data).
-		Put(fmt.Sprintf(`%s/%s`, url.String(), id))
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
-	}
-	return nil
-}
-
-func (p *AuthToken) Patch(url url.URL, id string, data, result interface{}) error {
-	p.CheckToken()
-	resp, err := resty.R().
+func (p *client) Put(url url.URL, data, result interface{}) error {
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
 		SetResult(result).
 		SetBody(data).
-		Patch(fmt.Sprintf(`%s/%s`, url.String(), id))
+		Put(url.String())
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode() != 200 {
-		return errors.New(resp.String())
+	if resp.StatusCode() >= 200 && resp.StatusCode() <= 204 {
+		return nil
 	}
-	return nil
+	return errors.New(resp.String())
 }
 
-func (p *AuthToken) CheckToken() {
-	if p.Expires < time.Now().UnixNano() {
-		p.FindToken()
+func (p *client) Patch(url url.URL, data, result interface{}) error {
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Authorization", p.Token).
+		SetResult(result).
+		SetBody(data).
+		Patch(url.String())
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode() >= 200 && resp.StatusCode() <= 204 {
+		return nil
+	}
+	return errors.New(resp.String())
+}
+
+func (p *client) checkToken() {
+	if p.expires-5 < time.Now().Unix() {
+		p.findToken()
 	}
 	return
+}
+
+func (p *client) GetLatest(query interface{}) (result []RealTimeData, err error) {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return nil, err
+	}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/latest"}
+	u.RawQuery = v.Encode()
+	result = make([]RealTimeData, 0)
+	if err := p.Get(u, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *client) PostLatest(query interface{}) (result []RealTimeData, err error) {
+	result = make([]RealTimeData, 0)
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/latest"}
+	if err := p.Post(u, query, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *client) GetQuery(query interface{}) (result *QueryData, err error) {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return nil, err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/query"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	result = new(QueryData)
+	if err := p.Get(u, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *client) PostQuery(query interface{}) (result *QueryData, err error) {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/query"}
+	result = new(QueryData)
+	if err := p.Post(u, query, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (p *client) ChangeCommand(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/command", id)}
+	return p.Post(u, data, &result)
+}
+
+func (p *client) FindExtQuery(tableName string, query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) SaveExt(tableName string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
+	return p.Post(u, data, result)
+}
+
+func (p *client) SaveManyExt(tableName string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/many", tableName)}
+	return p.Post(u, data, result)
+}
+
+func (p *client) FindExtById(tableName, id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	return p.Get(u, result)
+}
+
+func (p *client) DelExtById(tableName, id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateExtById(tableName, id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceExtById(tableName, id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindEventQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/event"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindEventById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveEvent(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/event"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelEventById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateEventById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceEventById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindHandlerQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/eventHandler"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindHandlerById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveHandler(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/eventHandler"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelHandlerById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateHandlerById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceHandlerById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindModelQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/model"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindModelById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveModel(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/model"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelModelById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateModelById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceModelById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindNodeQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/node"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindNodeById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveNode(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/node"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelNodeById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateNodeById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceNodeById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindSettingQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/setting"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindSettingById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveSetting(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/setting"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelSettingById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateSettingById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceSettingById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindTableQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/table"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindTableById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveTable(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/table"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelTableById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateTableById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceTableById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	return p.Put(u, data, result)
+}
+
+func (p *client) FindUserQuery(query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/user"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindUserById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	return p.Get(u, result)
+}
+
+func (p *client) SaveUser(data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/user"}
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelUserById(id string, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateUserById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceUserById(id string, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	return p.Put(u, data, result)
 }

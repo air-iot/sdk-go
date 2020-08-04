@@ -1,10 +1,20 @@
 package api
 
-import jsoniter "github.com/json-iterator/go"
+import (
+	"net/url"
+
+	jsoniter "github.com/json-iterator/go"
+)
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Client interface {
+	Get(url url.URL, result interface{}) error
+	Post(url url.URL, data, result interface{}) error
+	Delete(url url.URL, result interface{}) error
+	Put(url url.URL, data, result interface{}) error
+	Patch(url url.URL, data, result interface{}) error
+
 	// model
 	FindModelQuery(query, result interface{}) error
 	FindModelById(id string, result interface{}) error
