@@ -6,6 +6,7 @@ require (
 	github.com/armon/go-metrics v0.3.3 // indirect
 	github.com/eclipse/paho.mqtt.golang v1.2.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/go-resty/resty/v2 v2.3.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/consul/api v1.4.0
 	github.com/hashicorp/go-hclog v0.12.2 // indirect
@@ -27,7 +28,6 @@ require (
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	github.com/stretchr/testify v1.5.1 // indirect
 	golang.org/x/crypto v0.0.0-20200406173513-056763e48d71 // indirect
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
 	golang.org/x/sync v0.0.0-20200317015054-43a5402ce75a // indirect
 	golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect

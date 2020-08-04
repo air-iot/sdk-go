@@ -6,20 +6,15 @@ import (
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
-var Client MQTT.Client
-var Topic = "data/"
+type Mqtt struct {
+	client MQTT.Client
+}
 
-func Init() {
+func NewMqtt(host string, port int, username, password string) (*Mqtt, error) {
+	mqtt := new(Mqtt)
 	opts := MQTT.NewClientOptions()
-	var host = viper.GetString("mqtt.host")
-	var port = viper.GetInt("mqtt.port")
-	var username = viper.GetString("mqtt.username")
-	var password = viper.GetString("mqtt.password")
-	Topic = viper.GetString("mqtt.topic")
-	var clientID = viper.GetString("mqtt.clientId")
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
 	opts.SetAutoReconnect(true)
 	opts.SetCleanSession(true)
@@ -28,38 +23,38 @@ func Init() {
 	opts.SetConnectTimeout(time.Second * 20)
 	opts.SetKeepAlive(time.Second * 60)
 	opts.SetProtocolVersion(4)
-	opts.SetClientID(clientID)
-	//opts.SetConnectionLostHandler()
 	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
 		if e != nil {
-			logrus.Panic(e)
+			logrus.Errorf("消息队列连接错误,%s", e.Error())
 		}
 	})
 	opts.SetOrderMatters(false)
 	// Start the connection
-	Client = MQTT.NewClient(opts)
-	if token := Client.Connect(); token.Wait() && token.Error() != nil {
-		logrus.Panic(token.Error())
+	client := MQTT.NewClient(opts)
+	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		return nil, fmt.Errorf("消息队列连接错误,%s", token.Error())
+	}
+	mqtt.client = client
+	return mqtt, nil
+}
+
+func (p *Mqtt) Close() {
+	if p.client != nil {
+		p.client.Disconnect(250)
 	}
 }
 
-func Close() {
-	if Client != nil {
-		Client.Disconnect(250)
-	}
-}
-
-// SendMsg 发送消息
-func Send(topic string, b []byte) error {
-	if token := Client.Publish(topic, 0, false, string(b)); token.Wait() && token.Error() != nil {
+// Send 发送消息
+func (p *Mqtt) Send(topic, msg string) error {
+	if token := p.client.Publish(topic, 0, false, msg); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
 }
 
-// RecMsg 接收消息
-func Rec(topic string, handler func(client MQTT.Client, message MQTT.Message)) error {
-	if token := Client.Subscribe(topic, 0, func(client MQTT.Client, message MQTT.Message) {
+// Message 订阅并接收消息
+func (p *Mqtt) Message(topic string, handler func(client MQTT.Client, message MQTT.Message)) error {
+	if token := p.client.Subscribe(topic, 0, func(client MQTT.Client, message MQTT.Message) {
 		handler(client, message)
 	}); token.Wait() && token.Error() != nil {
 		return token.Error()
