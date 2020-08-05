@@ -4,46 +4,110 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 	"github.com/streadway/amqp"
 )
 
-var Channel *amqp.Channel
-var conn *amqp.Connection
-var RoutingKey = "data."
-var Queue string
+type Amqp struct {
+	*amqp.Connection
+}
 
-func Init() {
-	var (
-		host     = viper.GetString("rabbit.host")
-		port     = viper.GetInt("rabbit.port")
-		username = viper.GetString("rabbit.username")
-		password = viper.GetString("rabbit.password")
-		vhost    = viper.GetString("rabbit.vhost")
-	)
-	Queue = viper.GetString("rabbit.queue")
-	RoutingKey = viper.GetString("rabbit.routingKey")
-
-	var err error
-	conn, err = amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/%s", username, password, host, port, vhost))
+func NewAmqp(host string, port int, username, password, vhost string) (*Amqp, error) {
+	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/%s", username, password, host, port, vhost))
 	if err != nil {
-		logrus.Panic(err)
+		return nil, fmt.Errorf("创建Amqp连接错误,%s", err.Error())
 	}
-	Channel, err = conn.Channel()
-	if err != nil {
-		logrus.Panic(err)
+
+	return &Amqp{Connection: conn}, nil
+}
+
+func (p *Amqp) Close() {
+	if !p.Connection.IsClosed() {
+		if err := p.Connection.Close(); err != nil {
+			logrus.Errorln("关闭Amqp连接错误", err.Error())
+		}
 	}
 }
 
-func Close() {
-	if Channel != nil && !conn.IsClosed() {
-		if err := Channel.Close(); err != nil {
-			logrus.Errorln("关闭RabbitMQ channel错误", err.Error())
-		}
+func (p *Amqp) Send(exchange, routerKey string, data []byte) error {
+
+	channel, err := p.Connection.Channel()
+	if err != nil {
+		return fmt.Errorf("打开Channel错误,%s", err.Error())
 	}
-	if conn != nil && !conn.IsClosed() {
-		if err := conn.Close(); err != nil {
-			logrus.Errorln("关闭RabbitMQ connect错误", err.Error())
-		}
+
+	return channel.Publish(exchange, // exchange
+		routerKey, // routing key
+		false,     // mandatory
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Transient,
+			ContentType:  "text/plain",
+			Body:         data,
+		})
+}
+
+func (p *Amqp) Message(exchange, routingKey, queue string, handler func(routingKey string, body []byte)) error {
+	channel, err := p.Connection.Channel()
+	if err != nil {
+		return fmt.Errorf("打开Channel错误,%s", err.Error())
 	}
+	q, err := channel.QueueDeclare(
+		queue, // name
+		true,  // durable
+		true,  // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	if err != nil {
+		return err
+	}
+	err = channel.ExchangeDeclare(
+		exchange, // name
+		"topic",  // type
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
+	)
+	if err != nil {
+		return err
+	}
+	err = channel.QueueBind(
+		q.Name,     // queue name
+		routingKey, // routing key
+		exchange,   // exchange
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	err = channel.Qos(
+		1,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+	if err != nil {
+		return err
+	}
+	messages, err := channel.Consume(
+		q.Name, // queue
+		"",     // consumer
+		true,   // auto-ack
+		false,  // exclusive
+		false,  // no-local
+		false,  // no-wait
+		nil,    // args
+	)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for d := range messages {
+			handler(d.RoutingKey, d.Body)
+		}
+	}()
+	return nil
 }

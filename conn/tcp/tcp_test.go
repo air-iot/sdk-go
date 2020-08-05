@@ -7,7 +7,7 @@ import (
 )
 
 func Test_Read(t *testing.T) {
-	conn, err := NewConn("tcp", "localhost", 8001)
+	conn, err := DialTCP("tcp", "localhost", 8000)
 	if err != nil {
 		t.Fatal(err)
 	}

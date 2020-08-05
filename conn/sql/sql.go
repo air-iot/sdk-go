@@ -1,34 +1,28 @@
 package sql
 
 import (
-	"database/sql"
+	"fmt"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
 )
 
-var DB *sql.DB
-
-func Init() {
-	var (
-		driverName     = viper.GetString("db.dialect")
-		dataSourceName = viper.GetString("db.url")
-		maxIdleConn    = viper.GetInt("db.maxIdleConn")
-		maxOpenConn    = viper.GetInt("db.maxOpenConn")
-	)
-	var err error
-	DB, err = sql.Open(driverName, dataSourceName)
-	if err != nil {
-		logrus.Panic(err)
-	}
-	DB.SetMaxIdleConns(maxIdleConn)
-	DB.SetMaxOpenConns(maxOpenConn)
+type DBConn struct {
+	*sqlx.DB
 }
 
-func Close() {
-	if DB != nil {
-		if err := DB.Close(); err != nil {
-			logrus.Errorln("Conn????", err.Error())
-		}
+func NewDB(driverName, url string, maxIdleConn, maxOpenConn int) (*DBConn, error) {
+	db, err := sqlx.Open(driverName, url)
+	if err != nil {
+		return nil, fmt.Errorf("DB连接错误,%s", err.Error())
+	}
+	db.SetMaxIdleConns(maxIdleConn)
+	db.SetMaxOpenConns(maxOpenConn)
+	return &DBConn{DB: db}, nil
+}
+
+func (p *DBConn) Close() {
+	if err := p.DB.Close(); err != nil {
+		logrus.Errorln("Conn????", err.Error())
 	}
 }

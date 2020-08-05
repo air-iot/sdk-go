@@ -3,24 +3,23 @@ package driver
 import (
 	"errors"
 	"fmt"
+	"github.com/air-iot/sdk-go/logger"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"reflect"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
-	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"github.com/gorilla/websocket"
-	consulApi "github.com/hashicorp/consul/api"
+	"github.com/air-iot/sdk-go/api"
+	"github.com/air-iot/sdk-go/conn/mqtt"
+	"github.com/air-iot/sdk-go/conn/rabbit"
+	"github.com/air-iot/sdk-go/conn/websocket"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"github.com/streadway/amqp"
-	"gopkg.in/resty.v1"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -50,17 +49,16 @@ type Handler interface {
 
 // DG 数据采集类
 type app struct {
-	dataAction     string
-	mqtt           MQTT.Client
-	rabbit         *amqp.Connection
-	consul         *consulApi.Client
-	ws             *websocket.Conn
-	driverId       string
-	driverName     string
-	serviceId      string
-	serviceName    string
-	traefikAddress string
-	distributed    string
+	*logrus.Logger
+	sendMethod  string
+	mqtt        *mqtt.Mqtt
+	rabbit      *rabbit.Amqp
+	ws          *websocket.Conn
+	api         api.Client
+	driverId    string
+	serviceId   string
+	driverName  string
+	distributed string
 }
 
 type Point struct {
@@ -110,14 +108,10 @@ type resultMsg struct {
 }
 
 func init() {
-	viper.SetDefault("traefik.host", "traefik")
-	viper.SetDefault("traefik.port", 80)
 
-	viper.SetDefault("consul.enable", false)
-	viper.SetDefault("consul.host", "consul")
-	viper.SetDefault("consul.port", 8500)
-
-	viper.SetDefault("data.action", "mqtt")
+	//viper.SetDefault("log.level", "INFO")
+	viper.SetDefault("host", "traefik")
+	viper.SetDefault("port", 80)
 
 	viper.SetDefault("mqtt.host", "mqtt")
 	viper.SetDefault("mqtt.port", 1883)
@@ -131,177 +125,59 @@ func init() {
 
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
-	viper.SetConfigType("ini")
+	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./etc/")
 	if err := viper.ReadInConfig(); err != nil {
 		log.Println("读取配置,", err.Error())
 		os.Exit(1)
 	}
-	logInit()
 }
 
 // NewDG 创建DG
 func NewApp() App {
 	var (
+		host        = viper.GetString("host")
+		port        = viper.GetInt("port")
+		ak          = viper.GetString("credentials.ak")
+		sk          = viper.GetString("credentials.sk")
 		driverId    = viper.GetString("driver.id")
 		driverName  = viper.GetString("driver.name")
-		serviceID   = viper.GetString("service.id")
-		serviceName = viper.GetString("service.name")
-		distributed = viper.GetString("data.distributed")
+		distributed = viper.GetString("driver.distributed")
+		sendMethod  = viper.GetString("driver.sendMethod")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
 	}
-	if serviceName == "" {
-		panic("服务name不能为空")
-	}
-
-	if serviceID == "" {
-		serviceID = fmt.Sprintf("%s_%s", serviceName, GetRandomString(8))
-	}
 	a := new(app)
+	a.Logger = logger.NewLogger(logrus.InfoLevel)
+	a.Logger.Infoln(1, ak)
+	a.distributed = distributed
 	a.driverId = driverId
 	a.driverName = driverName
-	a.serviceId = serviceID
-	a.serviceName = serviceName
-	a.distributed = distributed
-	a.traefikAddress = fmt.Sprintf("%s:%d", viper.GetString("traefik.host"), viper.GetInt("traefik.port"))
-	a.dataAction = viper.GetString("data.action")
-	a.consulInit()
-	a.mqttInit()
-	a.rabbitInit()
-	return a
-}
-
-func (p *app) consulInit() {
-	if !viper.GetBool("consul.enable") {
-		logrus.Debugln("未注册consul")
-		return
-	}
-	cc := consulApi.DefaultConfig()
-	cc.Address = fmt.Sprintf("%s:%d", viper.GetString("consul.host"), viper.GetInt("consul.port"))
-	client, err := consulApi.NewClient(cc)
+	a.sendMethod = sendMethod
+	a.serviceId = GetRandomString(10)
+	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), ak, sk)
 	if err != nil {
-		panic(fmt.Sprintf("consul客户端初始化,%s", err.Error()))
+		panic(err)
 	}
-	p.consul = client
-	if err := p.register(); err != nil {
-		panic(fmt.Sprintf("注册服务,%s", err.Error()))
-	}
-}
-
-func (p *app) mqttInit() {
-	opts := MQTT.NewClientOptions()
-	var host = viper.GetString("mqtt.host")
-	var port = viper.GetInt("mqtt.port")
-	var username = viper.GetString("mqtt.username")
-	var password = viper.GetString("mqtt.password")
-	var clientID = viper.GetString("mqtt.clientId")
-	if clientID == "" {
-		clientID = p.serviceId
-	}
-	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
-	opts.SetAutoReconnect(true)
-	opts.SetCleanSession(true)
-	opts.SetUsername(username)
-	opts.SetPassword(password)
-	opts.SetConnectTimeout(time.Second * 20)
-	opts.SetKeepAlive(time.Second * 60)
-	opts.SetProtocolVersion(4)
-	opts.SetClientID(clientID)
-	//opts.SetConnectionLostHandler()
-	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
-		if e != nil {
-			logrus.Panic(e)
+	a.mqtt = mqttCli
+	if sendMethod == "rabbit" {
+		rabbitCli, err := rabbit.NewAmqp(viper.GetString("rabbit.host"), viper.GetInt("rabbit.port"), ak, sk, "/")
+		if err != nil {
+			panic(err)
 		}
-	})
-	opts.SetOrderMatters(false)
-	// Start the connection
-	client := MQTT.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		logrus.Panic(token.Error())
+		a.rabbit = rabbitCli
 	}
-	p.mqtt = client
-}
 
-func (p *app) rabbitInit() {
-	if p.dataAction != "rabbit" {
-		return
-	}
-	var (
-		host     = viper.GetString("rabbit.host")
-		port     = viper.GetInt("rabbit.port")
-		username = viper.GetString("rabbit.username")
-		password = viper.GetString("rabbit.password")
-		vhost    = viper.GetString("rabbit.vhost")
-	)
-	var err error
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/%s", username, password, host, port, vhost))
+	wsCli, err := websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, host, port, driverId, driverName, a.serviceId, distributed))
 	if err != nil {
-		logrus.Panic(err)
+		panic(err)
 	}
-	p.rabbit = conn
-}
+	a.ws = wsCli
+	a.api = api.NewClient("http", host, port, ak, sk)
 
-// Register 服务注册
-func (p *app) register() error {
-	var (
-		serviceHost = viper.GetString("service.host")
-		servicePort = viper.GetInt("service.port")
-		serviceTag  = viper.GetString("service.tag")
-	)
-
-	if servicePort == 0 {
-		servicePort = 9000
-	}
-	var err error
-	serviceHost, err = extract(serviceHost)
-	if err != nil {
-		serviceHost = "127.0.0.1"
-	}
-	tags := strings.Split(serviceTag, ",")
-	if len(tags) == 0 {
-		tags = append(tags, "traefik.enable=false", fmt.Sprintf("driver.id=%s", p.driverId), fmt.Sprintf("driver.name=%s", p.driverName))
-	} else {
-		tags = append(tags, fmt.Sprintf("driver.id=%s", p.driverId), fmt.Sprintf("driver.name=%s", p.driverName))
-	}
-	var check = &consulApi.AgentServiceCheck{
-		CheckID:                        p.serviceId,
-		TCP:                            fmt.Sprintf("%s:%d", serviceHost, servicePort),
-		Interval:                       fmt.Sprintf("%v", 10*time.Second),
-		Timeout:                        fmt.Sprintf("%v", 30*time.Second),
-		DeregisterCriticalServiceAfter: fmt.Sprintf("%v", getDeregisterTTL(30*time.Second)),
-	}
-
-	// register the service
-	asr := &consulApi.AgentServiceRegistration{
-		ID:      p.serviceId,
-		Name:    p.serviceName,
-		Tags:    tags,
-		Port:    servicePort,
-		Address: serviceHost,
-		Check:   check,
-	}
-	// Specify consul connect
-	asr.Connect = &consulApi.AgentServiceConnect{
-		Native: true,
-	}
-	if err := p.consul.Agent().ServiceRegister(asr); err != nil {
-		return err
-	}
-	return p.consul.Agent().CheckDeregister("service:" + p.serviceId)
-}
-
-func (p *app) getConfig() ([]byte, error) {
-	res, err := resty.R().Get(fmt.Sprintf("http://%s/driver/driver/%s/%s/config", p.traefikAddress, p.driverId, p.serviceId))
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode() == http.StatusOK {
-		return res.Body(), nil
-	}
-	return nil, fmt.Errorf("请求状态:%d,响应:%s", res.StatusCode(), res.String())
+	return a
 }
 
 // Start 开始服务
@@ -311,36 +187,21 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	for _, handler := range handlers {
 		handler.Start()
 	}
-
-	var c *websocket.Conn
 	go func() {
-		var timeConnect = 0
-		var timeOut = 10
 		for {
-			var err error
-			c, _, err = websocket.DefaultDialer.Dial(fmt.Sprintf(`ws://%s/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.traefikAddress, p.driverId, p.driverName, p.serviceId, p.distributed), nil)
-			if err != nil {
-				timeConnect++
-				if timeConnect > 5 {
-					timeOut = 60
-				}
-				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
-				time.Sleep(time.Second * time.Duration(timeOut))
-				continue
-			}
 			var handler = func() {
 				for {
 					var msg1 = new(wsRequest)
-					err := c.ReadJSON(&msg1)
+					err := p.ws.ReadJSON(&msg1)
 					if err != nil {
-						logrus.Warnln("服务端关闭,", err.Error())
+						p.Logger.Warnln("服务端关闭,", err.Error())
 						return
 					}
 
 					var r result
 					switch msg1.Action {
 					case "start":
-						c, err := p.getConfig()
+						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
@@ -351,7 +212,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							}
 						}
 					case "reload":
-						c, err := p.getConfig()
+						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
@@ -389,16 +250,13 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					default:
 						r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: "未找到执行动作"}}
 					}
-					err = c.WriteJSON(&wsResponse{RequestId: msg1.RequestId, Data: r})
+					err = p.ws.WriteJSON(&wsResponse{RequestId: msg1.RequestId, Data: r})
 					if err != nil {
-						logrus.Warnln("写数据错误,", err.Error())
+						p.Logger.Warnln("写数据错误,", err.Error())
 						return
 					}
 				}
 			}
-			//i = 4
-			timeConnect = 0
-			timeOut = 10
 			handler()
 		}
 	}()
@@ -406,9 +264,9 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		go func() {
 			var c1 []byte
 			for {
-				c, err := p.getConfig()
+				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 				if err != nil {
-					logrus.Warnln("查询配置错误,", err.Error())
+					p.Logger.Warnln("查询配置错误,", err.Error())
 					time.Sleep(time.Second * 5)
 					continue
 				}
@@ -416,42 +274,29 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				break
 			}
 			if err := driver.Start(p, c1); err != nil {
-				logrus.Panic("驱动启动错误,", err.Error())
+				p.Logger.Panic("驱动启动错误,", err.Error())
 			}
 		}()
 	}
 	sig := <-ch
-	p.stop()
-	if c != nil {
-		if err := c.Close(); err != nil {
-			logrus.Warnln("关闭TCP连接,", err.Error())
-		}
-	}
 	close(ch)
 	if err := driver.Stop(p); err != nil {
-		logrus.Warnln("驱动停止,", err.Error())
+		p.Logger.Warnln("驱动停止,", err.Error())
 	}
+	p.stop()
 	for _, handler := range handlers {
 		handler.Stop()
 	}
-	logrus.Debugln("关闭服务,", sig)
+	p.Logger.Debugln("关闭服务,", sig)
 	os.Exit(0)
 }
 
 // Stop 服务停止
 func (p *app) stop() {
-	if p.mqtt != nil {
-		p.mqtt.Disconnect(250)
-	}
-	if p.rabbit != nil && !p.rabbit.IsClosed() {
-		if err := p.rabbit.Close(); err != nil {
-			logrus.Errorln("关闭MQ错误,", err.Error())
-		}
-	}
-	if viper.GetBool("consul.enable") {
-		if err := p.consul.Agent().ServiceDeregister(p.serviceId); err != nil {
-			logrus.Errorln("注销服务错误,", err.Error())
-		}
+	p.ws.Close()
+	p.mqtt.Close()
+	if p.sendMethod == "rabbit" {
+		p.rabbit.Close()
 	}
 }
 
@@ -476,7 +321,7 @@ func (p *app) WritePoints(point Point) error {
 
 		tag, val, err := p.ConvertValue(field.Tag, field.Value)
 		if err != nil {
-			logrus.Warnln("转换值错误,", err)
+			p.Logger.Warnln("转换值错误,", err)
 			continue
 		}
 
@@ -496,32 +341,11 @@ func (p *app) WritePoints(point Point) error {
 	if err != nil {
 		return err
 	}
-	if p.dataAction == "rabbit" {
-		ch, err := p.rabbit.Channel()
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := ch.Close(); err != nil {
-				logrus.Warnln("关闭管道,", err.Error())
-			}
-		}()
-		return ch.Publish(
-			"data",                            // exchange
-			fmt.Sprintf("data.%s", point.Uid), // routing key
-			false,                             // mandatory
-			false,
-			amqp.Publishing{
-				DeliveryMode: amqp.Transient,
-				ContentType:  "text/plain",
-				Body:         b,
-			})
+	if p.sendMethod == "rabbit" {
+		return p.rabbit.Send("data", fmt.Sprintf("data.%s", point.Uid), b)
 	} else {
-		if token := p.mqtt.Publish(fmt.Sprintf("data/%s", point.Uid), 0, false, string(b)); token.Wait() && token.Error() != nil {
-			return token.Error()
-		}
+		return p.mqtt.Send(fmt.Sprintf("data/%s", point.Uid), string(b))
 	}
-	return nil
 }
 
 // LogDebug 写日志数据

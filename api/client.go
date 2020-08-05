@@ -503,3 +503,21 @@ func (p *client) ReplaceUserById(id string, data, result interface{}) error {
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
 	return p.Put(u, data, result)
 }
+
+func (p *client) DriverConfig(driverId, serviceId string) ([]byte, error) {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
+	p.checkToken()
+	resp, err := resty.New().SetTimeout(time.Minute*1).R().
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Authorization", p.Token).
+		Get(u.String())
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() == 200 {
+		return resp.Body(), nil
+	}
+	return nil, fmt.Errorf("请求状态:%d,响应:%s", resp.StatusCode(), resp.String())
+}

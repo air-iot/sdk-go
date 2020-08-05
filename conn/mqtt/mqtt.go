@@ -9,11 +9,10 @@ import (
 )
 
 type Mqtt struct {
-	client MQTT.Client
+	MQTT.Client
 }
 
 func NewMqtt(host string, port int, username, password string) (*Mqtt, error) {
-	mqtt := new(Mqtt)
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker(fmt.Sprintf("tcp://%s:%d", host, port))
 	opts.SetAutoReconnect(true)
@@ -34,19 +33,16 @@ func NewMqtt(host string, port int, username, password string) (*Mqtt, error) {
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, fmt.Errorf("消息队列连接错误,%s", token.Error())
 	}
-	mqtt.client = client
-	return mqtt, nil
+	return &Mqtt{Client: client}, nil
 }
 
 func (p *Mqtt) Close() {
-	if p.client != nil {
-		p.client.Disconnect(250)
-	}
+	p.Client.Disconnect(250)
 }
 
 // Send 发送消息
 func (p *Mqtt) Send(topic, msg string) error {
-	if token := p.client.Publish(topic, 0, false, msg); token.Wait() && token.Error() != nil {
+	if token := p.Client.Publish(topic, 0, false, msg); token.Wait() && token.Error() != nil {
 		return token.Error()
 	}
 	return nil
@@ -54,7 +50,7 @@ func (p *Mqtt) Send(topic, msg string) error {
 
 // Message 订阅并接收消息
 func (p *Mqtt) Message(topic string, handler func(client MQTT.Client, message MQTT.Message)) error {
-	if token := p.client.Subscribe(topic, 0, func(client MQTT.Client, message MQTT.Message) {
+	if token := p.Client.Subscribe(topic, 0, func(client MQTT.Client, message MQTT.Message) {
 		handler(client, message)
 	}); token.Wait() && token.Error() != nil {
 		return token.Error()

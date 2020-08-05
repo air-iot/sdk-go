@@ -1,0 +1,13 @@
+host: iot.tmis.top
+port: 8010
+
+credentials:
+  ak: e002250f-1ee4-6bfe-8596-f9989d379db9
+  sk: b3e573ba-cb33-bcfe-1d09-ad4ee010a2bc
+
+mqtt:
+  host: iot.tmis.top
+
+driver:
+  id: test
+  name: test
