@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"github.com/air-iot/sdk-go/driver"
-	"log"
 	"math/rand"
+	"time"
 )
 
 type (
@@ -41,11 +41,11 @@ type TestDriver struct{}
 
 // Start 驱动执行，实现Driver的Start函数
 func (p *TestDriver) Start(a driver.App, models []byte) error {
-	log.Println("start", string(models))
+	a.GetLogger().Debugln("start")
 	ms := config{}
 	err := json.Unmarshal(models, &ms)
 	if err != nil {
-		log.Println(err)
+		a.GetLogger().Errorln(err)
 		return err
 	}
 	for _, m1 := range ms {
@@ -67,21 +67,21 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 				//fields[t1.ID] = rand.Intn(100)
 				fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
 			}
-			//for i := 0; i < 20000; i++ {
-			//	point := sdk.Point{
-			//		Uid:      n1.Uid,
-			//		ModelId:  m1.ID,
-			//		NodeId:   n1.ID,
-			//		Fields:   fields,
-			//		UnixTime: time.Now().UnixNano()/10e6,
-			//	}
-			//	if err := a.WritePoints(point); err != nil {
-			//		//a.LogError(n1.Uid, "写数据错误")
-			//		logrus.Errorln("写数据,", err)
-			//	}
-			//	logrus.Debugf("%d 写数据成功,%+v", i, point)
-			//	time.Sleep(time.Millisecond)
-			//}
+			for i := 0; i < 100; i++ {
+				point := driver.Point{
+					Uid:      n1.Uid,
+					ModelId:  m1.ID,
+					NodeId:   n1.ID,
+					Fields:   fields,
+					UnixTime: time.Now().UnixNano() / 10e6,
+				}
+				if err := a.WritePoints(point); err != nil {
+					//a.LogError(n1.Uid, "写数据错误")
+					a.GetLogger().Errorln("写数据,", err)
+				}
+				//logrus.Debugf("%d 写数据成功,%+v", i, point)
+				time.Sleep(time.Second)
+			}
 
 		}
 	}
@@ -90,22 +90,23 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 
 // Reload 驱动重启，实现Driver的Reload函数
 func (p *TestDriver) Reload(a driver.App, models []byte) error {
-	return p.Start(a, models)
+	a.GetLogger().Debugln("Reload")
+	return nil
 }
 
 // Run 执行指令，实现Driver的Run函数
 func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) error {
-	log.Println("run", deviceID, string(cmd))
+	a.GetLogger().Debugln("run", deviceID, string(cmd))
 	return nil
 }
 
 func (p *TestDriver) Debug(a driver.App, b []byte) (interface{}, error) {
-	log.Println("debug", string(b))
+	a.GetLogger().Debugln("debug", string(b))
 	return []int{1, 2, 3}, nil
 }
 
 func (p *TestDriver) Stop(a driver.App) error {
-	log.Println("stop")
+	a.GetLogger().Debugln("stop")
 	return nil
 }
 

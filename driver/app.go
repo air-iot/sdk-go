@@ -3,7 +3,6 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"github.com/air-iot/sdk-go/logger"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +19,8 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+
+	"github.com/air-iot/sdk-go/logger"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -31,6 +32,7 @@ type App interface {
 	LogInfo(uid string, msg interface{})
 	LogWarn(uid string, msg interface{})
 	LogError(uid string, msg interface{})
+	GetLogger() *logrus.Logger
 	ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
 }
 
@@ -109,7 +111,7 @@ type resultMsg struct {
 
 func init() {
 
-	//viper.SetDefault("log.level", "INFO")
+	viper.SetDefault("log.level", "INFO")
 	viper.SetDefault("host", "traefik")
 	viper.SetDefault("port", 80)
 
@@ -145,12 +147,13 @@ func NewApp() App {
 		driverName  = viper.GetString("driver.name")
 		distributed = viper.GetString("driver.distributed")
 		sendMethod  = viper.GetString("driver.sendMethod")
+		logLevel    = viper.GetString("log.level")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
 	}
 	a := new(app)
-	a.Logger = logger.NewLogger(logrus.InfoLevel)
+	a.Logger = logger.NewLogger(logLevel)
 	a.Logger.Infoln(1, ak)
 	a.distributed = distributed
 	a.driverId = driverId
@@ -291,6 +294,11 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	os.Exit(0)
 }
 
+// GetLogger 获取日志
+func (p *app) GetLogger() *logrus.Logger {
+	return p.Logger
+}
+
 // Stop 服务停止
 func (p *app) stop() {
 	p.ws.Close()
@@ -336,11 +344,11 @@ func (p *app) WritePoints(point Point) error {
 	if len(fields) == 0 {
 		return errors.New("数据点为空值")
 	}
-
 	b, err := json.Marshal(&pointTmp{Uid: point.Uid, ModelId: point.ModelId, NodeId: point.NodeId, UnixTime: point.UnixTime, Fields: fields})
 	if err != nil {
 		return err
 	}
+	p.Logger.Debugf("保存数据,%s", string(b))
 	if p.sendMethod == "rabbit" {
 		return p.rabbit.Send("data", fmt.Sprintf("data.%s", point.Uid), b)
 	} else {

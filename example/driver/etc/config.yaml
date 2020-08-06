@@ -11,3 +11,6 @@ mqtt:
 driver:
   id: test
   name: test
+
+log:
+  level: debug
