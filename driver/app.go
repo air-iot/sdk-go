@@ -33,7 +33,7 @@ type App interface {
 	LogWarn(uid string, msg interface{})
 	LogError(uid string, msg interface{})
 	GetLogger() *logrus.Logger
-	ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
+	//ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
 }
 
 type Driver interface {
@@ -42,6 +42,7 @@ type Driver interface {
 	Run(App, string, []byte) error
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
+	Schema() string
 }
 
 type Handler interface {
@@ -63,17 +64,19 @@ type app struct {
 	distributed string
 }
 
+// 存储数据
 type Point struct {
-	Uid      string  `json:"uid"`
-	ModelId  string  `json:"modelId"`
-	NodeId   string  `json:"nodeId"`
-	Fields   []Field `json:"fields"`
-	UnixTime int64   `json:"time"`
+	Uid      string  `json:"uid"`     // 设备编号
+	ModelId  string  `json:"modelId"` // 模型id
+	NodeId   string  `json:"nodeId"`  // 资产id
+	Fields   []Field `json:"fields"`  // 数据点
+	UnixTime int64   `json:"time"`    // 数据采集时间 毫秒数
 }
 
+// 字段
 type Field struct {
-	Tag   interface{} `json:"tag"`
-	Value interface{} `json:"value"`
+	Tag   interface{} `json:"tag"`   // 数据点
+	Value interface{} `json:"value"` // 数据采集值
 }
 
 type pointTmp struct {

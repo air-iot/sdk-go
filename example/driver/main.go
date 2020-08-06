@@ -88,6 +88,10 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 	return nil
 }
 
+func (p *TestDriver) Schema() string {
+	return ""
+}
+
 // Reload 驱动重启，实现Driver的Reload函数
 func (p *TestDriver) Reload(a driver.App, models []byte) error {
 	a.GetLogger().Debugln("Reload")
