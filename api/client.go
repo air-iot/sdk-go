@@ -504,6 +504,59 @@ func (p *client) ReplaceUserById(id string, data, result interface{}) error {
 	return p.Put(u, data, result)
 }
 
+func (p *client) FindWarnQuery(archive bool, query, result interface{}) error {
+	b, err := json.Marshal(query)
+	if err != nil {
+		return err
+	}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "warning/warning"}
+	v := url.Values{}
+	v.Set("query", string(b))
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) FindWarnById(id string, archive bool, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	v := url.Values{}
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Get(u, result)
+}
+
+func (p *client) SaveWarn(data, archive bool, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "warning/warning"}
+	v := url.Values{}
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Post(u, data, result)
+}
+
+func (p *client) DelWarnById(id string, archive bool, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	v := url.Values{}
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Delete(u, result)
+}
+
+func (p *client) UpdateWarnById(id string, archive bool, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	v := url.Values{}
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Patch(u, data, result)
+}
+
+func (p *client) ReplaceWarnById(id string, archive bool, data, result interface{}) error {
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	v := url.Values{}
+	v.Set("archive", strconv.FormatBool(archive))
+	u.RawQuery = v.Encode()
+	return p.Put(u, data, result)
+}
+
 func (p *client) DriverConfig(driverId, serviceId string) ([]byte, error) {
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
 	p.checkToken()
