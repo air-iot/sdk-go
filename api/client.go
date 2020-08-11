@@ -559,10 +559,10 @@ func (p *client) ReplaceWarnById(id string, archive bool, data, result interface
 
 func (p *client) DriverConfig(driverId, serviceId string) ([]byte, error) {
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
-	p.checkToken()
+	// p.checkToken()
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
-		SetHeader("Authorization", p.Token).
+		// SetHeader("Authorization", p.Token).
 		Get(u.String())
 
 	if err != nil {
