@@ -1,9 +1,8 @@
 package api
 
 import (
-	"net/url"
-
 	jsoniter "github.com/json-iterator/go"
+	"net/url"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -85,6 +84,14 @@ type Client interface {
 	PostLatest(data interface{}) (result []RealTimeData, err error)
 	GetQuery(query interface{}) (result *QueryData, err error)
 	PostQuery(query interface{}) (result *QueryData, err error)
+
+	// 报警
+	FindWarnQuery(archive bool, query, result interface{}) error
+	FindWarnById(id string, archive bool, result interface{}) error
+	SaveWarn(data, archive bool, result interface{}) error
+	DelWarnById(id string, archive bool, result interface{}) error
+	UpdateWarnById(id string, archive bool, data, result interface{}) error
+	ReplaceWarnById(id string, archive bool, data, result interface{}) error
 
 	// driver
 	ChangeCommand(id string, data, result interface{}) error
