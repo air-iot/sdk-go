@@ -41,7 +41,7 @@ type TestDriver struct{}
 
 // Start 驱动执行，实现Driver的Start函数
 func (p *TestDriver) Start(a driver.App, models []byte) error {
-	a.GetLogger().Debugln("start")
+	a.GetLogger().Debugln("start", string(models))
 	ms := config{}
 	err := json.Unmarshal(models, &ms)
 	if err != nil {
@@ -59,12 +59,12 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 			fields := make([]driver.Field, 0)
 			if m1.Device.Tags != nil {
 				for _, t1 := range m1.Device.Tags {
-					//fields[t1.ID] = rand.Intn(100)
+					// fields[t1.ID] = rand.Intn(100)
 					fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
 				}
 			}
 			for _, t1 := range n1.Device.Tags {
-				//fields[t1.ID] = rand.Intn(100)
+				// fields[t1.ID] = rand.Intn(100)
 				fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
 			}
 			for i := 0; i < 100; i++ {
@@ -76,10 +76,10 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 					UnixTime: time.Now().UnixNano() / 10e6,
 				}
 				if err := a.WritePoints(point); err != nil {
-					//a.LogError(n1.Uid, "写数据错误")
+					// a.LogError(n1.Uid, "写数据错误")
 					a.GetLogger().Errorln("写数据,", err)
 				}
-				//logrus.Debugf("%d 写数据成功,%+v", i, point)
+				// logrus.Debugf("%d 写数据成功,%+v", i, point)
 				time.Sleep(time.Second)
 			}
 
