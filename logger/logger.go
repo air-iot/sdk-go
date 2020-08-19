@@ -1,26 +1,17 @@
 package logger
 
 import (
-	"os"
-	"strings"
-
 	"github.com/sirupsen/logrus"
+	"os"
 )
-
-var levelMap = map[string]logrus.Level{
-	"DEBUG": logrus.DebugLevel,
-	"INFO":  logrus.InfoLevel,
-	"WARN":  logrus.WarnLevel,
-	"ERROR": logrus.ErrorLevel,
-}
 
 func NewLogger(level string) *logrus.Logger {
 	logger := logrus.New()
 	logger.SetOutput(os.Stdout)
-	logLevel, ok := levelMap[strings.ToUpper(level)]
-	if !ok {
-		logLevel = logrus.InfoLevel
+	l, err := logrus.ParseLevel(level)
+	if err != nil {
+		l = logrus.ErrorLevel
 	}
-	logger.SetLevel(logLevel)
+	logger.SetLevel(l)
 	return logger
 }
