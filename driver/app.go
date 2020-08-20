@@ -33,7 +33,7 @@ type App interface {
 	LogWarn(uid string, msg interface{})
 	LogError(uid string, msg interface{})
 	GetLogger() *logrus.Logger
-	//ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
+	// ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
 }
 
 type Driver interface {
@@ -42,7 +42,7 @@ type Driver interface {
 	Run(App, string, []byte) error
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
-	Schema() string
+	Schema(App) (string, error)
 }
 
 type Handler interface {
@@ -163,7 +163,7 @@ func NewApp() App {
 	a.driverName = driverName
 	a.sendMethod = sendMethod
 	a.serviceId = GetRandomString(10)
-	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), ak, sk)
+	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
 		panic(err)
 	}
@@ -252,6 +252,12 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							} else {
 								r = result{Code: http.StatusOK, Result: r1}
 							}
+						}
+					case "schema":
+						if r1, err := driver.Schema(p); err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+						} else {
+							r = result{Code: http.StatusOK, Result: r1}
 						}
 					default:
 						r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: "未找到执行动作"}}

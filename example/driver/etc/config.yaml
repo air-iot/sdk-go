@@ -10,8 +10,8 @@ mqtt:
   port: 1883
 
 driver:
-  id: hik-resource
-  name: hik
+  id: test
+  name: test
 
 log:
   level: debug

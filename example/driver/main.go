@@ -88,8 +88,8 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 	return nil
 }
 
-func (p *TestDriver) Schema() string {
-	return ""
+func (p *TestDriver) Schema(a driver.App) (string, error) {
+	return "测试", nil
 }
 
 // Reload 驱动重启，实现Driver的Reload函数
