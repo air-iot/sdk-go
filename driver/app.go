@@ -39,7 +39,7 @@ type App interface {
 type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
-	Run(App, string, []byte) error
+	Run(App, string, []byte) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
 	Schema(App) (string, error)
@@ -236,10 +236,13 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
 							cmdByte, _ := json.Marshal(cmd.Command)
-							if err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
+							if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
-								r = result{Code: http.StatusOK, Result: resultMsg{"指令写入成功"}}
+								if res1 == nil {
+									res1 = resultMsg{"指令写入成功"}
+								}
+								r = result{Code: http.StatusOK, Result: res1}
 							}
 						}
 					case "debug":

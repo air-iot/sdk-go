@@ -99,9 +99,9 @@ func (p *TestDriver) Reload(a driver.App, models []byte) error {
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) error {
+func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
 	a.GetLogger().Debugln("run", deviceID, string(cmd))
-	return nil
+	return nil, nil
 }
 
 func (p *TestDriver) Debug(a driver.App, b []byte) (interface{}, error) {
