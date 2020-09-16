@@ -62,6 +62,8 @@ type app struct {
 	serviceId   string
 	driverName  string
 	distributed string
+	host        string
+	port        int
 }
 
 // 存储数据
@@ -175,12 +177,8 @@ func NewApp() App {
 		}
 		a.rabbit = rabbitCli
 	}
-
-	wsCli, err := websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, host, port, driverId, driverName, a.serviceId, distributed))
-	if err != nil {
-		panic(err)
-	}
-	a.ws = wsCli
+	a.host = host
+	a.port = port
 	a.api = api.NewClient("http", host, port, ak, sk)
 
 	return a
@@ -194,7 +192,20 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		handler.Start()
 	}
 	go func() {
+		var timeConnect = 0
+		var timeOut = 10
 		for {
+			var err error
+			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.host, p.port, p.driverId, p.driverName, p.serviceId, p.distributed))
+			if err != nil {
+				timeConnect++
+				if timeConnect > 5 {
+					timeOut = 60
+				}
+				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
+				time.Sleep(time.Second * time.Duration(timeOut))
+				continue
+			}
 			var handler = func() {
 				for {
 					var msg1 = new(wsRequest)
@@ -272,6 +283,8 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					}
 				}
 			}
+			timeConnect = 0
+			timeOut = 10
 			handler()
 		}
 	}()
@@ -282,7 +295,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 				if err != nil {
 					p.Logger.Warnln("查询配置错误,", err.Error())
-					time.Sleep(time.Second * 5)
+					time.Sleep(time.Second * 10)
 					continue
 				}
 				c1 = c
@@ -313,7 +326,9 @@ func (p *app) GetLogger() *logrus.Logger {
 
 // Stop 服务停止
 func (p *app) stop() {
-	p.ws.Close()
+	if p.ws != nil {
+		p.ws.Close()
+	}
 	p.mqtt.Close()
 	if p.sendMethod == "rabbit" {
 		p.rabbit.Close()
