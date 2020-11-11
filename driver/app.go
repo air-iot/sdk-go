@@ -450,7 +450,6 @@ func (p *app) LogError(uid string, msg interface{}) {
 
 // ConvertValue 数据点值转换
 func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}, val interface{}, err error) {
-
 	tag = make(map[string]interface{})
 
 	b, err := json.Marshal(tagTemp)
@@ -461,10 +460,8 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	if err != nil {
 		return tag, raw, err
 	}
-
 	var value float64
 	vType := reflect.TypeOf(raw).String()
-
 	switch vType {
 	case "float32", "float64":
 		value = reflect.ValueOf(raw).Float()
@@ -475,7 +472,7 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	default:
 		return tag, raw, nil
 	}
-
+	var rawTmp = value
 	const (
 		minValueKey = "minValue"
 		maxValueKey = "maxValue"
@@ -483,7 +480,6 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 		maxRawKey   = "maxRaw"
 	)
 
-	// let { minValue, maxValue, minRaw, maxRaw }
 	tagValue := make(map[string]float64)
 	if val, ok := tag["tagValue"]; ok {
 		if tagValueMap, ok := val.(map[string]interface{}); ok {
@@ -493,6 +489,7 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 			p.convertValue(&tagValue, maxRawKey, tagValueMap)
 		}
 	}
+
 	if minRaw, ok := tagValue[minRawKey]; ok && value < minRaw {
 		value = minRaw
 	}
@@ -505,8 +502,9 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	maxValue, ok2 := tagValue[maxValueKey]
 	minRaw, ok3 := tagValue[minRawKey]
 	maxRaw, ok4 := tagValue[maxRawKey]
+
 	if ok1 && ok2 && ok3 && ok4 && (maxRaw != minRaw) {
-		value = (((value - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+		value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
 	}
 
 	if fixed, ok := tag["fixed"]; ok {
