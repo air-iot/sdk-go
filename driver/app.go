@@ -352,7 +352,7 @@ func (p *app) WritePoints(point Point) error {
 		if field.Tag == nil {
 			continue
 		}
-		fmt.Println(1, field.Value)
+
 		tag, val, err := p.ConvertValue(field.Tag, field.Value)
 		if err != nil {
 			p.Logger.Warnln("转换值错误,", err)
