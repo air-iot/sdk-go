@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"reflect"
 	"strconv"
 	"syscall"
 	"time"
@@ -353,7 +352,7 @@ func (p *app) WritePoints(point Point) error {
 		if field.Tag == nil {
 			continue
 		}
-
+		fmt.Println(1, field.Value)
 		tag, val, err := p.ConvertValue(field.Tag, field.Value)
 		if err != nil {
 			p.Logger.Warnln("转换值错误,", err)
@@ -460,15 +459,33 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	if err != nil {
 		return tag, raw, err
 	}
-	var value float64
-	vType := reflect.TypeOf(raw).String()
-	switch vType {
-	case "float32", "float64":
-		value = reflect.ValueOf(raw).Float()
-	case "uint", "uintptr", "uint8", "uint16", "uint32", "uint64":
-		value = float64(reflect.ValueOf(raw).Uint())
-	case "int", "int8", "int16", "int32", "int64":
-		value = float64(reflect.ValueOf(raw).Int())
+	var value float32
+	//vType := reflect.TypeOf(raw).String()
+	switch valueTmp := raw.(type) {
+	case float32:
+		value = valueTmp
+	case float64:
+		value = float32(valueTmp)
+	case uint:
+		value = float32(valueTmp)
+	case uint8:
+		value = float32(valueTmp)
+	case uint16:
+		value = float32(valueTmp)
+	case uint32:
+		value = float32(valueTmp)
+	case uint64:
+		value = float32(valueTmp)
+	case int:
+		value = float32(valueTmp)
+	case int8:
+		value = float32(valueTmp)
+	case int16:
+		value = float32(valueTmp)
+	case int32:
+		value = float32(valueTmp)
+	case int64:
+		value = float32(valueTmp)
 	default:
 		return tag, raw, nil
 	}
@@ -480,7 +497,7 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 		maxRawKey   = "maxRaw"
 	)
 
-	tagValue := make(map[string]float64)
+	tagValue := make(map[string]float32)
 	if val, ok := tag["tagValue"]; ok {
 		if tagValueMap, ok := val.(map[string]interface{}); ok {
 			p.convertValue(&tagValue, minValueKey, tagValueMap)
@@ -509,17 +526,21 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 
 	if fixed, ok := tag["fixed"]; ok {
 		switch val1 := fixed.(type) {
+		case float32:
+			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(int(val1))+"f", value), 64); err == nil {
+				value = float32(n2)
+			}
 		case float64:
 			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(int(val1))+"f", value), 64); err == nil {
-				value = n2
+				value = float32(n2)
 			}
 		case int:
 			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(val1)+"f", value), 64); err == nil {
-				value = n2
+				value = float32(n2)
 			}
 		case string:
 			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+val1+"f", value), 64); err == nil {
-				value = n2
+				value = float32(n2)
 			}
 		}
 
@@ -527,13 +548,15 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 
 	if mod, ok := tag["mod"]; ok {
 		switch val1 := mod.(type) {
-		case float64:
+		case float32:
 			value = value * val1
+		case float64:
+			value = value * float32(val1)
 		case int:
-			value = value * float64(val1)
+			value = value * float32(val1)
 		case string:
 			if v, err := strconv.ParseFloat(val1, 64); err == nil {
-				value = value * v
+				value = value * float32(v)
 			}
 		}
 	}
@@ -541,16 +564,18 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	return tag, value, nil
 }
 
-func (p *app) convertValue(tagValue *map[string]float64, key string, tagValueMap map[string]interface{}) {
+func (p *app) convertValue(tagValue *map[string]float32, key string, tagValueMap map[string]interface{}) {
 	if val, ok := tagValueMap[key]; ok {
 		switch val1 := val.(type) {
-		case float64:
+		case float32:
 			(*tagValue)[key] = val1
+		case float64:
+			(*tagValue)[key] = float32(val1)
 		case int:
-			(*tagValue)[key] = float64(val1)
+			(*tagValue)[key] = float32(val1)
 		case string:
 			if v, err := strconv.ParseFloat(val1, 64); err == nil {
-				(*tagValue)[key] = v
+				(*tagValue)[key] = float32(v)
 			}
 		}
 	}
