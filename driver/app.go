@@ -16,6 +16,7 @@ import (
 	"github.com/air-iot/sdk-go/conn/rabbit"
 	"github.com/air-iot/sdk-go/conn/websocket"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -459,33 +460,33 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	if err != nil {
 		return tag, raw, err
 	}
-	var value float32
+	var value decimal.Decimal
 	//vType := reflect.TypeOf(raw).String()
 	switch valueTmp := raw.(type) {
 	case float32:
-		value = valueTmp
+		value = decimal.NewFromFloat32(valueTmp)
 	case float64:
-		value = float32(valueTmp)
+		value = decimal.NewFromFloat(valueTmp)
 	case uint:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case uint8:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case uint16:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case uint32:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case uint64:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case int:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case int8:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case int16:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(int64(valueTmp))
 	case int32:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt32(valueTmp)
 	case int64:
-		value = float32(valueTmp)
+		value = decimal.NewFromInt(valueTmp)
 	default:
 		return tag, raw, nil
 	}
@@ -497,7 +498,7 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 		maxRawKey   = "maxRaw"
 	)
 
-	tagValue := make(map[string]float32)
+	tagValue := make(map[string]decimal.Decimal)
 	if val, ok := tag["tagValue"]; ok {
 		if tagValueMap, ok := val.(map[string]interface{}); ok {
 			p.convertValue(&tagValue, minValueKey, tagValueMap)
@@ -507,11 +508,11 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 		}
 	}
 
-	if minRaw, ok := tagValue[minRawKey]; ok && value < minRaw {
+	if minRaw, ok := tagValue[minRawKey]; ok && value.LessThan(minRaw) {
 		value = minRaw
 	}
 
-	if maxRaw, ok := tagValue[maxRawKey]; ok && value > maxRaw {
+	if maxRaw, ok := tagValue[maxRawKey]; ok && value.GreaterThan(maxRaw) {
 		value = maxRaw
 	}
 
@@ -520,62 +521,56 @@ func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}
 	minRaw, ok3 := tagValue[minRawKey]
 	maxRaw, ok4 := tagValue[maxRawKey]
 
-	if ok1 && ok2 && ok3 && ok4 && (maxRaw != minRaw) {
-		value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+	if ok1 && ok2 && ok3 && ok4 && !(maxRaw.Equal(minRaw)) {
+		//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+		value = rawTmp.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
 	}
 
 	if fixed, ok := tag["fixed"]; ok {
 		switch val1 := fixed.(type) {
 		case float32:
-			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(int(val1))+"f", value), 64); err == nil {
-				value = float32(n2)
-			}
+			value = value.Round(int32(val1))
 		case float64:
-			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(int(val1))+"f", value), 64); err == nil {
-				value = float32(n2)
-			}
+			value = value.Round(int32(val1))
 		case int:
-			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+strconv.Itoa(val1)+"f", value), 64); err == nil {
-				value = float32(n2)
-			}
+			value = value.Round(int32(val1))
 		case string:
-			if n2, err := strconv.ParseFloat(fmt.Sprintf("%."+val1+"f", value), 64); err == nil {
-				value = float32(n2)
+			if n2, err := strconv.Atoi(val1); err == nil {
+				value = value.Round(int32(n2))
 			}
 		}
-
 	}
 
 	if mod, ok := tag["mod"]; ok {
 		switch val1 := mod.(type) {
 		case float32:
-			value = value * val1
+			value = value.Mul(decimal.NewFromFloat32(val1))
 		case float64:
-			value = value * float32(val1)
+			value = value.Mul(decimal.NewFromFloat(val1))
 		case int:
-			value = value * float32(val1)
+			value = value.Mul(decimal.NewFromInt(int64(val1)))
 		case string:
-			if v, err := strconv.ParseFloat(val1, 64); err == nil {
-				value = value * float32(v)
+			if v, err := decimal.NewFromString(val1); err == nil {
+				value = value.Mul(v)
 			}
 		}
 	}
-
-	return tag, value, nil
+	valTmp, _ := value.Float64()
+	return tag, valTmp, nil
 }
 
-func (p *app) convertValue(tagValue *map[string]float32, key string, tagValueMap map[string]interface{}) {
+func (p *app) convertValue(tagValue *map[string]decimal.Decimal, key string, tagValueMap map[string]interface{}) {
 	if val, ok := tagValueMap[key]; ok {
 		switch val1 := val.(type) {
 		case float32:
-			(*tagValue)[key] = val1
+			(*tagValue)[key] = decimal.NewFromFloat32(val1)
 		case float64:
-			(*tagValue)[key] = float32(val1)
+			(*tagValue)[key] = decimal.NewFromFloat(val1)
 		case int:
-			(*tagValue)[key] = float32(val1)
+			(*tagValue)[key] = decimal.NewFromInt(int64(val1))
 		case string:
 			if v, err := strconv.ParseFloat(val1, 64); err == nil {
-				(*tagValue)[key] = float32(v)
+				(*tagValue)[key] = decimal.NewFromFloat(v)
 			}
 		}
 	}
