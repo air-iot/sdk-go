@@ -55,6 +55,18 @@ func (p *client) findToken() {
 	p.expires = auth.Expires/10e9 + time.Now().Unix()
 }
 
+func (p *client) Host() string {
+	return p.host
+}
+
+func (p *client) AK() string {
+	return p.ak
+}
+
+func (p *client) SK() string {
+	return p.sk
+}
+
 func (p *client) Get(url url.URL, result interface{}) error {
 	p.checkToken()
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().

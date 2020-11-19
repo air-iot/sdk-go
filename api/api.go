@@ -8,6 +8,9 @@ import (
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Client interface {
+	Host() string
+	AK() string
+	SK() string
 	Get(url url.URL, result interface{}) error
 	Post(url url.URL, data, result interface{}) error
 	Delete(url url.URL, result interface{}) error
