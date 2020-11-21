@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
@@ -159,7 +158,6 @@ func NewApp() App {
 	}
 	a := new(app)
 	a.Logger = logger.NewLogger(logLevel)
-	a.Logger.Infoln(1, ak)
 	a.distributed = distributed
 	a.driverId = driverId
 	a.driverName = driverName
@@ -350,22 +348,59 @@ func (p *app) WritePoints(point Point) error {
 	}
 	fields := make(map[string]interface{})
 	for _, field := range point.Fields {
-		if field.Tag == nil {
+		if field.Tag == nil || field.Value == nil {
+			p.Logger.Warnf("资产 [%s] 数据点为空", point.Uid)
 			continue
 		}
-
-		tag, val, err := p.ConvertValue(field.Tag, field.Value)
+		tagByte, err := json.Marshal(field.Tag)
 		if err != nil {
-			p.Logger.Warnln("转换值错误,", err)
+			p.Logger.Warnf("资产 [%s] 数据点序列化错误: %s", point.Uid, err.Error())
 			continue
 		}
 
-		if id1, ok := tag["id"]; ok {
-			if id, ok := id1.(string); ok {
-				fields[id] = val
-			}
+		tag := new(Tag)
+		err = json.Unmarshal(tagByte, tag)
+		if err != nil {
+			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.Uid, err.Error())
+			continue
 		}
 
+		var value decimal.Decimal
+		//vType := reflect.TypeOf(raw).String()
+		switch valueTmp := field.Value.(type) {
+		case float32:
+			value = decimal.NewFromFloat32(valueTmp)
+		case float64:
+			value = decimal.NewFromFloat(valueTmp)
+		case uint:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint8:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint16:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint32:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint64:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int8:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int16:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int32:
+			value = decimal.NewFromInt32(valueTmp)
+		case int64:
+			value = decimal.NewFromInt(valueTmp)
+		default:
+			fields[tag.ID] = field.Value
+			continue
+		}
+
+		val := p.convertRange(tag.Range, p.convertValue(tag, value))
+		if val != nil {
+			fields[tag.ID] = val
+		}
 	}
 
 	if len(fields) == 0 {
@@ -381,6 +416,84 @@ func (p *app) WritePoints(point Point) error {
 	} else {
 		return p.mqtt.Send(fmt.Sprintf("data/%s", point.Uid), string(b))
 	}
+}
+
+// active fixed  boundary  discard
+func (p *app) convertRange(tagRange *Range, raw decimal.Decimal) (val *float64) {
+	value, _ := raw.Float64()
+	if tagRange == nil {
+		return &value
+	}
+	if tagRange.MinValue == nil || tagRange.MaxValue == nil || tagRange.Active == nil {
+		return &value
+	}
+	minValue := decimal.NewFromFloat(*tagRange.MinValue)
+	maxValue := decimal.NewFromFloat(*tagRange.MaxValue)
+
+	if raw.GreaterThanOrEqual(minValue) && raw.LessThanOrEqual(maxValue) {
+		return &value
+	}
+
+	switch *tagRange.Active {
+	case "fixed":
+		if tagRange.FixedValue == nil {
+			return &value
+		}
+		return tagRange.FixedValue
+	case "boundary":
+		if raw.LessThan(minValue) {
+			return tagRange.MinValue
+		}
+		if raw.GreaterThan(maxValue) {
+			return tagRange.MaxValue
+		}
+	case "discard":
+		return nil
+	default:
+		return &value
+	}
+	return &value
+}
+
+// ConvertValue 数据点值转换
+func (p *app) convertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
+	var value = raw
+	if tagTemp.TagValue != nil {
+		if tagTemp.TagValue.MinRaw != nil {
+			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
+			if value.LessThan(minRaw) {
+				value = minRaw
+			}
+		}
+
+		if tagTemp.TagValue.MaxRaw != nil {
+			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
+			if value.GreaterThan(maxRaw) {
+				value = maxRaw
+			}
+		}
+
+		if tagTemp.TagValue.MinRaw != nil && tagTemp.TagValue.MaxRaw != nil && tagTemp.TagValue.MinValue != nil && tagTemp.TagValue.MaxValue != nil {
+			//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
+			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
+			minValue := decimal.NewFromFloat(*tagTemp.TagValue.MinValue)
+			maxValue := decimal.NewFromFloat(*tagTemp.TagValue.MaxValue)
+			if !maxRaw.Equal(minRaw) {
+				value = raw.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
+			}
+		}
+	}
+
+	if tagTemp.Fixed != nil {
+		value = value.Round(*tagTemp.Fixed)
+	}
+
+	if tagTemp.Mod != nil {
+		value = value.Mul(decimal.NewFromFloat(*tagTemp.Mod))
+	}
+
+	return value
 }
 
 // LogDebug 写日志数据
@@ -445,133 +558,5 @@ func (p *app) LogError(uid string, msg interface{}) {
 	err = p.send("logs/error/"+uid, b)
 	if err != nil {
 		return
-	}
-}
-
-// ConvertValue 数据点值转换
-func (p *app) ConvertValue(tagTemp, raw interface{}) (tag map[string]interface{}, val interface{}, err error) {
-	tag = make(map[string]interface{})
-
-	b, err := json.Marshal(tagTemp)
-	if err != nil {
-		return tag, raw, err
-	}
-	err = json.Unmarshal(b, &tag)
-	if err != nil {
-		return tag, raw, err
-	}
-	var value decimal.Decimal
-	//vType := reflect.TypeOf(raw).String()
-	switch valueTmp := raw.(type) {
-	case float32:
-		value = decimal.NewFromFloat32(valueTmp)
-	case float64:
-		value = decimal.NewFromFloat(valueTmp)
-	case uint:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case uint8:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case uint16:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case uint32:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case uint64:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case int:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case int8:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case int16:
-		value = decimal.NewFromInt(int64(valueTmp))
-	case int32:
-		value = decimal.NewFromInt32(valueTmp)
-	case int64:
-		value = decimal.NewFromInt(valueTmp)
-	default:
-		return tag, raw, nil
-	}
-	var rawTmp = value
-	const (
-		minValueKey = "minValue"
-		maxValueKey = "maxValue"
-		minRawKey   = "minRaw"
-		maxRawKey   = "maxRaw"
-	)
-
-	tagValue := make(map[string]decimal.Decimal)
-	if val, ok := tag["tagValue"]; ok {
-		if tagValueMap, ok := val.(map[string]interface{}); ok {
-			p.convertValue(&tagValue, minValueKey, tagValueMap)
-			p.convertValue(&tagValue, maxValueKey, tagValueMap)
-			p.convertValue(&tagValue, minRawKey, tagValueMap)
-			p.convertValue(&tagValue, maxRawKey, tagValueMap)
-		}
-	}
-
-	if minRaw, ok := tagValue[minRawKey]; ok && value.LessThan(minRaw) {
-		value = minRaw
-	}
-
-	if maxRaw, ok := tagValue[maxRawKey]; ok && value.GreaterThan(maxRaw) {
-		value = maxRaw
-	}
-
-	minValue, ok1 := tagValue[minValueKey]
-	maxValue, ok2 := tagValue[maxValueKey]
-	minRaw, ok3 := tagValue[minRawKey]
-	maxRaw, ok4 := tagValue[maxRawKey]
-
-	if ok1 && ok2 && ok3 && ok4 && !(maxRaw.Equal(minRaw)) {
-		//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
-		value = rawTmp.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
-	}
-
-	if fixed, ok := tag["fixed"]; ok {
-		switch val1 := fixed.(type) {
-		case float32:
-			value = value.Round(int32(val1))
-		case float64:
-			value = value.Round(int32(val1))
-		case int:
-			value = value.Round(int32(val1))
-		case string:
-			if n2, err := strconv.Atoi(val1); err == nil {
-				value = value.Round(int32(n2))
-			}
-		}
-	}
-
-	if mod, ok := tag["mod"]; ok {
-		switch val1 := mod.(type) {
-		case float32:
-			value = value.Mul(decimal.NewFromFloat32(val1))
-		case float64:
-			value = value.Mul(decimal.NewFromFloat(val1))
-		case int:
-			value = value.Mul(decimal.NewFromInt(int64(val1)))
-		case string:
-			if v, err := decimal.NewFromString(val1); err == nil {
-				value = value.Mul(v)
-			}
-		}
-	}
-	valTmp, _ := value.Float64()
-	return tag, valTmp, nil
-}
-
-func (p *app) convertValue(tagValue *map[string]decimal.Decimal, key string, tagValueMap map[string]interface{}) {
-	if val, ok := tagValueMap[key]; ok {
-		switch val1 := val.(type) {
-		case float32:
-			(*tagValue)[key] = decimal.NewFromFloat32(val1)
-		case float64:
-			(*tagValue)[key] = decimal.NewFromFloat(val1)
-		case int:
-			(*tagValue)[key] = decimal.NewFromInt(int64(val1))
-		case string:
-			if v, err := strconv.ParseFloat(val1, 64); err == nil {
-				(*tagValue)[key] = decimal.NewFromFloat(v)
-			}
-		}
 	}
 }
