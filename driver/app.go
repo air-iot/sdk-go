@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -114,6 +116,9 @@ type resultMsg struct {
 }
 
 func init() {
+	// 设置随机数种子
+	rand.Seed(time.Now().Unix())
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	viper.SetDefault("log.level", "INFO")
 	viper.SetDefault("host", "traefik")
@@ -162,7 +167,7 @@ func NewApp() App {
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
-	a.serviceId = GetRandomString(10)
+	a.serviceId = GetRandomString(20)
 	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
 		panic(err)
