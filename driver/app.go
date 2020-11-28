@@ -3,7 +3,6 @@ package driver
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -140,8 +139,9 @@ func init() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./etc/")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Println("读取配置,", err.Error())
-		os.Exit(1)
+		//log.Println("读取配置,", err.Error())
+		//os.Exit(1)
+		logrus.Fatalln("读取配置,", err.Error())
 	}
 }
 
@@ -170,13 +170,14 @@ func NewApp() App {
 	a.serviceId = GetRandomString(20)
 	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
-		panic(err)
+		logrus.Fatalln("连接mqtt错误,", err.Error())
 	}
 	a.mqtt = mqttCli
 	if sendMethod == "rabbit" {
 		rabbitCli, err := rabbit.NewAmqp(viper.GetString("rabbit.host"), viper.GetInt("rabbit.port"), ak, sk, "/")
 		if err != nil {
-			panic(err)
+			//panic(err)
+			logrus.Fatalln("连接rabbit错误,", err.Error())
 		}
 		a.rabbit = rabbitCli
 	}
@@ -194,6 +195,8 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	for _, handler := range handlers {
 		handler.Start()
 	}
+	var wsConnected = false
+	var reloadFlag = true
 	go func() {
 		var timeConnect = 0
 		var timeOut = 10
@@ -221,6 +224,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					var r result
 					switch msg1.Action {
 					case "start":
+						reloadFlag = false
 						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
@@ -232,6 +236,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							}
 						}
 					case "reload":
+						reloadFlag = false
 						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
@@ -288,27 +293,35 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			}
 			timeConnect = 0
 			timeOut = 10
+			wsConnected = true
 			handler()
 		}
 	}()
-	if p.distributed == "" {
-		go func() {
-			var c1 []byte
-			for {
+	//if p.distributed == "" {
+	go func() {
+		var c1 = make([]byte, 0)
+		for {
+			if wsConnected {
 				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 				if err != nil {
 					p.Logger.Warnln("查询配置错误,", err.Error())
-					time.Sleep(time.Second * 10)
-					continue
+					//time.Sleep(time.Second * 10)
+					//continue
+				} else {
+					c1 = c
 				}
-				c1 = c
 				break
+			} else {
+				time.Sleep(time.Second * 10)
 			}
+		}
+		if reloadFlag {
 			if err := driver.Start(p, c1); err != nil {
-				p.Logger.Panic("驱动启动错误,", err.Error())
+				p.Logger.Warnln("驱动启动错误,", err.Error())
 			}
-		}()
-	}
+		}
+	}()
+	//}
 	sig := <-ch
 	close(ch)
 	if err := driver.Stop(p); err != nil {
