@@ -196,7 +196,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		handler.Start()
 	}
 	var wsConnected = false
-	var reloadFlag = true
+	var reloadFlag = false
 	go func() {
 		var timeConnect = 0
 		var timeOut = 10
@@ -224,7 +224,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					var r result
 					switch msg1.Action {
 					case "start":
-						reloadFlag = false
+						reloadFlag = true
 						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
@@ -236,7 +236,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							}
 						}
 					case "reload":
-						reloadFlag = false
+						reloadFlag = true
 						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
@@ -315,7 +315,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				time.Sleep(time.Second * 10)
 			}
 		}
-		if reloadFlag {
+		if !reloadFlag {
 			if err := driver.Start(p, c1); err != nil {
 				p.Logger.Warnln("驱动启动错误,", err.Error())
 			}
