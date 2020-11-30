@@ -8,6 +8,7 @@
 package api
 
 import (
+	"encoding/json"
 	"testing"
 )
 

@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -15,15 +16,12 @@ import (
 	"github.com/air-iot/sdk-go/conn/mqtt"
 	"github.com/air-iot/sdk-go/conn/rabbit"
 	"github.com/air-iot/sdk-go/conn/websocket"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
 	"github.com/air-iot/sdk-go/logger"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type App interface {
 	Start(driver Driver, handlers ...Handler)

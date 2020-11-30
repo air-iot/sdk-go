@@ -1,11 +1,8 @@
 package api
 
 import (
-	jsoniter "github.com/json-iterator/go"
 	"net/url"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type Client interface {
 	Host() string
