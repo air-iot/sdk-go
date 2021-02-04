@@ -55,7 +55,7 @@ type app struct {
 	mqtt        *mqtt.Mqtt
 	rabbit      *rabbit.Amqp
 	ws          *websocket.Conn
-	api         api.Client
+	Api         api.Client
 	driverId    string
 	serviceId   string
 	driverName  string
@@ -181,7 +181,7 @@ func NewApp() App {
 	}
 	a.host = host
 	a.port = port
-	a.api = api.NewClient("http", host, port, ak, sk)
+	a.Api = api.NewClient("http", host, port, ak, sk)
 
 	return a
 }
@@ -223,7 +223,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					switch msg1.Action {
 					case "start":
 						reloadFlag = true
-						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
+						c, err := p.Api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
@@ -235,7 +235,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "reload":
 						reloadFlag = true
-						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
+						c, err := p.Api.DriverConfig(p.driverId, p.serviceId)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
@@ -300,7 +300,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		var c1 = make([]byte, 0)
 		for {
 			if wsConnected {
-				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
+				c, err := p.Api.DriverConfig(p.driverId, p.serviceId)
 				if err != nil {
 					p.Logger.Warnln("查询配置错误,", err.Error())
 					//time.Sleep(time.Second * 10)
