@@ -10,7 +10,6 @@ func TestApp_WritePoints(t *testing.T) {
 	viper.Set("mqtt.host", "127.0.0.1")
 	viper.Set("driver.id", "test")
 	viper.Set("driver.name", "test")
-
 	var minValue float64 = 10
 	var MaxValue float64 = 100
 	//var MinRaw float64 = 200
