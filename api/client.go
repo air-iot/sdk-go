@@ -92,6 +92,7 @@ func (p *client) Post(url url.URL, data, result interface{}) error {
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
+		SetHeader("Request-Type", "service").
 		SetResult(result).
 		SetBody(data).
 		Post(url.String())
