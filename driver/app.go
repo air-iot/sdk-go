@@ -299,10 +299,10 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		for {
 			if wsConnected {
 				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
-				if err != nil {
+				if err != nil || len(c) == 0 {
 					p.Logger.Warnln("查询配置错误,", err.Error())
-					//time.Sleep(time.Second * 10)
-					//continue
+					time.Sleep(time.Second * 10)
+					continue
 				} else {
 					c1 = c
 				}
