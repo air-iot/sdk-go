@@ -19,9 +19,8 @@ func TestApp_WritePoints(t *testing.T) {
 	var FixedS = "boundary"
 
 	point := Point{
-		Uid:     "b1",
-		ModelId: "5fb887123ab8daa563692579",
-		NodeId:  "5fb8874b3ab8daa56369257d",
+		ID:        "b1",
+		ProjectID: "default",
 		Fields: []Field{
 			{Tag: Tag{
 				ID:       "p1",

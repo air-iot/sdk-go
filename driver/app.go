@@ -49,7 +49,7 @@ type Handler interface {
 	Stop()
 }
 
-// DG 数据采集类
+// app 数据采集类
 type app struct {
 	*logrus.Logger
 	sendMethod  string
@@ -65,25 +65,22 @@ type app struct {
 	port        int
 }
 
-// 存储数据
+// Point 存储数据
 type Point struct {
-	Uid      string  `json:"uid"`     // 设备编号
-	ModelId  string  `json:"modelId"` // 模型id
-	NodeId   string  `json:"nodeId"`  // 资产id
-	Fields   []Field `json:"fields"`  // 数据点
-	UnixTime int64   `json:"time"`    // 数据采集时间 毫秒数
+	ProjectID string  `json:"project"`
+	ID        string  `json:"id"`     // 设备编号
+	Fields    []Field `json:"fields"` // 数据点
+	UnixTime  int64   `json:"time"`   // 数据采集时间 毫秒数
 }
 
-// 字段
+// Field 字段
 type Field struct {
 	Tag   interface{} `json:"tag"`   // 数据点
 	Value interface{} `json:"value"` // 数据采集值
 }
 
 type pointTmp struct {
-	Uid      string                 `json:"uid"`
-	ModelId  string                 `json:"modelId"`
-	NodeId   string                 `json:"nodeId"`
+	ID       string                 `json:"id"`
 	Fields   map[string]interface{} `json:"fields"`
 	UnixTime int64                  `json:"time"`
 }
@@ -144,7 +141,7 @@ func init() {
 	}
 }
 
-// NewDG 创建DG
+// NewApp 创建App
 func NewApp() App {
 	var (
 		host        = viper.GetString("host")
@@ -360,25 +357,25 @@ func (p *app) send(topic string, b []byte) error {
 
 // WritePoints 写数据点数据
 func (p *app) WritePoints(point Point) error {
-	if point.Uid == "" || point.NodeId == "" || point.ModelId == "" || point.Fields == nil || len(point.Fields) == 0 {
+	if point.ProjectID == "" || point.ID == "" || point.Fields == nil || len(point.Fields) == 0 {
 		return errors.New("数据有空值")
 	}
 	fields := make(map[string]interface{})
 	for _, field := range point.Fields {
 		if field.Tag == nil || field.Value == nil {
-			p.Logger.Warnf("资产 [%s] 数据点为空", point.Uid)
+			p.Logger.Warnf("资产 [%s] 数据点为空", point.ID)
 			continue
 		}
 		tagByte, err := json.Marshal(field.Tag)
 		if err != nil {
-			p.Logger.Warnf("资产 [%s] 数据点序列化错误: %s", point.Uid, err.Error())
+			p.Logger.Warnf("资产 [%s] 数据点序列化错误: %s", point.ID, err.Error())
 			continue
 		}
 
 		tag := new(Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
-			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.Uid, err.Error())
+			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())
 			continue
 		}
 
@@ -423,15 +420,15 @@ func (p *app) WritePoints(point Point) error {
 	if len(fields) == 0 {
 		return errors.New("数据点为空值")
 	}
-	b, err := json.Marshal(&pointTmp{Uid: point.Uid, ModelId: point.ModelId, NodeId: point.NodeId, UnixTime: point.UnixTime, Fields: fields})
+	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields})
 	if err != nil {
 		return err
 	}
 	p.Logger.Debugf("保存数据,%s", string(b))
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("data", fmt.Sprintf("data.%s", point.Uid), b)
+		return p.rabbit.Send("data", fmt.Sprintf("data.%s.%s", point.ProjectID, point.ID), b)
 	} else {
-		return p.mqtt.Send(fmt.Sprintf("data/%s", point.Uid), string(b))
+		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", point.ProjectID, point.ID), string(b))
 	}
 }
 
@@ -513,7 +510,7 @@ func (p *app) convertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decim
 	return value
 }
 
-// LogDebug 写日志数据
+// Log 写日志数据
 func (p *app) Log(topic string, msg interface{}) {
 	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 	b, err := json.Marshal(l)
