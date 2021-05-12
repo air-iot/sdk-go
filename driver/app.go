@@ -303,9 +303,16 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			if wsConnected {
 				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 				if err != nil {
-					p.Logger.Warnln("查询配置错误,", err.Error())
-					//time.Sleep(time.Second * 10)
-					//continue
+					p.Logger.Errorln("查询配置错误,", err.Error())
+					time.Sleep(time.Second * 60)
+					continue
+				} else if string(c) == "[]" {
+					if reloadFlag {
+						break
+					}
+					p.Logger.Warnln("查询配置为空")
+					time.Sleep(time.Second * 60)
+					continue
 				} else {
 					c1 = c
 				}
@@ -314,7 +321,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				time.Sleep(time.Second * 10)
 			}
 		}
-		if !reloadFlag {
+		if !reloadFlag && string(c1) != "[]" {
 			if err := driver.Start(p, c1); err != nil {
 				p.Logger.Warnln("驱动启动错误,", err.Error())
 			}
