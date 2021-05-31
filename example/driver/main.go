@@ -69,9 +69,7 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 			}
 			for i := 0; i < 100; i++ {
 				point := driver.Point{
-					Uid:      n1.Uid,
-					ModelId:  m1.ID,
-					NodeId:   n1.ID,
+					ID:       n1.ID,
 					Fields:   fields,
 					UnixTime: time.Now().UnixNano() / 10e6,
 				}
