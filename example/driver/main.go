@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/air-iot/sdk-go/driver"
+	"github.com/sirupsen/logrus"
 	"math/rand"
 	"time"
 )
@@ -57,30 +58,33 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 				continue
 			}
 			fields := make([]driver.Field, 0)
+			fieldType := make(map[string]string)
 			if m1.Device.Tags != nil {
 				for _, t1 := range m1.Device.Tags {
 					// fields[t1.ID] = rand.Intn(100)
 					fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
+					fieldType[t1.ID] = driver.Float
 				}
 			}
 			for _, t1 := range n1.Device.Tags {
 				// fields[t1.ID] = rand.Intn(100)
 				fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
+
 			}
-			for i := 0; i < 100; i++ {
+			for tries := 0; tries < 1000; tries++ {
 				point := driver.Point{
-					ID:       n1.ID,
-					Fields:   fields,
-					UnixTime: time.Now().UnixNano() / 10e6,
+					ID:         n1.ID,
+					Fields:     fields,
+					FieldTypes: fieldType,
+					UnixTime:   time.Now().UnixNano() / 1e6,
 				}
 				if err := a.WritePoints(point); err != nil {
 					// a.LogError(n1.Uid, "写数据错误")
 					a.GetLogger().Errorln("写数据,", err)
 				}
-				// logrus.Debugf("%d 写数据成功,%+v", i, point)
+				logrus.Debugf("写数据成功,%+v", point)
 				time.Sleep(time.Second)
 			}
-
 		}
 	}
 	return nil

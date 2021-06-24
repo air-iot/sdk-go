@@ -1,4 +1,4 @@
-host: 127.0.0.1
+host: localhost
 port: 9000
 
 credentials:
@@ -6,7 +6,7 @@ credentials:
   sk: 958eaf9c-5f01-8afe-18cf-9673052f7958
 
 mqtt:
-  host: iot.tmis.top
+  host: localhost
   port: 1883
 
 driver:

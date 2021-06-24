@@ -19,8 +19,7 @@ func TestApp_WritePoints(t *testing.T) {
 	var FixedS = "boundary"
 
 	point := Point{
-		ID:        "b1",
-		ProjectID: "default",
+		ID: "b1",
 		Fields: []Field{
 			{Tag: Tag{
 				ID:       "p1",

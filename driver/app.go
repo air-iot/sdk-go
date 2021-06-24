@@ -1,9 +1,11 @@
 package driver
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"math/rand"
 	"net/http"
 	"os"
@@ -12,14 +14,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shopspring/decimal"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/air-iot/sdk-go/api"
 	"github.com/air-iot/sdk-go/conn/mqtt"
 	"github.com/air-iot/sdk-go/conn/rabbit"
 	"github.com/air-iot/sdk-go/conn/websocket"
-	"github.com/shopspring/decimal"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/viper"
-
 	"github.com/air-iot/sdk-go/logger"
 )
 
@@ -49,6 +52,13 @@ type Handler interface {
 	Stop()
 }
 
+const (
+	String  = "string"
+	Float   = "float"
+	Integer = "integer"
+	Boolean = "boolean"
+)
+
 // app 数据采集类
 type app struct {
 	*logrus.Logger
@@ -61,16 +71,18 @@ type app struct {
 	serviceId   string
 	driverName  string
 	distributed string
+	projectID   string
 	host        string
 	port        int
 }
 
 // Point 存储数据
 type Point struct {
-	ProjectID string  `json:"project"`
-	ID        string  `json:"id"`     // 设备编号
-	Fields    []Field `json:"fields"` // 数据点
-	UnixTime  int64   `json:"time"`   // 数据采集时间 毫秒数
+	ID       string  `json:"id"`     // 设备编号
+	Fields   []Field `json:"fields"` // 数据点
+	UnixTime int64   `json:"time"`   // 数据采集时间 毫秒数
+	//
+	FieldTypes map[string]string `json:"fieldTypes"` // 数据点类型
 }
 
 // Field 字段
@@ -80,9 +92,10 @@ type Field struct {
 }
 
 type pointTmp struct {
-	ID       string                 `json:"id"`
-	Fields   map[string]interface{} `json:"fields"`
-	UnixTime int64                  `json:"time"`
+	ID         string                 `json:"id"`
+	Fields     map[string]interface{} `json:"fields"`
+	UnixTime   int64                  `json:"time"`
+	FieldTypes map[string]string      `json:"fieldTypes"` // 数据点类型
 }
 
 type wsRequest struct {
@@ -115,6 +128,9 @@ func init() {
 	rand.Seed(time.Now().Unix())
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
+	pflag.String("project", "default", "项目id")
+	pflag.Parse()
+
 	viper.SetDefault("log.level", "INFO")
 	viper.SetDefault("host", "traefik")
 	viper.SetDefault("port", 80)
@@ -134,9 +150,12 @@ func init() {
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./etc/")
+
+	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
+		logrus.Fatalln("读取命令行参数错误,", err.Error())
+	}
+
 	if err := viper.ReadInConfig(); err != nil {
-		//log.Println("读取配置,", err.Error())
-		//os.Exit(1)
 		logrus.Fatalln("读取配置,", err.Error())
 	}
 }
@@ -153,9 +172,13 @@ func NewApp() App {
 		distributed = viper.GetString("driver.distributed")
 		sendMethod  = viper.GetString("driver.sendMethod")
 		logLevel    = viper.GetString("log.level")
+		projectID   = viper.GetString("project")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
+	}
+	if projectID == "" {
+		projectID = "default"
 	}
 	a := new(app)
 	a.Logger = logger.NewLogger(logLevel)
@@ -163,7 +186,9 @@ func NewApp() App {
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
-	a.serviceId = GetRandomString(20)
+	a.serviceId = uuid.New().String()
+	a.projectID = projectID
+	logrus.Infof("项目ID: %s", projectID)
 	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
 		logrus.Fatalln("连接mqtt错误,", err.Error())
@@ -198,7 +223,15 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 		var timeOut = 10
 		for {
 			var err error
-			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.host, p.port, p.driverId, p.driverName, p.serviceId, p.distributed))
+			connMap, _ := json.Marshal(map[string]string{
+				"driverId":    p.driverId,
+				"driverName":  p.driverName,
+				"serviceId":   p.serviceId,
+				"distributed": p.distributed,
+				"projectId":   p.projectID,
+			})
+
+			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?connInfo=%s&format=hex`, p.host, p.port, hex.EncodeToString(connMap)))
 			if err != nil {
 				timeConnect++
 				if timeConnect > 5 {
@@ -261,11 +294,11 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							}
 						}
 					case "debug":
-						debugByte, err := json.Marshal(msg1.Data)
-						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("序列化数据错误,%s", err.Error())}}
+						debugByte, ok := msg1.Data.(string)
+						if !ok {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("数据非字符串")}}
 						} else {
-							if r1, err := driver.Debug(p, debugByte); err != nil {
+							if r1, err := driver.Debug(p, []byte(debugByte)); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								r = result{Code: http.StatusOK, Result: r1}
@@ -364,7 +397,7 @@ func (p *app) send(topic string, b []byte) error {
 
 // WritePoints 写数据点数据
 func (p *app) WritePoints(point Point) error {
-	if point.ProjectID == "" || point.ID == "" || point.Fields == nil || len(point.Fields) == 0 {
+	if point.ID == "" || point.Fields == nil || len(point.Fields) == 0 {
 		return errors.New("数据有空值")
 	}
 	fields := make(map[string]interface{})
@@ -385,7 +418,6 @@ func (p *app) WritePoints(point Point) error {
 			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())
 			continue
 		}
-
 		var value decimal.Decimal
 		//vType := reflect.TypeOf(raw).String()
 		switch valueTmp := field.Value.(type) {
@@ -420,22 +452,31 @@ func (p *app) WritePoints(point Point) error {
 
 		val := p.convertRange(tag.Range, p.convertValue(tag, value))
 		if val != nil {
-			fields[tag.ID] = val
+			if fieldType, ok := point.FieldTypes[tag.ID]; ok {
+				switch fieldType {
+				case Integer:
+					fields[tag.ID] = int(*val)
+				default:
+					fields[tag.ID] = val
+				}
+			} else {
+				fields[tag.ID] = val
+			}
 		}
 	}
 
 	if len(fields) == 0 {
 		return errors.New("数据点为空值")
 	}
-	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields})
+	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
 	if err != nil {
 		return err
 	}
 	p.Logger.Debugf("保存数据,%s", string(b))
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("data", fmt.Sprintf("data.%s.%s", point.ProjectID, point.ID), b)
+		return p.rabbit.Send("data", fmt.Sprintf("data.%s.%s", p.projectID, point.ID), b)
 	} else {
-		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", point.ProjectID, point.ID), string(b))
+		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", p.projectID, point.ID), string(b))
 	}
 }
 
