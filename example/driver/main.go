@@ -63,7 +63,7 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 				for _, t1 := range m1.Device.Tags {
 					// fields[t1.ID] = rand.Intn(100)
 					fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
-					fieldType[t1.ID] = driver.Float
+					fieldType[t1.ID] = driver.Integer
 				}
 			}
 			for _, t1 := range n1.Device.Tags {

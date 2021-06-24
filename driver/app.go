@@ -74,6 +74,7 @@ type app struct {
 	projectID   string
 	host        string
 	port        int
+	stopped     bool
 }
 
 // Point 存储数据
@@ -204,6 +205,7 @@ func NewApp() App {
 	}
 	a.host = host
 	a.port = port
+	a.stopped = false
 	a.api = api.NewClient("http", host, port, ak, sk)
 
 	return a
@@ -211,6 +213,7 @@ func NewApp() App {
 
 // Start 开始服务
 func (p *app) Start(driver Driver, handlers ...Handler) {
+	p.stopped = false
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	for _, handler := range handlers {
@@ -218,10 +221,14 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	}
 	var wsConnected = false
 	var reloadFlag = false
+
 	go func() {
 		var timeConnect = 0
 		var timeOut = 10
 		for {
+			if p.stopped {
+				return
+			}
 			var err error
 			connMap, _ := json.Marshal(map[string]string{
 				"driverId":    p.driverId,
@@ -230,7 +237,6 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				"distributed": p.distributed,
 				"projectId":   p.projectID,
 			})
-
 			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?connInfo=%s&format=hex`, p.host, p.port, hex.EncodeToString(connMap)))
 			if err != nil {
 				timeConnect++
@@ -246,7 +252,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					var msg1 = new(wsRequest)
 					err := p.ws.ReadJSON(&msg1)
 					if err != nil {
-						p.Logger.Warnln("服务端关闭,", err.Error())
+						p.Logger.Warnf("读数据错误: %s", err.Error())
 						return
 					}
 
@@ -378,6 +384,7 @@ func (p *app) GetLogger() *logrus.Logger {
 
 // Stop 服务停止
 func (p *app) stop() {
+	p.stopped = true
 	if p.ws != nil {
 		p.ws.Close()
 	}
