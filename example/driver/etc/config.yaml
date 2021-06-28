@@ -12,6 +12,7 @@ mqtt:
 driver:
   id: test
   name: test
+#  distributed: loadBalance
 
 log:
   level: debug
