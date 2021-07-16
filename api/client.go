@@ -571,11 +571,12 @@ func (p *client) ReplaceWarnById(id string, archive bool, data, result interface
 	return p.Put(u, data, result)
 }
 
-func (p *client) DriverConfig(driverId, serviceId string) ([]byte, error) {
+func (p *client) DriverConfig(projectId, driverId, serviceId string) ([]byte, error) {
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
 	// p.checkToken()
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
+		SetHeader("x-request-project", projectId).
 		// SetHeader("Authorization", p.Token).
 		Get(u.String())
 

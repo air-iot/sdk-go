@@ -95,5 +95,5 @@ type Client interface {
 
 	// driver
 	ChangeCommand(id string, data, result interface{}) error
-	DriverConfig(driverId, serviceId string) ([]byte, error)
+	DriverConfig(projectId, driverId, serviceId string) ([]byte, error)
 }
