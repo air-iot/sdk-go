@@ -475,6 +475,9 @@ func (p *app) WritePoints(point Point) error {
 	if len(fields) == 0 {
 		return errors.New("数据点为空值")
 	}
+	if point.UnixTime == 0 {
+		point.UnixTime = time.Now().Local().UnixNano() / 1e6
+	}
 	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
 	if err != nil {
 		return err
