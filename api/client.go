@@ -393,7 +393,7 @@ func (p *client) FindNodeQuery(query, result interface{}) error {
 }
 
 func (p *client) FindNodeById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/_id/%s", id)}
 	return p.Get(u, result)
 }
 

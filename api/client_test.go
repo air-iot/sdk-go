@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-var cli = NewClient("http", "iot.tmis.top", 8010, "b9bd592b-2d79-4f5c-d583-aad18ebe00ca", "c5de1068-79fd-b32b-a4f8-291c337111fa")
+var cli = NewClient("http", "localhost", 31001, "60bf02235196c2b9ae932f01", "e2d28203-1fdf-8442-a380-31cff9c1ac4a", "33be8f2f-5df8-a3b3-d05a-329f269628d3")
 
 func TestClient_GetLatest(t *testing.T) {
 	r, err := cli.GetLatest([]map[string]interface{}{
@@ -348,7 +348,7 @@ func TestNode_FindQuery(t *testing.T) {
 
 func TestNode_FindById(t *testing.T) {
 	var r = make(map[string]interface{})
-	err := cli.FindNodeById("5ecf1f423e951ef12218381d", &r)
+	err := cli.FindNodeById("001", &r)
 	if err != nil {
 		t.Fatal(err)
 	}
