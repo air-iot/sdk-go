@@ -1,15 +1,8 @@
-/**
- * @Author: ZhangQiang
- * @Description:
- * @File:  type
- * @Version: 1.0.0
- * @Date: 2020/8/4 14:41
- */
 package api
 
 type AuthToken struct {
-	Expires int64  `json:"expires"`
-	Token   string `json:"token"`
+	ExpiresAt int64  `json:"expiresAt"`
+	Token     string `json:"token"`
 }
 
 // 采集数据

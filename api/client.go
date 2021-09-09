@@ -14,20 +14,24 @@ import (
 )
 
 type client struct {
-	protocol string
-	host     string
-	ak       string
-	sk       string
-	Token    string
-	expires  int64
+	protocol  string
+	host      string
+	ak        string
+	sk        string
+	projectID string
+	Token     string
+	expiresAt int64
 }
 
-func NewClient(protocol, host string, port int, ak, sk string) Client {
+var header = "x-request-project"
+
+func NewClient(protocol, host string, port int, projectID, ak, sk string) Client {
 	return &client{
-		protocol: protocol,
-		host:     net.JoinHostPort(host, strconv.Itoa(port)),
-		ak:       ak,
-		sk:       sk,
+		protocol:  protocol,
+		host:      net.JoinHostPort(host, strconv.Itoa(port)),
+		projectID: projectID,
+		ak:        ak,
+		sk:        sk,
 	}
 }
 
@@ -42,6 +46,7 @@ func (p *client) findToken() {
 	auth := new(AuthToken)
 	resp, err := resty.New().SetTimeout(time.Second*30).R().
 		SetHeader("Content-Type", "application/json").
+		SetHeader(header, p.projectID).
 		SetResult(auth).
 		Get(u.String())
 	if err != nil {
@@ -53,7 +58,7 @@ func (p *client) findToken() {
 		return
 	}
 	p.Token = auth.Token
-	p.expires = auth.Expires/10e9 + time.Now().Unix()
+	p.expiresAt = auth.ExpiresAt
 }
 
 func (p *client) Host() string {
@@ -73,6 +78,7 @@ func (p *client) Get(url url.URL, result interface{}) error {
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
+		SetHeader(header, p.projectID).
 		SetResult(result).
 		Get(url.String())
 
@@ -93,6 +99,7 @@ func (p *client) Post(url url.URL, data, result interface{}) error {
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
 		SetHeader("Request-Type", "service").
+		SetHeader(header, p.projectID).
 		SetResult(result).
 		SetBody(data).
 		Post(url.String())
@@ -110,6 +117,7 @@ func (p *client) Delete(url url.URL, result interface{}) error {
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
+		SetHeader(header, p.projectID).
 		SetResult(result).
 		Delete(url.String())
 	if err != nil {
@@ -126,6 +134,7 @@ func (p *client) Put(url url.URL, data, result interface{}) error {
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
+		SetHeader(header, p.projectID).
 		SetResult(result).
 		SetBody(data).
 		Put(url.String())
@@ -143,6 +152,7 @@ func (p *client) Patch(url url.URL, data, result interface{}) error {
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Authorization", p.Token).
+		SetHeader(header, p.projectID).
 		SetResult(result).
 		SetBody(data).
 		Patch(url.String())
@@ -156,7 +166,7 @@ func (p *client) Patch(url url.URL, data, result interface{}) error {
 }
 
 func (p *client) checkToken() {
-	if p.expires-5 < time.Now().Unix() {
+	if p.expiresAt-5 < time.Now().Unix() {
 		p.findToken()
 	}
 	return
