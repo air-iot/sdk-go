@@ -206,7 +206,7 @@ func NewApp() App {
 	a.host = host
 	a.port = port
 	a.stopped = false
-	a.api = api.NewClient("http", host, port, ak, sk)
+	a.api = api.NewClient("http", host, port, projectID, ak, sk)
 
 	return a
 }
