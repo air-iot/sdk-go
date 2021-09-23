@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"os"
@@ -63,6 +64,7 @@ type app struct {
 	distributed string
 	host        string
 	port        int
+	emulator    bool
 }
 
 // 存储数据
@@ -121,6 +123,7 @@ func init() {
 	viper.SetDefault("log.level", "INFO")
 	viper.SetDefault("host", "traefik")
 	viper.SetDefault("port", 80)
+	viper.SetDefault("emulator", false)
 
 	viper.SetDefault("mqtt.host", "mqtt")
 	viper.SetDefault("mqtt.port", 1883)
@@ -156,6 +159,7 @@ func NewApp() App {
 		distributed = viper.GetString("driver.distributed")
 		sendMethod  = viper.GetString("driver.sendMethod")
 		logLevel    = viper.GetString("log.level")
+		emulator    = viper.GetBool("emulator")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
@@ -166,6 +170,7 @@ func NewApp() App {
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
+	a.emulator = emulator
 	a.serviceId = GetRandomString(20)
 	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
@@ -194,139 +199,149 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 	for _, handler := range handlers {
 		handler.Start()
 	}
-	var wsConnected = false
-	var reloadFlag = false
-	go func() {
-		var timeConnect = 0
-		var timeOut = 10
-		for {
-			var err error
-			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.host, p.port, p.driverId, p.driverName, p.serviceId, p.distributed))
-			if err != nil {
-				timeConnect++
-				if timeConnect > 5 {
-					timeOut = 60
-				}
-				logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
-				time.Sleep(time.Second * time.Duration(timeOut))
-				continue
-			}
-			var handler = func() {
-				for {
-					var msg1 = new(wsRequest)
-					err := p.ws.ReadJSON(&msg1)
-					if err != nil {
-						p.Logger.Warnln("服务端关闭,", err.Error())
-						return
+	if p.emulator {
+		configData, err := ioutil.ReadFile("./data.json")
+		if err != nil {
+			p.Logger.Fatalln(fmt.Sprintf("放在读配置数据错误：%s", err.Error()))
+		}
+		if err := driver.Start(p, configData); err != nil {
+			p.Logger.Warnln("驱动启动错误,", err.Error())
+		}
+	} else {
+		var wsConnected = false
+		var reloadFlag = false
+		go func() {
+			var timeConnect = 0
+			var timeOut = 10
+			for {
+				var err error
+				p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?driverId=%s&driverName=%s&serviceId=%s&distributed=%s`, p.host, p.port, p.driverId, p.driverName, p.serviceId, p.distributed))
+				if err != nil {
+					timeConnect++
+					if timeConnect > 5 {
+						timeOut = 60
 					}
+					logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
+					time.Sleep(time.Second * time.Duration(timeOut))
+					continue
+				}
+				var handler = func() {
+					for {
+						var msg1 = new(wsRequest)
+						err := p.ws.ReadJSON(&msg1)
+						if err != nil {
+							p.Logger.Warnln("服务端关闭,", err.Error())
+							return
+						}
 
-					var r result
-					switch msg1.Action {
-					case "start":
-						reloadFlag = true
-						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
-						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
-						} else {
-							if err := driver.Start(p, c); err != nil {
-								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+						var r result
+						switch msg1.Action {
+						case "start":
+							reloadFlag = true
+							c, err := p.api.DriverConfig(p.driverId, p.serviceId)
+							if err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 							} else {
-								r = result{Code: http.StatusOK, Result: resultMsg{Message: "驱动启动成功"}}
-							}
-						}
-					case "reload":
-						reloadFlag = true
-						c, err := p.api.DriverConfig(p.driverId, p.serviceId)
-						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
-						} else {
-							if err := driver.Reload(p, c); err != nil {
-								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
-							} else {
-								r = result{Code: http.StatusOK, Result: resultMsg{Message: "驱动重启成功"}}
-							}
-						}
-					case "run":
-						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(command)
-						err := json.Unmarshal(cmdByte, cmd)
-						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
-						} else {
-							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
-								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
-							} else {
-								if res1 == nil {
-									res1 = resultMsg{"指令写入成功"}
+								if err := driver.Start(p, c); err != nil {
+									r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+								} else {
+									r = result{Code: http.StatusOK, Result: resultMsg{Message: "驱动启动成功"}}
 								}
-								r = result{Code: http.StatusOK, Result: res1}
 							}
-						}
-					case "debug":
-						debugByte, err := json.Marshal(msg1.Data)
-						if err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("序列化数据错误,%s", err.Error())}}
-						} else {
-							if r1, err := driver.Debug(p, debugByte); err != nil {
+						case "reload":
+							reloadFlag = true
+							c, err := p.api.DriverConfig(p.driverId, p.serviceId)
+							if err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
+							} else {
+								if err := driver.Reload(p, c); err != nil {
+									r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+								} else {
+									r = result{Code: http.StatusOK, Result: resultMsg{Message: "驱动重启成功"}}
+								}
+							}
+						case "run":
+							cmdByte, _ := json.Marshal(msg1.Data)
+							cmd := new(command)
+							err := json.Unmarshal(cmdByte, cmd)
+							if err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
+							} else {
+								cmdByte, _ := json.Marshal(cmd.Command)
+								if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
+									r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+								} else {
+									if res1 == nil {
+										res1 = resultMsg{"指令写入成功"}
+									}
+									r = result{Code: http.StatusOK, Result: res1}
+								}
+							}
+						case "debug":
+							debugByte, err := json.Marshal(msg1.Data)
+							if err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("序列化数据错误,%s", err.Error())}}
+							} else {
+								if r1, err := driver.Debug(p, debugByte); err != nil {
+									r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+								} else {
+									r = result{Code: http.StatusOK, Result: r1}
+								}
+							}
+						case "schema":
+							if r1, err := driver.Schema(p); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								r = result{Code: http.StatusOK, Result: r1}
 							}
+						default:
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: "未找到执行动作"}}
 						}
-					case "schema":
-						if r1, err := driver.Schema(p); err != nil {
-							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
-						} else {
-							r = result{Code: http.StatusOK, Result: r1}
+						err = p.ws.WriteJSON(&wsResponse{RequestId: msg1.RequestId, Data: r})
+						if err != nil {
+							p.Logger.Warnln("写数据错误,", err.Error())
+							return
 						}
-					default:
-						r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: "未找到执行动作"}}
 					}
-					err = p.ws.WriteJSON(&wsResponse{RequestId: msg1.RequestId, Data: r})
+				}
+				timeConnect = 0
+				timeOut = 10
+				wsConnected = true
+				handler()
+			}
+		}()
+		//if p.distributed == "" {
+		go func() {
+			var c1 = make([]byte, 0)
+			for {
+				if wsConnected {
+					c, err := p.api.DriverConfig(p.driverId, p.serviceId)
 					if err != nil {
-						p.Logger.Warnln("写数据错误,", err.Error())
-						return
+						p.Logger.Errorln("查询配置错误,", err.Error())
+						time.Sleep(time.Second * 60)
+						continue
+					} else if string(c) == "[]" {
+						if reloadFlag {
+							break
+						}
+						p.Logger.Warnln("查询配置为空")
+						time.Sleep(time.Second * 60)
+						continue
+					} else {
+						c1 = c
 					}
-				}
-			}
-			timeConnect = 0
-			timeOut = 10
-			wsConnected = true
-			handler()
-		}
-	}()
-	//if p.distributed == "" {
-	go func() {
-		var c1 = make([]byte, 0)
-		for {
-			if wsConnected {
-				c, err := p.api.DriverConfig(p.driverId, p.serviceId)
-				if err != nil {
-					p.Logger.Errorln("查询配置错误,", err.Error())
-					time.Sleep(time.Second * 60)
-					continue
-				} else if string(c) == "[]" {
-					if reloadFlag {
-						break
-					}
-					p.Logger.Warnln("查询配置为空")
-					time.Sleep(time.Second * 60)
-					continue
+					break
 				} else {
-					c1 = c
+					time.Sleep(time.Second * 10)
 				}
-				break
-			} else {
-				time.Sleep(time.Second * 10)
 			}
-		}
-		if !reloadFlag && string(c1) != "[]" {
-			if err := driver.Start(p, c1); err != nil {
-				p.Logger.Warnln("驱动启动错误,", err.Error())
+			if !reloadFlag && string(c1) != "[]" {
+				if err := driver.Start(p, c1); err != nil {
+					p.Logger.Warnln("驱动启动错误,", err.Error())
+				}
 			}
-		}
-	}()
+		}()
+	}
 	//}
 	sig := <-ch
 	close(ch)
