@@ -42,6 +42,7 @@ type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
 	Run(App, string, []byte) (interface{}, error)
+	WriteTag(App, string, []byte) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
 	Schema(App) (string, error)
@@ -295,6 +296,23 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							} else {
 								if res1 == nil {
 									res1 = resultMsg{"指令写入成功"}
+								}
+								r = result{Code: http.StatusOK, Result: res1}
+							}
+						}
+					case "writeTag":
+						cmdByte, _ := json.Marshal(msg1.Data)
+						cmd := new(command)
+						err := json.Unmarshal(cmdByte, cmd)
+						if err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("数据点转换错误,%s", err.Error())}}
+						} else {
+							cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.WriteTag(p, cmd.NodeId, cmdByte); err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+							} else {
+								if res1 == nil {
+									res1 = resultMsg{"数据点写入成功"}
 								}
 								r = result{Code: http.StatusOK, Result: res1}
 							}

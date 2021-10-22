@@ -106,6 +106,11 @@ func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) (interface{}
 	return nil, nil
 }
 
+func (p *TestDriver) WriteTag(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
+	a.GetLogger().Debugln("WriteTag", deviceID, string(cmd))
+	return nil, nil
+}
+
 func (p *TestDriver) Debug(a driver.App, b []byte) (interface{}, error) {
 	a.GetLogger().Debugln("debug", string(b))
 	return []int{1, 2, 3}, nil
