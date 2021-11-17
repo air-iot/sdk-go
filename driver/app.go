@@ -606,7 +606,7 @@ func (p *app) LogDebug(uid string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	err = p.send("logs/debug/"+uid, b)
+	err = p.send(fmt.Sprintf("logs/%s/debug/%s", p.projectID, uid), b)
 	if err != nil {
 		return
 	}
@@ -619,7 +619,7 @@ func (p *app) LogInfo(uid string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	err = p.send("logs/info/"+uid, b)
+	err = p.send(fmt.Sprintf("logs/%s/info/%s", p.projectID, uid), b)
 	if err != nil {
 		return
 	}
@@ -632,7 +632,7 @@ func (p *app) LogWarn(uid string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	err = p.send("logs/warn/"+uid, b)
+	err = p.send(fmt.Sprintf("logs/%s/warn/%s", p.projectID, uid), b)
 	if err != nil {
 		return
 	}
@@ -645,7 +645,7 @@ func (p *app) LogError(uid string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	err = p.send("logs/error/"+uid, b)
+	err = p.send(fmt.Sprintf("logs/%s/error/%s", p.projectID, uid), b)
 	if err != nil {
 		return
 	}
