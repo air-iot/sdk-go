@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"math/rand"
 	"net/http"
 	"os"
@@ -131,6 +130,7 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	pflag.String("project", "default", "项目id")
+	pflag.String("serviceId", "", "服务id")
 	pflag.Parse()
 
 	viper.SetDefault("log.level", "INFO")
@@ -175,9 +175,10 @@ func NewApp() App {
 		sendMethod  = viper.GetString("driver.sendMethod")
 		logLevel    = viper.GetString("log.level")
 		projectID   = viper.GetString("project")
+		serviceId   = viper.GetString("serviceId")
 	)
-	if driverId == "" || driverName == "" {
-		panic("驱动id或name不能为空")
+	if driverId == "" || driverName == "" || serviceId == "" {
+		panic("驱动id或name或服务id不能为空")
 	}
 	if projectID == "" {
 		projectID = "default"
@@ -188,9 +189,9 @@ func NewApp() App {
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
-	a.serviceId = uuid.New().String()
+	a.serviceId = serviceId
 	a.projectID = projectID
-	logrus.Infof("项目ID: %s", projectID)
+	logrus.Infof("项目ID: %s 服务ID: %s", projectID, serviceId)
 	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
 	if err != nil {
 		logrus.Fatalln("连接mqtt错误,", err.Error())
