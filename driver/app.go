@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -177,11 +178,15 @@ func NewApp() App {
 		projectID   = viper.GetString("project")
 		serviceId   = viper.GetString("serviceId")
 	)
-	if driverId == "" || driverName == "" || serviceId == "" {
-		panic("驱动id或name或服务id不能为空")
+	if driverId == "" || driverName == "" {
+		panic("驱动id或name不能为空")
 	}
 	if projectID == "" {
 		projectID = "default"
+	}
+
+	if serviceId == "" {
+		serviceId = uuid.New().String()
 	}
 	a := new(app)
 	a.Logger = logger.NewLogger(logLevel)
