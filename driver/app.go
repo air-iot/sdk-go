@@ -63,19 +63,19 @@ const (
 // app 数据采集类
 type app struct {
 	*logrus.Logger
-	sendMethod  string
-	mqtt        *mqtt.Mqtt
-	rabbit      *rabbit.Amqp
-	ws          *websocket.Conn
-	api         api.Client
-	driverId    string
-	serviceId   string
-	driverName  string
-	distributed string
-	projectID   string
-	host        string
-	port        int
-	stopped     bool
+	sendMethod string
+	mqtt       *mqtt.Mqtt
+	rabbit     *rabbit.Amqp
+	ws         *websocket.Conn
+	api        api.Client
+	driverId   string
+	serviceId  string
+	driverName string
+	driverType string
+	projectID  string
+	host       string
+	port       int
+	stopped    bool
 }
 
 // Point 存储数据
@@ -166,17 +166,17 @@ func init() {
 // NewApp 创建App
 func NewApp() App {
 	var (
-		host        = viper.GetString("host")
-		port        = viper.GetInt("port")
-		ak          = viper.GetString("credentials.ak")
-		sk          = viper.GetString("credentials.sk")
-		driverId    = viper.GetString("driver.id")
-		driverName  = viper.GetString("driver.name")
-		distributed = viper.GetString("driver.distributed")
-		sendMethod  = viper.GetString("driver.sendMethod")
-		logLevel    = viper.GetString("log.level")
-		projectID   = viper.GetString("project")
-		serviceId   = viper.GetString("serviceId")
+		host       = viper.GetString("host")
+		port       = viper.GetInt("port")
+		ak         = viper.GetString("credentials.ak")
+		sk         = viper.GetString("credentials.sk")
+		driverId   = viper.GetString("driver.id")
+		driverName = viper.GetString("driver.name")
+		driverType = viper.GetString("driver.type")
+		sendMethod = viper.GetString("driver.sendMethod")
+		logLevel   = viper.GetString("log.level")
+		projectID  = viper.GetString("project")
+		serviceId  = viper.GetString("serviceId")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
@@ -185,12 +185,16 @@ func NewApp() App {
 		projectID = "default"
 	}
 
+	if driverType == "" {
+		driverType = "client"
+	}
+
 	if serviceId == "" {
 		serviceId = uuid.New().String()
 	}
 	a := new(app)
 	a.Logger = logger.NewLogger(logLevel)
-	a.distributed = distributed
+	a.driverType = driverType
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
@@ -238,11 +242,11 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			}
 			var err error
 			connMap, _ := json.Marshal(map[string]string{
-				"driverId":    p.driverId,
-				"driverName":  p.driverName,
-				"serviceId":   p.serviceId,
-				"distributed": p.distributed,
-				"projectId":   p.projectID,
+				"driverId":   p.driverId,
+				"driverName": p.driverName,
+				"serviceId":  p.serviceId,
+				"driverType": p.driverType,
+				"projectId":  p.projectID,
 			})
 			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?connInfo=%s&format=hex`, p.host, p.port, hex.EncodeToString(connMap)))
 			if err != nil {
