@@ -172,7 +172,7 @@ func NewApp() App {
 		sk         = viper.GetString("credentials.sk")
 		driverId   = viper.GetString("driver.id")
 		driverName = viper.GetString("driver.name")
-		driverType = viper.GetString("driver.type")
+		//driverType = viper.GetString("driver.type")
 		sendMethod = viper.GetString("driver.sendMethod")
 		logLevel   = viper.GetString("log.level")
 		projectID  = viper.GetString("project")
@@ -185,16 +185,16 @@ func NewApp() App {
 		projectID = "default"
 	}
 
-	if driverType == "" {
-		driverType = "client"
-	}
+	//if driverType == "" {
+	//	driverType = "client"
+	//}
 
 	if serviceId == "" {
 		serviceId = uuid.New().String()
 	}
 	a := new(app)
 	a.Logger = logger.NewLogger(logLevel)
-	a.driverType = driverType
+	//a.driverType = driverType
 	a.driverId = driverId
 	a.driverName = driverName
 	a.sendMethod = sendMethod
