@@ -71,11 +71,11 @@ type app struct {
 	driverId   string
 	serviceId  string
 	driverName string
-	driverType string
-	projectID  string
-	host       string
-	port       int
-	stopped    bool
+	//driverType string
+	projectID string
+	host      string
+	port      int
+	stopped   bool
 }
 
 // Point 存储数据
@@ -245,8 +245,8 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				"driverId":   p.driverId,
 				"driverName": p.driverName,
 				"serviceId":  p.serviceId,
-				"driverType": p.driverType,
-				"projectId":  p.projectID,
+				//"driverType": p.driverType,
+				"projectId": p.projectID,
 			})
 			p.ws, err = websocket.DialWS(fmt.Sprintf(`ws://%s:%d/driver/ws?connInfo=%s&format=hex`, p.host, p.port, hex.EncodeToString(connMap)))
 			if err != nil {
