@@ -518,6 +518,94 @@ func (p *app) WritePoints(point Point) error {
 	}
 }
 
+// WriteEvent 写事件数据
+func (p *app) WriteEvent(point Point) error {
+	if point.ID == "" || point.Fields == nil || len(point.Fields) == 0 {
+		return errors.New("数据有空值")
+	}
+	fields := make(map[string]interface{})
+	for _, field := range point.Fields {
+		if field.Tag == nil || field.Value == nil {
+			p.Logger.Warnf("资产 [%s] 数据点为空", point.ID)
+			continue
+		}
+		tagByte, err := json.Marshal(field.Tag)
+		if err != nil {
+			p.Logger.Warnf("资产 [%s] 数据点序列化错误: %s", point.ID, err.Error())
+			continue
+		}
+
+		tag := new(Tag)
+		err = json.Unmarshal(tagByte, tag)
+		if err != nil {
+			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())
+			continue
+		}
+		var value decimal.Decimal
+		//vType := reflect.TypeOf(raw).String()
+		switch valueTmp := field.Value.(type) {
+		case float32:
+			value = decimal.NewFromFloat32(valueTmp)
+		case float64:
+			value = decimal.NewFromFloat(valueTmp)
+		case uint:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint8:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint16:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint32:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case uint64:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int8:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int16:
+			value = decimal.NewFromInt(int64(valueTmp))
+		case int32:
+			value = decimal.NewFromInt32(valueTmp)
+		case int64:
+			value = decimal.NewFromInt(valueTmp)
+		default:
+			fields[tag.ID] = field.Value
+			continue
+		}
+
+		val := p.convertRange(tag.Range, p.convertValue(tag, value))
+		if val != nil {
+			if fieldType, ok := point.FieldTypes[tag.ID]; ok {
+				switch fieldType {
+				case Integer:
+					fields[tag.ID] = int(*val)
+				default:
+					fields[tag.ID] = val
+				}
+			} else {
+				fields[tag.ID] = val
+			}
+		}
+	}
+
+	if len(fields) == 0 {
+		return errors.New("数据点为空值")
+	}
+	if point.UnixTime == 0 {
+		point.UnixTime = time.Now().Local().UnixNano() / 1e6
+	}
+	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
+	if err != nil {
+		return err
+	}
+	p.Logger.Debugf("保存数据,%s", string(b))
+	if p.sendMethod == "rabbit" {
+		return p.rabbit.Send("data", fmt.Sprintf("data.%s.%s", p.projectID, point.ID), b)
+	} else {
+		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", p.projectID, point.ID), string(b))
+	}
+}
+
 // active fixed  boundary  discard
 func (p *app) convertRange(tagRange *Range, raw decimal.Decimal) (val *float64) {
 	value, _ := raw.Float64()
