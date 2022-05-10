@@ -137,6 +137,11 @@ type command struct {
 	Command interface{} `json:"command"`
 }
 
+type batchCommand struct {
+	NodeIds []string    `json:"nodeIds"`
+	Command interface{} `json:"command"`
+}
+
 type resultMsg struct {
 	Message string `json:"message"`
 }
@@ -308,6 +313,23 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						} else {
 							cmdByte, _ := json.Marshal(cmd.Command)
 							if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+							} else {
+								if res1 == nil {
+									res1 = resultMsg{"指令写入成功"}
+								}
+								r = result{Code: http.StatusOK, Result: res1}
+							}
+						}
+					case "batchRun":
+						cmdByte, _ := json.Marshal(msg1.Data)
+						cmd := new(batchCommand)
+						err := json.Unmarshal(cmdByte, cmd)
+						if err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
+						} else {
+							cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.BatchRun(p, cmd.NodeIds, cmdByte); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
