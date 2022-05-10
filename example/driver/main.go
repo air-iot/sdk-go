@@ -106,6 +106,12 @@ func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) (interface{}
 	return nil, nil
 }
 
+// BatchRun 批量执行指令，实现Driver的Run函数
+func (p *TestDriver) BatchRun(a driver.App, deviceID []string, cmd []byte) (interface{}, error) {
+	a.GetLogger().Debugln("BatchRun", deviceID, string(cmd))
+	return nil, nil
+}
+
 func (p *TestDriver) WriteTag(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
 	a.GetLogger().Debugln("WriteTag", deviceID, string(cmd))
 	return nil, nil

@@ -42,6 +42,7 @@ type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
 	Run(App, string, []byte) (interface{}, error)
+	BatchRun(App, []string, []byte) (interface{}, error)
 	WriteTag(App, string, []byte) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
@@ -85,6 +86,21 @@ type Point struct {
 	UnixTime int64   `json:"time"`   // 数据采集时间 毫秒数
 	//
 	FieldTypes map[string]string `json:"fieldTypes"` // 数据点类型
+}
+
+type Event struct {
+	ID       string      `json:"id"`      // 设备编号
+	EventID  string      `json:"eventId"` // 事件ID
+	UnixTime int64       `json:"time"`    // 数据采集时间 毫秒数
+	Data     interface{} `json:"data"`    // 事件数据
+}
+
+type Log struct {
+	RunID     string `json:"runId"`     // 运行指令流水id
+	SerialNum string `json:"serialNum"` // 流水号
+	Status    string `json:"status"`    // 日志状态
+	UnixTime  int64  `json:"time"`      // 日志时间毫秒数
+	Desc      string `json:"desc"`      // 描述
 }
 
 // Field 字段
@@ -506,6 +522,41 @@ func (p *app) WritePoints(point Point) error {
 	} else {
 		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", p.projectID, point.ID), string(b))
 	}
+}
+
+func (p *app) WriteEvent(event Event) error {
+	b, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	if p.sendMethod == "rabbit" {
+		return p.rabbit.Send("driverEvent", fmt.Sprintf("driverEvent.%s.%s", p.projectID, event.ID), b)
+	} else {
+		return p.mqtt.Send(fmt.Sprintf("driverEvent/%s/%s", p.projectID, event.ID), string(b))
+	}
+}
+
+func (p *app) RunLog(l Log) error {
+	b, err := json.Marshal(l)
+	if err != nil {
+		return err
+	}
+	if p.sendMethod == "rabbit" {
+		return p.rabbit.Send("runLog", "driverRunLog", b)
+	} else {
+		return p.mqtt.Send("driverRunLog", string(b))
+	}
+}
+
+func (p *app) UpdateNode(id string, custom map[string]interface{}) error {
+	data := make(map[string]interface{})
+	for k, v := range custom {
+		data[fmt.Sprintf("custom.%s", k)] = v
+	}
+	if err := p.api.UpdateNodeById(id, data, &map[string]interface{}{}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // active fixed  boundary  discard
