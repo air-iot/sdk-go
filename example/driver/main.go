@@ -101,13 +101,13 @@ func (p *TestDriver) Reload(a driver.App, models []byte) error {
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
+func (p *TestDriver) Run(a driver.App, serialNo, deviceID string, cmd []byte) (interface{}, error) {
 	a.GetLogger().Debugln("run", deviceID, string(cmd))
 	return nil, nil
 }
 
 // BatchRun 批量执行指令，实现Driver的Run函数
-func (p *TestDriver) BatchRun(a driver.App, deviceID []string, cmd []byte) (interface{}, error) {
+func (p *TestDriver) BatchRun(a driver.App, serialNo string, deviceID []string, cmd []byte) (interface{}, error) {
 	a.GetLogger().Debugln("BatchRun", deviceID, string(cmd))
 	return nil, nil
 }

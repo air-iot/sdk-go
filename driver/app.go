@@ -41,8 +41,8 @@ type App interface {
 type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
-	Run(App, string, []byte) (interface{}, error)
-	BatchRun(App, []string, []byte) (interface{}, error)
+	Run(app App, serialNo, nodeID string, cmd []byte) (interface{}, error)
+	BatchRun(app App, serialNo string, nodeIds []string, cmd []byte) (interface{}, error)
 	WriteTag(App, string, []byte) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
@@ -96,11 +96,10 @@ type Event struct {
 }
 
 type Log struct {
-	RunID     string `json:"runId"`     // 运行指令流水id
-	SerialNum string `json:"serialNum"` // 流水号
-	Status    string `json:"status"`    // 日志状态
-	UnixTime  int64  `json:"time"`      // 日志时间毫秒数
-	Desc      string `json:"desc"`      // 描述
+	SerialNo string `json:"serialNo"` // 流水号
+	Status   string `json:"status"`   // 日志状态
+	UnixTime int64  `json:"time"`     // 日志时间毫秒数
+	Desc     string `json:"desc"`     // 描述
 }
 
 // Field 字段
@@ -133,13 +132,15 @@ type result struct {
 }
 
 type command struct {
-	NodeId  string      `json:"nodeId"`
-	Command interface{} `json:"command"`
+	NodeId   string      `json:"nodeId"`
+	SerialNo string      `json:"serialNo"`
+	Command  interface{} `json:"command"`
 }
 
 type batchCommand struct {
-	NodeIds []string    `json:"nodeIds"`
-	Command interface{} `json:"command"`
+	NodeIds  []string    `json:"nodeIds"`
+	SerialNo string      `json:"serialNo"`
+	Command  interface{} `json:"command"`
 }
 
 type resultMsg struct {
@@ -312,7 +313,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
 							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
+							if res1, err := driver.Run(p, cmd.SerialNo, cmd.NodeId, cmdByte); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -329,7 +330,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
 							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.BatchRun(p, cmd.NodeIds, cmdByte); err != nil {
+							if res1, err := driver.BatchRun(p, cmd.SerialNo, cmd.NodeIds, cmdByte); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -564,9 +565,9 @@ func (p *app) RunLog(l Log) error {
 		return err
 	}
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("runLog", "driverRunLog", b)
+		return p.rabbit.Send("runLog", fmt.Sprintf("driverEvent.%s", p.projectID), b)
 	} else {
-		return p.mqtt.Send("driverRunLog", string(b))
+		return p.mqtt.Send(fmt.Sprintf("driverEvent/%s", p.projectID), string(b))
 	}
 }
 
