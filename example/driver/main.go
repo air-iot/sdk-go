@@ -137,8 +137,8 @@ func (p *TestDriver) BatchRun(a driver.App, cmd *driver.BatchCommand) (interface
 	return nil, nil
 }
 
-func (p *TestDriver) WriteTag(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
-	a.GetLogger().Debugln("WriteTag", deviceID, string(cmd))
+func (p *TestDriver) WriteTag(a driver.App, cmd *driver.Command) (interface{}, error) {
+	a.GetLogger().Debugln("WriteTag", *cmd)
 	return nil, nil
 }
 
