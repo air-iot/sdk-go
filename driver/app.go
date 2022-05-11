@@ -29,6 +29,9 @@ import (
 type App interface {
 	Start(driver Driver, handlers ...Handler)
 	WritePoints(point Point) error
+	WriteEvent(event Event) error
+	RunLog(l Log) error
+	UpdateNode(id string, custom map[string]interface{}) error
 	LogDebug(uid string, msg interface{})
 	LogInfo(uid string, msg interface{})
 	LogWarn(uid string, msg interface{})
@@ -41,8 +44,8 @@ type App interface {
 type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
-	Run(app App, serialNo, nodeID string, cmd []byte) (interface{}, error)
-	BatchRun(app App, serialNo string, nodeIds []string, cmd []byte) (interface{}, error)
+	Run(app App, cmd *Command) (interface{}, error)
+	BatchRun(app App, cmd *BatchCommand) (interface{}, error)
 	WriteTag(App, string, []byte) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
@@ -131,16 +134,16 @@ type result struct {
 	Result interface{} `json:"result"`
 }
 
-type command struct {
+type Command struct {
 	NodeId   string      `json:"nodeId"`
 	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"command"`
+	Command  interface{} `json:"Command"`
 }
 
-type batchCommand struct {
+type BatchCommand struct {
 	NodeIds  []string    `json:"nodeIds"`
 	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"command"`
+	Command  interface{} `json:"Command"`
 }
 
 type resultMsg struct {
@@ -307,13 +310,13 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "run":
 						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(command)
+						cmd := new(Command)
 						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
-							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.Run(p, cmd.SerialNo, cmd.NodeId, cmdByte); err != nil {
+							//cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.Run(p, cmd); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -324,13 +327,13 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "batchRun":
 						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(batchCommand)
+						cmd := new(BatchCommand)
 						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
-							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.BatchRun(p, cmd.SerialNo, cmd.NodeIds, cmdByte); err != nil {
+							//cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.BatchRun(p, cmd); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -341,7 +344,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "writeTag":
 						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(command)
+						cmd := new(Command)
 						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("数据点转换错误,%s", err.Error())}}
@@ -565,9 +568,9 @@ func (p *app) RunLog(l Log) error {
 		return err
 	}
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("runLog", fmt.Sprintf("driverEvent.%s", p.projectID), b)
+		return p.rabbit.Send("runLog", fmt.Sprintf("driverRunLog.%s", p.projectID), b)
 	} else {
-		return p.mqtt.Send(fmt.Sprintf("driverEvent/%s", p.projectID), string(b))
+		return p.mqtt.Send(fmt.Sprintf("driverRunLog/%s", p.projectID), string(b))
 	}
 }
 
