@@ -137,13 +137,13 @@ type result struct {
 type Command struct {
 	NodeId   string      `json:"nodeId"`
 	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"Command"`
+	Command  interface{} `json:"command"`
 }
 
 type BatchCommand struct {
 	NodeIds  []string    `json:"nodeIds"`
 	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"Command"`
+	Command  interface{} `json:"command"`
 }
 
 type resultMsg struct {
@@ -551,6 +551,9 @@ func (p *app) WritePoints(point Point) error {
 }
 
 func (p *app) WriteEvent(event Event) error {
+	if event.ID == "" || event.EventID == "" {
+		return errors.New("资产或事件ID为空")
+	}
 	b, err := json.Marshal(event)
 	if err != nil {
 		return err
@@ -563,12 +566,15 @@ func (p *app) WriteEvent(event Event) error {
 }
 
 func (p *app) RunLog(l Log) error {
+	if l.SerialNo == "" {
+		return errors.New("流水号为空")
+	}
 	b, err := json.Marshal(l)
 	if err != nil {
 		return err
 	}
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("runLog", fmt.Sprintf("driverRunLog.%s", p.projectID), b)
+		return p.rabbit.Send("driverRunLog", fmt.Sprintf("driverRunLog.%s", p.projectID), b)
 	} else {
 		return p.mqtt.Send(fmt.Sprintf("driverRunLog/%s", p.projectID), string(b))
 	}

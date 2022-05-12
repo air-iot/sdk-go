@@ -118,7 +118,11 @@ func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error)
 		UnixTime: time.Now().UnixNano() / 1e6,
 		Data:     cmd.Command,
 	}); err != nil {
-		a.GetLogger().Errorf("writeEeent log: %s", err)
+		a.GetLogger().Errorf("writeEvent: %s", err)
+	}
+
+	if err := a.UpdateNode(cmd.NodeId, map[string]interface{}{"n2": 22}); err != nil {
+		a.GetLogger().Errorf("UpdateNode: %s", err)
 	}
 	return nil, nil
 }
