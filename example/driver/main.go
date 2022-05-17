@@ -101,13 +101,48 @@ func (p *TestDriver) Reload(a driver.App, models []byte) error {
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
-	a.GetLogger().Debugln("run", deviceID, string(cmd))
+func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error) {
+	a.GetLogger().Debugln("run", *cmd)
+	if err := a.RunLog(driver.Log{
+		SerialNo: cmd.SerialNo,
+		Status:   "成功",
+		UnixTime: time.Now().UnixNano() / 1e6,
+		Desc:     "测试",
+	}); err != nil {
+		a.GetLogger().Errorf("run log: %s", err)
+	}
+
+	if err := a.WriteEvent(driver.Event{
+		ID:       cmd.NodeId,
+		EventID:  "test11",
+		UnixTime: time.Now().UnixNano() / 1e6,
+		Data:     cmd.Command,
+	}); err != nil {
+		a.GetLogger().Errorf("writeEvent: %s", err)
+	}
+
+	//if err := a.UpdateNode(cmd.NodeId, map[string]interface{}{"n2": 22}); err != nil {
+	//	a.GetLogger().Errorf("UpdateNode: %s", err)
+	//}
 	return nil, nil
 }
 
-func (p *TestDriver) WriteTag(a driver.App, deviceID string, cmd []byte) (interface{}, error) {
-	a.GetLogger().Debugln("WriteTag", deviceID, string(cmd))
+// BatchRun 批量执行指令，实现Driver的Run函数
+func (p *TestDriver) BatchRun(a driver.App, cmd *driver.BatchCommand) (interface{}, error) {
+	a.GetLogger().Debugln("BatchRun", *cmd)
+	if err := a.RunLog(driver.Log{
+		SerialNo: cmd.SerialNo,
+		Status:   "成功",
+		UnixTime: time.Now().UnixNano() / 1e6,
+		Desc:     "批量测试",
+	}); err != nil {
+		a.GetLogger().Errorf("run log: %s", err)
+	}
+	return nil, nil
+}
+
+func (p *TestDriver) WriteTag(a driver.App, cmd *driver.Command) (interface{}, error) {
+	a.GetLogger().Debugln("WriteTag", *cmd)
 	return nil, nil
 }
 

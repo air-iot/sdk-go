@@ -29,6 +29,9 @@ import (
 type App interface {
 	Start(driver Driver, handlers ...Handler)
 	WritePoints(point Point) error
+	WriteEvent(event Event) error
+	RunLog(l Log) error
+	UpdateNode(id string, custom map[string]interface{}) error
 	LogDebug(uid string, msg interface{})
 	LogInfo(uid string, msg interface{})
 	LogWarn(uid string, msg interface{})
@@ -41,8 +44,9 @@ type App interface {
 type Driver interface {
 	Start(App, []byte) error
 	Reload(App, []byte) error
-	Run(App, string, []byte) (interface{}, error)
-	WriteTag(App, string, []byte) (interface{}, error)
+	Run(app App, cmd *Command) (interface{}, error)
+	BatchRun(app App, cmd *BatchCommand) (interface{}, error)
+	WriteTag(app App, cmd *Command) (interface{}, error)
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
 	Schema(App) (string, error)
@@ -87,6 +91,20 @@ type Point struct {
 	FieldTypes map[string]string `json:"fieldTypes"` // 数据点类型
 }
 
+type Event struct {
+	ID       string      `json:"id"`      // 设备编号
+	EventID  string      `json:"eventId"` // 事件ID
+	UnixTime int64       `json:"time"`    // 数据采集时间 毫秒数
+	Data     interface{} `json:"data"`    // 事件数据
+}
+
+type Log struct {
+	SerialNo string `json:"serialNo"` // 流水号
+	Status   string `json:"status"`   // 日志状态
+	UnixTime int64  `json:"time"`     // 日志时间毫秒数
+	Desc     string `json:"desc"`     // 描述
+}
+
 // Field 字段
 type Field struct {
 	Tag   interface{} `json:"tag"`   // 数据点
@@ -116,9 +134,16 @@ type result struct {
 	Result interface{} `json:"result"`
 }
 
-type command struct {
-	NodeId  string      `json:"nodeId"`
-	Command interface{} `json:"command"`
+type Command struct {
+	NodeId   string      `json:"nodeId"`
+	SerialNo string      `json:"serialNo"`
+	Command  interface{} `json:"command"`
+}
+
+type BatchCommand struct {
+	NodeIds  []string    `json:"nodeIds"`
+	SerialNo string      `json:"serialNo"`
+	Command  interface{} `json:"command"`
 }
 
 type resultMsg struct {
@@ -295,13 +320,30 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "run":
 						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(command)
+						cmd := new(Command)
 						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
 						} else {
-							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.Run(p, cmd.NodeId, cmdByte); err != nil {
+							//cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.Run(p, cmd); err != nil {
+								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
+							} else {
+								if res1 == nil {
+									res1 = resultMsg{"指令写入成功"}
+								}
+								r = result{Code: http.StatusOK, Result: res1}
+							}
+						}
+					case "batchRun":
+						cmdByte, _ := json.Marshal(msg1.Data)
+						cmd := new(BatchCommand)
+						err := json.Unmarshal(cmdByte, cmd)
+						if err != nil {
+							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("指令转换错误,%s", err.Error())}}
+						} else {
+							//cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.BatchRun(p, cmd); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -312,13 +354,13 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						}
 					case "writeTag":
 						cmdByte, _ := json.Marshal(msg1.Data)
-						cmd := new(command)
+						cmd := new(Command)
 						err := json.Unmarshal(cmdByte, cmd)
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("数据点转换错误,%s", err.Error())}}
 						} else {
-							cmdByte, _ := json.Marshal(cmd.Command)
-							if res1, err := driver.WriteTag(p, cmd.NodeId, cmdByte); err != nil {
+							//cmdByte, _ := json.Marshal(cmd.Command)
+							if res1, err := driver.WriteTag(p, cmd); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
 								if res1 == nil {
@@ -518,92 +560,45 @@ func (p *app) WritePoints(point Point) error {
 	}
 }
 
-// WriteEvent 写事件数据
-func (p *app) WriteEvent(point Point) error {
-	if point.ID == "" || point.Fields == nil || len(point.Fields) == 0 {
-		return errors.New("数据有空值")
+func (p *app) WriteEvent(event Event) error {
+	if event.ID == "" || event.EventID == "" {
+		return errors.New("资产或事件ID为空")
 	}
-	fields := make(map[string]interface{})
-	for _, field := range point.Fields {
-		if field.Tag == nil || field.Value == nil {
-			p.Logger.Warnf("资产 [%s] 数据点为空", point.ID)
-			continue
-		}
-		tagByte, err := json.Marshal(field.Tag)
-		if err != nil {
-			p.Logger.Warnf("资产 [%s] 数据点序列化错误: %s", point.ID, err.Error())
-			continue
-		}
-
-		tag := new(Tag)
-		err = json.Unmarshal(tagByte, tag)
-		if err != nil {
-			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())
-			continue
-		}
-		var value decimal.Decimal
-		//vType := reflect.TypeOf(raw).String()
-		switch valueTmp := field.Value.(type) {
-		case float32:
-			value = decimal.NewFromFloat32(valueTmp)
-		case float64:
-			value = decimal.NewFromFloat(valueTmp)
-		case uint:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case uint8:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case uint16:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case uint32:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case uint64:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case int:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case int8:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case int16:
-			value = decimal.NewFromInt(int64(valueTmp))
-		case int32:
-			value = decimal.NewFromInt32(valueTmp)
-		case int64:
-			value = decimal.NewFromInt(valueTmp)
-		default:
-			fields[tag.ID] = field.Value
-			continue
-		}
-
-		val := p.convertRange(tag.Range, p.convertValue(tag, value))
-		if val != nil {
-			if fieldType, ok := point.FieldTypes[tag.ID]; ok {
-				switch fieldType {
-				case Integer:
-					fields[tag.ID] = int(*val)
-				default:
-					fields[tag.ID] = val
-				}
-			} else {
-				fields[tag.ID] = val
-			}
-		}
-	}
-
-	if len(fields) == 0 {
-		return errors.New("数据点为空值")
-	}
-	if point.UnixTime == 0 {
-		point.UnixTime = time.Now().Local().UnixNano() / 1e6
-	}
-	b, err := json.Marshal(&pointTmp{ID: point.ID, UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
+	b, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
-	p.Logger.Debugf("保存数据,%s", string(b))
 	if p.sendMethod == "rabbit" {
-		return p.rabbit.Send("data", fmt.Sprintf("data.%s.%s", p.projectID, point.ID), b)
+		return p.rabbit.Send("driverEvent", fmt.Sprintf("driverEvent.%s.%s", p.projectID, event.ID), b)
 	} else {
-		return p.mqtt.Send(fmt.Sprintf("data/%s/%s", p.projectID, point.ID), string(b))
+		return p.mqtt.Send(fmt.Sprintf("driverEvent/%s/%s", p.projectID, event.ID), string(b))
 	}
+}
+
+func (p *app) RunLog(l Log) error {
+	if l.SerialNo == "" {
+		return errors.New("流水号为空")
+	}
+	b, err := json.Marshal(l)
+	if err != nil {
+		return err
+	}
+	if p.sendMethod == "rabbit" {
+		return p.rabbit.Send("driverRunLog", fmt.Sprintf("driverRunLog.%s", p.projectID), b)
+	} else {
+		return p.mqtt.Send(fmt.Sprintf("driverRunLog/%s", p.projectID), string(b))
+	}
+}
+
+func (p *app) UpdateNode(id string, custom map[string]interface{}) error {
+	data := make(map[string]interface{})
+	for k, v := range custom {
+		data[fmt.Sprintf("custom.%s", k)] = v
+	}
+	if err := p.api.UpdateNodeById(id, data, &map[string]interface{}{}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // active fixed  boundary  discard
