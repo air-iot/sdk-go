@@ -1,10 +1,3 @@
-/**
- * @Author: ZhangQiang
- * @Description:
- * @File:  app
- * @Version: 1.0.0
- * @Date: 2020/8/6 10:51
- */
 package service
 
 import (
@@ -18,8 +11,6 @@ import (
 	mw "github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"github.com/air-iot/sdk-go/logger"
 )
 
 type App interface {
@@ -54,14 +45,14 @@ type app struct {
 	*echo.Echo
 }
 
-// NewDG 创建DG
+// NewApp 创建DG
 func NewApp() App {
-	var logLevel = viper.GetString("log.level")
+	//var logLevel = viper.GetString("log.level")
 	a := new(app)
 	e := echo.New()
 	e.Use(mw.Recover())
 	a.Echo = echo.New()
-	a.Logger = logger.NewLogger(logLevel)
+	//a.Logger = logger.NewLogger(logLevel)
 	return a
 }
 

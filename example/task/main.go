@@ -12,7 +12,7 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/air-iot/sdk-go/task"
+	"github.com/air-iot/sdk-go/v4/task"
 	"github.com/robfig/cron/v3"
 )
 

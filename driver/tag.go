@@ -3,7 +3,6 @@ package driver
 type Tag struct {
 	ID   string `json:"id" description:"ID"`
 	Name string `json:"name" description:"自定义名称"`
-
 	//以下为通用值计算相关属性
 	TagValue *TagValue `json:"tagValue"`
 	Fixed    *int32    `json:"fixed"`

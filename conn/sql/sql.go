@@ -23,6 +23,6 @@ func NewDB(driverName, url string, maxIdleConn, maxOpenConn int) (*DBConn, error
 
 func (p *DBConn) Close() {
 	if err := p.DB.Close(); err != nil {
-		logrus.Errorln("Conn????", err.Error())
+		logrus.Errorln("cli????", err.Error())
 	}
 }

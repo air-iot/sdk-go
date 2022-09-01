@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strconv"
 	"time"
@@ -14,10 +13,8 @@ import (
 )
 
 type client struct {
-	protocol  string
+	cfg       Config
 	host      string
-	ak        string
-	sk        string
 	projectID string
 	Token     string
 	expiresAt int64
@@ -25,23 +22,21 @@ type client struct {
 
 var header = "x-request-project"
 
-func NewClient(protocol, host string, port int, projectID, ak, sk string) Client {
+func NewClient(projectID string, cfg Config) Client {
 	return &client{
-		protocol:  protocol,
-		host:      net.JoinHostPort(host, strconv.Itoa(port)),
+		host:      fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		cfg:       cfg,
 		projectID: projectID,
-		ak:        ak,
-		sk:        sk,
 	}
 }
 
 // 根据 app appkey和appsecret 获取token
 func (p *client) findToken() {
 	// 生成要访问的url
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/auth/token"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/auth/token"}
 	v := url.Values{}
-	v.Set("appkey", p.ak)
-	v.Set("appsecret", p.sk)
+	v.Set("appkey", p.cfg.Credentials.AK)
+	v.Set("appsecret", p.cfg.Credentials.SK)
 	u.RawQuery = v.Encode()
 	auth := new(AuthToken)
 	resp, err := resty.New().SetTimeout(time.Second*30).R().
@@ -61,16 +56,8 @@ func (p *client) findToken() {
 	p.expiresAt = auth.ExpiresAt
 }
 
-func (p *client) Host() string {
-	return p.host
-}
-
-func (p *client) AK() string {
-	return p.ak
-}
-
-func (p *client) SK() string {
-	return p.sk
+func (p *client) Config() Config {
+	return p.cfg
 }
 
 func (p *client) Get(url url.URL, result interface{}) error {
@@ -179,7 +166,7 @@ func (p *client) GetLatest(query interface{}) (result []RealTimeData, err error)
 	}
 	v := url.Values{}
 	v.Set("query", string(b))
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/latest"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/data/latest"}
 	u.RawQuery = v.Encode()
 	result = make([]RealTimeData, 0)
 	if err := p.Get(u, &result); err != nil {
@@ -190,7 +177,7 @@ func (p *client) GetLatest(query interface{}) (result []RealTimeData, err error)
 
 func (p *client) PostLatest(query interface{}) (result []RealTimeData, err error) {
 	result = make([]RealTimeData, 0)
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/latest"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/data/latest"}
 	if err := p.Post(u, query, &result); err != nil {
 		return nil, err
 	}
@@ -202,7 +189,7 @@ func (p *client) GetQuery(query interface{}) (result *QueryData, err error) {
 	if err != nil {
 		return nil, err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/query"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/data/query"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -214,7 +201,7 @@ func (p *client) GetQuery(query interface{}) (result *QueryData, err error) {
 }
 
 func (p *client) PostQuery(query interface{}) (result *QueryData, err error) {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/data/query"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/data/query"}
 	result = new(QueryData)
 	if err := p.Post(u, query, &result); err != nil {
 		return nil, err
@@ -223,7 +210,7 @@ func (p *client) PostQuery(query interface{}) (result *QueryData, err error) {
 }
 
 func (p *client) ChangeCommand(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/command", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/command", id)}
 	return p.Post(u, data, &result)
 }
 
@@ -232,7 +219,7 @@ func (p *client) FindExtQuery(tableName string, query, result interface{}) error
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -240,32 +227,32 @@ func (p *client) FindExtQuery(tableName string, query, result interface{}) error
 }
 
 func (p *client) SaveExt(tableName string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s", tableName)}
 	return p.Post(u, data, result)
 }
 
 func (p *client) SaveManyExt(tableName string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/many", tableName)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s/many", tableName)}
 	return p.Post(u, data, result)
 }
 
 func (p *client) FindExtById(tableName, id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
 	return p.Get(u, result)
 }
 
 func (p *client) DelExtById(tableName, id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateExtById(tableName, id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceExtById(tableName, id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/ext/%s/%s", tableName, id)}
 	return p.Put(u, data, result)
 }
 
@@ -274,7 +261,7 @@ func (p *client) FindEventQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/event"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "event/event"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -282,27 +269,27 @@ func (p *client) FindEventQuery(query, result interface{}) error {
 }
 
 func (p *client) FindEventById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveEvent(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/event"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "event/event"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelEventById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateEventById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceEventById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/event/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -311,7 +298,7 @@ func (p *client) FindHandlerQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/eventHandler"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "event/eventHandler"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -319,27 +306,27 @@ func (p *client) FindHandlerQuery(query, result interface{}) error {
 }
 
 func (p *client) FindHandlerById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveHandler(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "event/eventHandler"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "event/eventHandler"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelHandlerById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateHandlerById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceHandlerById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("event/eventHandler/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -348,7 +335,7 @@ func (p *client) FindModelQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/model"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/model"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -356,27 +343,27 @@ func (p *client) FindModelQuery(query, result interface{}) error {
 }
 
 func (p *client) FindModelById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveModel(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/model"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/model"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelModelById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateModelById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceModelById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/model/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -385,7 +372,7 @@ func (p *client) FindNodeQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/node"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/node"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -393,27 +380,27 @@ func (p *client) FindNodeQuery(query, result interface{}) error {
 }
 
 func (p *client) FindNodeById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/_id/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/node/_id/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveNode(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/node"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/node"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelNodeById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateNodeById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceNodeById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/node/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -422,7 +409,7 @@ func (p *client) FindSettingQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/setting"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/setting"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -430,27 +417,27 @@ func (p *client) FindSettingQuery(query, result interface{}) error {
 }
 
 func (p *client) FindSettingById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveSetting(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/setting"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/setting"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelSettingById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateSettingById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceSettingById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/setting/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -459,7 +446,7 @@ func (p *client) FindTableQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/table"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/table"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -467,27 +454,27 @@ func (p *client) FindTableQuery(query, result interface{}) error {
 }
 
 func (p *client) FindTableById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveTable(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/table"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/table"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelTableById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateTableById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceTableById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/table/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -496,7 +483,7 @@ func (p *client) FindUserQuery(query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/user"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/user"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	u.RawQuery = v.Encode()
@@ -504,27 +491,27 @@ func (p *client) FindUserQuery(query, result interface{}) error {
 }
 
 func (p *client) FindUserById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
 	return p.Get(u, result)
 }
 
 func (p *client) SaveUser(data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "core/user"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "core/user"}
 	return p.Post(u, data, result)
 }
 
 func (p *client) DelUserById(id string, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
 	return p.Delete(u, result)
 }
 
 func (p *client) UpdateUserById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
 	return p.Patch(u, data, result)
 }
 
 func (p *client) ReplaceUserById(id string, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("core/user/%s", id)}
 	return p.Put(u, data, result)
 }
 
@@ -533,7 +520,7 @@ func (p *client) FindWarnQuery(archive bool, query, result interface{}) error {
 	if err != nil {
 		return err
 	}
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "warning/warning"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "warning/warning"}
 	v := url.Values{}
 	v.Set("query", string(b))
 	v.Set("archive", strconv.FormatBool(archive))
@@ -542,7 +529,7 @@ func (p *client) FindWarnQuery(archive bool, query, result interface{}) error {
 }
 
 func (p *client) FindWarnById(id string, archive bool, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))
 	u.RawQuery = v.Encode()
@@ -550,7 +537,7 @@ func (p *client) FindWarnById(id string, archive bool, result interface{}) error
 }
 
 func (p *client) SaveWarn(data, archive bool, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "warning/warning"}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: "warning/warning"}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))
 	u.RawQuery = v.Encode()
@@ -558,7 +545,7 @@ func (p *client) SaveWarn(data, archive bool, result interface{}) error {
 }
 
 func (p *client) DelWarnById(id string, archive bool, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))
 	u.RawQuery = v.Encode()
@@ -566,7 +553,7 @@ func (p *client) DelWarnById(id string, archive bool, result interface{}) error 
 }
 
 func (p *client) UpdateWarnById(id string, archive bool, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))
 	u.RawQuery = v.Encode()
@@ -574,7 +561,7 @@ func (p *client) UpdateWarnById(id string, archive bool, data, result interface{
 }
 
 func (p *client) ReplaceWarnById(id string, archive bool, data, result interface{}) error {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("warning/warning/%s", id)}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))
 	u.RawQuery = v.Encode()
@@ -582,7 +569,7 @@ func (p *client) ReplaceWarnById(id string, archive bool, data, result interface
 }
 
 func (p *client) DriverConfig(projectId, driverId, serviceId string) ([]byte, error) {
-	u := url.URL{Scheme: p.protocol, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
+	u := url.URL{Scheme: p.cfg.Schema, Host: p.host, Path: fmt.Sprintf("driver/driver/%s/%s/config", driverId, serviceId)}
 	// p.checkToken()
 	resp, err := resty.New().SetTimeout(time.Minute*1).R().
 		SetHeader("Content-Type", "application/json").

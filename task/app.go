@@ -16,8 +16,6 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-
-	"github.com/air-iot/sdk-go/logger"
 )
 
 type App interface {
@@ -50,11 +48,11 @@ type app struct {
 	*cron.Cron
 }
 
-// NewDG 创建DG
+// NewApp 创建DG
 func NewApp() App {
-	var logLevel = viper.GetString("log.level")
+	//var logLevel = viper.GetString("log.level")
 	a := new(app)
-	a.Logger = logger.NewLogger(logLevel)
+	//a.Logger = logger.NewLogger(logLevel)
 	a.Cron = cron.New(cron.WithSeconds(), cron.WithChain(cron.DelayIfStillRunning(cron.DefaultLogger)))
 	return a
 }

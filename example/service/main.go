@@ -13,7 +13,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 
-	"github.com/air-iot/sdk-go/service"
+	"github.com/air-iot/sdk-go/v4/service"
 )
 
 // TestService 定义测试接口结构体

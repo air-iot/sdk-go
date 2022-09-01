@@ -1,0 +1,81 @@
+// Copyright 2015 The gRPC Authors
+// protoc -I . --go_out=plugins=grpc:. ./driver.proto
+syntax = "proto3";
+
+package proto;
+
+option go_package = "./;proto";
+
+service DriverService {
+  rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse) {}
+  rpc SchemaStream (stream SchemaResult) returns (stream SchemaRequest) {}
+  rpc StartStream (stream StartResult) returns (stream StartRequest) {}
+  rpc RunStream (stream RunResult) returns (stream RunRequest) {}
+  rpc WriteTagStream (stream RunResult) returns (stream RunRequest) {}
+  rpc BatchRunStream (stream BatchRunResult) returns (stream BatchRunRequest) {}
+  rpc DebugStream (stream Debug) returns (stream Debug) {}
+}
+
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;  // Used only by the Watch method.
+  }
+  ServingStatus status = 1;
+}
+
+message SchemaRequest {
+  string request = 1;
+}
+
+message SchemaResult {
+  string request = 1;
+  bytes message = 2;
+}
+
+message StartRequest {
+  string request = 1;
+  bytes config = 2;
+}
+
+message StartResult {
+  string request = 1;
+  bytes message = 2;
+}
+
+message RunRequest {
+  string request = 1;
+  string tableId = 2;
+  string id = 3;
+  string serialNo = 4;
+  bytes command = 5;
+}
+
+message RunResult {
+  string request = 1;
+  bytes message = 2;
+}
+
+message BatchRunRequest {
+  string request = 1;
+  string tableId = 2;
+  repeated string id = 3;
+  string serialNo = 4;
+  bytes command = 5;
+}
+
+message BatchRunResult {
+  string request = 1;
+  bytes message = 2;
+}
+
+message Debug {
+  string request = 1;
+  bytes data = 2;
+}

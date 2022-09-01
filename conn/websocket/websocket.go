@@ -86,7 +86,7 @@ func (c *Conn) reConnect() error {
 	if err != nil {
 		return err
 	}
-	//c.Conn.Close()
+	//c.cli.Close()
 	c.Conn = conn
 	return nil
 }
