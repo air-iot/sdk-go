@@ -8,6 +8,9 @@ option go_package = "./;proto";
 
 service DriverService {
   rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse) {}
+  rpc Event (Request) returns (Response) {}
+  rpc CommandLog (Request) returns (Response) {}
+  rpc UpdateTableData (Request) returns (Response) {}
   rpc SchemaStream (stream SchemaResult) returns (stream SchemaRequest) {}
   rpc StartStream (stream StartResult) returns (stream StartRequest) {}
   rpc RunStream (stream RunResult) returns (stream RunRequest) {}
@@ -28,6 +31,18 @@ message HealthCheckResponse {
     SERVICE_UNKNOWN = 3;  // Used only by the Watch method.
   }
   ServingStatus status = 1;
+}
+
+message Request {
+  string project = 1;
+  bytes data = 4;
+}
+
+message Response {
+  bool status = 1;
+  int32 code = 2;
+  string info = 3;
+  bytes result = 4;
 }
 
 message SchemaRequest {

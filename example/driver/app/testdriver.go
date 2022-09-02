@@ -147,7 +147,7 @@ func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error)
 // BatchRun 批量执行指令，实现Driver的Run函数
 func (p *TestDriver) BatchRun(a driver.App, cmd *driver.BatchCommand) (interface{}, error) {
 	logger.Debugln("BatchRun", *cmd)
-	if err := a.RunLog(driver.Log{
+	if err := a.RunLog(context.Background(), driver.Log{
 		SerialNo: cmd.SerialNo,
 		Status:   "成功",
 		UnixTime: time.Now().UnixNano() / 1e6,

@@ -25,9 +25,9 @@ import (
 type App interface {
 	Start(Driver)
 	WritePoints(Point) error
-	WriteEvent(Event) error
-	RunLog(Log) error
-	UpdateTableData(table, id string, custom map[string]interface{}) error
+	WriteEvent(context.Context, Event) error
+	RunLog(context.Context, Log) error
+	UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error
 	LogDebug(table, id string, msg interface{})
 	LogInfo(table, id string, msg interface{})
 	LogWarn(table, id string, msg interface{})
@@ -46,6 +46,7 @@ type app struct {
 	*logrus.Logger
 	mq      mq.MQ
 	stopped bool
+	cli     *Client
 	clean   func()
 }
 
@@ -116,7 +117,7 @@ func NewApp() App {
 func (a *app) Start(driver Driver) {
 	a.stopped = false
 	cli := Client{}
-	cli.Start(a, driver)
+	a.cli = cli.Start(a, driver)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	sig := <-ch
@@ -228,38 +229,20 @@ func (a *app) WritePoints(p Point) error {
 	return a.mq.Publish(context.Background(), []string{"data", C.Project, p.Table, p.ID}, b)
 }
 
-func (a *app) WriteEvent(event Event) error {
-	if event.ID == "" || event.EventID == "" {
-		return errors.New("资产或事件ID为空")
-	}
-	b, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-	return a.mq.Publish(context.Background(), []string{"driverEvent", C.Project, event.ID}, b)
+func (a *app) WriteEvent(ctx context.Context, event Event) error {
+	return a.cli.WriteEvent(ctx, event)
 }
 
-func (a *app) RunLog(l Log) error {
-	if l.SerialNo == "" {
-		return errors.New("流水号为空")
-	}
-	b, err := json.Marshal(l)
-	if err != nil {
-		return err
-	}
-	return a.mq.Publish(context.Background(), []string{"driverRunLog", C.Project}, b)
+func (a *app) RunLog(ctx context.Context, l Log) error {
+	return a.cli.RunLog(ctx, l)
 }
 
-func (a *app) UpdateTableData(table, id string, custom map[string]interface{}) error {
-	// TODO
-	//data := make(map[string]interface{})
-	//for k, v := range custom {
-	//	data[fmt.Sprintf("custom.%s", k)] = v
-	//}
-	//if err := a.api.UpdateNodeById(id, data, &map[string]interface{}{}); err != nil {
-	//	return err
-	//}
-	return nil
+func (a *app) UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error {
+	return a.cli.UpdateTableData(ctx, TableData{
+		TableID: table,
+		ID:      id,
+		Data:    custom,
+	}, &map[string]interface{}{})
 }
 
 // active fixed  boundary  discard

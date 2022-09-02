@@ -173,6 +173,132 @@ func (x *HealthCheckResponse) GetStatus() HealthCheckResponse_ServingStatus {
 	return HealthCheckResponse_UNKNOWN
 }
 
+type Request struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Project string `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
+	Data    []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+}
+
+func (x *Request) Reset() {
+	*x = Request{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_driver_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Request) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Request) ProtoMessage() {}
+
+func (x *Request) ProtoReflect() protoreflect.Message {
+	mi := &file_driver_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Request.ProtoReflect.Descriptor instead.
+func (*Request) Descriptor() ([]byte, []int) {
+	return file_driver_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Request) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *Request) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type Response struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Status bool   `protobuf:"varint,1,opt,name=status,proto3" json:"status,omitempty"`
+	Code   int32  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`
+	Info   string `protobuf:"bytes,3,opt,name=info,proto3" json:"info,omitempty"`
+	Result []byte `protobuf:"bytes,4,opt,name=result,proto3" json:"result,omitempty"`
+}
+
+func (x *Response) Reset() {
+	*x = Response{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_driver_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Response) ProtoMessage() {}
+
+func (x *Response) ProtoReflect() protoreflect.Message {
+	mi := &file_driver_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Response.ProtoReflect.Descriptor instead.
+func (*Response) Descriptor() ([]byte, []int) {
+	return file_driver_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Response) GetStatus() bool {
+	if x != nil {
+		return x.Status
+	}
+	return false
+}
+
+func (x *Response) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *Response) GetInfo() string {
+	if x != nil {
+		return x.Info
+	}
+	return ""
+}
+
+func (x *Response) GetResult() []byte {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 type SchemaRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -184,7 +310,7 @@ type SchemaRequest struct {
 func (x *SchemaRequest) Reset() {
 	*x = SchemaRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[2]
+		mi := &file_driver_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -197,7 +323,7 @@ func (x *SchemaRequest) String() string {
 func (*SchemaRequest) ProtoMessage() {}
 
 func (x *SchemaRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[2]
+	mi := &file_driver_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -210,7 +336,7 @@ func (x *SchemaRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SchemaRequest.ProtoReflect.Descriptor instead.
 func (*SchemaRequest) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{2}
+	return file_driver_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SchemaRequest) GetRequest() string {
@@ -232,7 +358,7 @@ type SchemaResult struct {
 func (x *SchemaResult) Reset() {
 	*x = SchemaResult{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[3]
+		mi := &file_driver_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -245,7 +371,7 @@ func (x *SchemaResult) String() string {
 func (*SchemaResult) ProtoMessage() {}
 
 func (x *SchemaResult) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[3]
+	mi := &file_driver_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -258,7 +384,7 @@ func (x *SchemaResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SchemaResult.ProtoReflect.Descriptor instead.
 func (*SchemaResult) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{3}
+	return file_driver_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SchemaResult) GetRequest() string {
@@ -287,7 +413,7 @@ type StartRequest struct {
 func (x *StartRequest) Reset() {
 	*x = StartRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[4]
+		mi := &file_driver_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -300,7 +426,7 @@ func (x *StartRequest) String() string {
 func (*StartRequest) ProtoMessage() {}
 
 func (x *StartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[4]
+	mi := &file_driver_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -313,7 +439,7 @@ func (x *StartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRequest.ProtoReflect.Descriptor instead.
 func (*StartRequest) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{4}
+	return file_driver_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *StartRequest) GetRequest() string {
@@ -342,7 +468,7 @@ type StartResult struct {
 func (x *StartResult) Reset() {
 	*x = StartResult{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[5]
+		mi := &file_driver_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -355,7 +481,7 @@ func (x *StartResult) String() string {
 func (*StartResult) ProtoMessage() {}
 
 func (x *StartResult) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[5]
+	mi := &file_driver_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +494,7 @@ func (x *StartResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartResult.ProtoReflect.Descriptor instead.
 func (*StartResult) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{5}
+	return file_driver_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StartResult) GetRequest() string {
@@ -400,7 +526,7 @@ type RunRequest struct {
 func (x *RunRequest) Reset() {
 	*x = RunRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[6]
+		mi := &file_driver_proto_msgTypes[8]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -413,7 +539,7 @@ func (x *RunRequest) String() string {
 func (*RunRequest) ProtoMessage() {}
 
 func (x *RunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[6]
+	mi := &file_driver_proto_msgTypes[8]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -426,7 +552,7 @@ func (x *RunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunRequest.ProtoReflect.Descriptor instead.
 func (*RunRequest) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{6}
+	return file_driver_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RunRequest) GetRequest() string {
@@ -476,7 +602,7 @@ type RunResult struct {
 func (x *RunResult) Reset() {
 	*x = RunResult{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[7]
+		mi := &file_driver_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -489,7 +615,7 @@ func (x *RunResult) String() string {
 func (*RunResult) ProtoMessage() {}
 
 func (x *RunResult) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[7]
+	mi := &file_driver_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,7 +628,7 @@ func (x *RunResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunResult.ProtoReflect.Descriptor instead.
 func (*RunResult) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{7}
+	return file_driver_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RunResult) GetRequest() string {
@@ -534,7 +660,7 @@ type BatchRunRequest struct {
 func (x *BatchRunRequest) Reset() {
 	*x = BatchRunRequest{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[8]
+		mi := &file_driver_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -547,7 +673,7 @@ func (x *BatchRunRequest) String() string {
 func (*BatchRunRequest) ProtoMessage() {}
 
 func (x *BatchRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[8]
+	mi := &file_driver_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -560,7 +686,7 @@ func (x *BatchRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchRunRequest.ProtoReflect.Descriptor instead.
 func (*BatchRunRequest) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{8}
+	return file_driver_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BatchRunRequest) GetRequest() string {
@@ -610,7 +736,7 @@ type BatchRunResult struct {
 func (x *BatchRunResult) Reset() {
 	*x = BatchRunResult{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[9]
+		mi := &file_driver_proto_msgTypes[11]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -623,7 +749,7 @@ func (x *BatchRunResult) String() string {
 func (*BatchRunResult) ProtoMessage() {}
 
 func (x *BatchRunResult) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[9]
+	mi := &file_driver_proto_msgTypes[11]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -636,7 +762,7 @@ func (x *BatchRunResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchRunResult.ProtoReflect.Descriptor instead.
 func (*BatchRunResult) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{9}
+	return file_driver_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *BatchRunResult) GetRequest() string {
@@ -665,7 +791,7 @@ type Debug struct {
 func (x *Debug) Reset() {
 	*x = Debug{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_driver_proto_msgTypes[10]
+		mi := &file_driver_proto_msgTypes[12]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -678,7 +804,7 @@ func (x *Debug) String() string {
 func (*Debug) ProtoMessage() {}
 
 func (x *Debug) ProtoReflect() protoreflect.Message {
-	mi := &file_driver_proto_msgTypes[10]
+	mi := &file_driver_proto_msgTypes[12]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +817,7 @@ func (x *Debug) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Debug.ProtoReflect.Descriptor instead.
 func (*Debug) Descriptor() ([]byte, []int) {
-	return file_driver_proto_rawDescGZIP(), []int{10}
+	return file_driver_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Debug) GetRequest() string {
@@ -726,56 +852,75 @@ var file_driver_proto_rawDesc = []byte{
 	0x07, 0x53, 0x45, 0x52, 0x56, 0x49, 0x4e, 0x47, 0x10, 0x01, 0x12, 0x0f, 0x0a, 0x0b, 0x4e, 0x4f,
 	0x54, 0x5f, 0x53, 0x45, 0x52, 0x56, 0x49, 0x4e, 0x47, 0x10, 0x02, 0x12, 0x13, 0x0a, 0x0f, 0x53,
 	0x45, 0x52, 0x56, 0x49, 0x43, 0x45, 0x5f, 0x55, 0x4e, 0x4b, 0x4e, 0x4f, 0x57, 0x4e, 0x10, 0x03,
-	0x22, 0x29, 0x0a, 0x0d, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73,
-	0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x42, 0x0a, 0x0c, 0x53,
-	0x63, 0x68, 0x65, 0x6d, 0x61, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72,
+	0x22, 0x37, 0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x70,
+	0x72, 0x6f, 0x6a, 0x65, 0x63, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x70, 0x72,
+	0x6f, 0x6a, 0x65, 0x63, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x04, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x22, 0x62, 0x0a, 0x08, 0x52, 0x65, 0x73,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x08, 0x52, 0x06, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x12, 0x12, 0x0a,
+	0x04, 0x63, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x05, 0x52, 0x04, 0x63, 0x6f, 0x64,
+	0x65, 0x12, 0x12, 0x0a, 0x04, 0x69, 0x6e, 0x66, 0x6f, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x69, 0x6e, 0x66, 0x6f, 0x12, 0x16, 0x0a, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x22, 0x29, 0x0a,
+	0x0d, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18,
+	0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x22, 0x42, 0x0a, 0x0c, 0x53, 0x63, 0x68, 0x65,
+	0x6d, 0x61, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x40, 0x0a, 0x0c,
+	0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07,
+	0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72,
+	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69, 0x67, 0x22, 0x41,
+	0x0a, 0x0b, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a,
+	0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
+	0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61,
+	0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+	0x65, 0x22, 0x86, 0x01, 0x0a, 0x0a, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x61,
+	0x62, 0x6c, 0x65, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x61, 0x62,
+	0x6c, 0x65, 0x49, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x02, 0x69, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x4e, 0x6f,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x4e, 0x6f,
+	0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28,
+	0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x3f, 0x0a, 0x09, 0x52, 0x75,
+	0x6e, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73,
+	0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01,
+	0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x8b, 0x01, 0x0a, 0x0f,
+	0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
+	0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x74, 0x61, 0x62,
+	0x6c, 0x65, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x61, 0x62, 0x6c,
+	0x65, 0x49, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x03, 0x20, 0x03, 0x28, 0x09, 0x52,
+	0x02, 0x69, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x4e, 0x6f, 0x18,
+	0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x4e, 0x6f, 0x12,
+	0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x18, 0x05, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x44, 0x0a, 0x0e, 0x42, 0x61, 0x74,
+	0x63, 0x68, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72,
 	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65,
 	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65,
 	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22,
-	0x40, 0x0a, 0x0c, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12,
-	0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
-	0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x63, 0x6f, 0x6e,
-	0x66, 0x69, 0x67, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x06, 0x63, 0x6f, 0x6e, 0x66, 0x69,
-	0x67, 0x22, 0x41, 0x0a, 0x0b, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74,
-	0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65,
-	0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73,
-	0x73, 0x61, 0x67, 0x65, 0x22, 0x86, 0x01, 0x0a, 0x0a, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x71, 0x75,
-	0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a,
-	0x07, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07,
-	0x74, 0x61, 0x62, 0x6c, 0x65, 0x49, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x03, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61,
-	0x6c, 0x4e, 0x6f, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61,
-	0x6c, 0x4e, 0x6f, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x18, 0x05,
-	0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x3f, 0x0a,
-	0x09, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65,
-	0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71,
-	0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18,
-	0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x8b,
-	0x01, 0x0a, 0x0f, 0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x71, 0x75, 0x65,
-	0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07,
-	0x74, 0x61, 0x62, 0x6c, 0x65, 0x49, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x74,
-	0x61, 0x62, 0x6c, 0x65, 0x49, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x03, 0x20, 0x03,
-	0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x1a, 0x0a, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c,
-	0x4e, 0x6f, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x65, 0x72, 0x69, 0x61, 0x6c,
-	0x4e, 0x6f, 0x12, 0x18, 0x0a, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x18, 0x05, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x44, 0x0a, 0x0e,
-	0x42, 0x61, 0x74, 0x63, 0x68, 0x52, 0x75, 0x6e, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x12, 0x18,
-	0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x18, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73,
-	0x61, 0x67, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61,
-	0x67, 0x65, 0x22, 0x35, 0x0a, 0x05, 0x44, 0x65, 0x62, 0x75, 0x67, 0x12, 0x18, 0x0a, 0x07, 0x72,
-	0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65,
-	0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x0c, 0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x32, 0xc3, 0x03, 0x0a, 0x0d, 0x44, 0x72,
-	0x69, 0x76, 0x65, 0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x46, 0x0a, 0x0b, 0x48,
-	0x65, 0x61, 0x6c, 0x74, 0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x12, 0x19, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x2e, 0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x52, 0x65,
-	0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x1a, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x48, 0x65,
-	0x61, 0x6c, 0x74, 0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x35, 0x0a, 0x05, 0x44, 0x65, 0x62, 0x75, 0x67, 0x12, 0x18, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75,
+	0x65, 0x73, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x64, 0x61, 0x74, 0x61, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c,
+	0x52, 0x04, 0x64, 0x61, 0x74, 0x61, 0x32, 0xd6, 0x04, 0x0a, 0x0d, 0x44, 0x72, 0x69, 0x76, 0x65,
+	0x72, 0x53, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x12, 0x46, 0x0a, 0x0b, 0x48, 0x65, 0x61, 0x6c,
+	0x74, 0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x12, 0x19, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
+	0x48, 0x65, 0x61, 0x6c, 0x74, 0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x52, 0x65, 0x71, 0x75, 0x65,
+	0x73, 0x74, 0x1a, 0x1a, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x48, 0x65, 0x61, 0x6c, 0x74,
+	0x68, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00,
+	0x12, 0x2a, 0x0a, 0x05, 0x45, 0x76, 0x65, 0x6e, 0x74, 0x12, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0f, 0x2e, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x2f, 0x0a, 0x0a,
+	0x43, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x4c, 0x6f, 0x67, 0x12, 0x0e, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x0f, 0x2e, 0x70, 0x72, 0x6f,
+	0x74, 0x6f, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x12, 0x34, 0x0a,
+	0x0f, 0x55, 0x70, 0x64, 0x61, 0x74, 0x65, 0x54, 0x61, 0x62, 0x6c, 0x65, 0x44, 0x61, 0x74, 0x61,
+	0x12, 0x0e, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74,
+	0x1a, 0x0f, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
 	0x65, 0x22, 0x00, 0x12, 0x3f, 0x0a, 0x0c, 0x53, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x53, 0x74, 0x72,
 	0x65, 0x61, 0x6d, 0x12, 0x13, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x53, 0x63, 0x68, 0x65,
 	0x6d, 0x61, 0x52, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x1a, 0x14, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
@@ -816,39 +961,47 @@ func file_driver_proto_rawDescGZIP() []byte {
 }
 
 var file_driver_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_driver_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_driver_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_driver_proto_goTypes = []interface{}{
 	(HealthCheckResponse_ServingStatus)(0), // 0: proto.HealthCheckResponse.ServingStatus
 	(*HealthCheckRequest)(nil),             // 1: proto.HealthCheckRequest
 	(*HealthCheckResponse)(nil),            // 2: proto.HealthCheckResponse
-	(*SchemaRequest)(nil),                  // 3: proto.SchemaRequest
-	(*SchemaResult)(nil),                   // 4: proto.SchemaResult
-	(*StartRequest)(nil),                   // 5: proto.StartRequest
-	(*StartResult)(nil),                    // 6: proto.StartResult
-	(*RunRequest)(nil),                     // 7: proto.RunRequest
-	(*RunResult)(nil),                      // 8: proto.RunResult
-	(*BatchRunRequest)(nil),                // 9: proto.BatchRunRequest
-	(*BatchRunResult)(nil),                 // 10: proto.BatchRunResult
-	(*Debug)(nil),                          // 11: proto.Debug
+	(*Request)(nil),                        // 3: proto.Request
+	(*Response)(nil),                       // 4: proto.Response
+	(*SchemaRequest)(nil),                  // 5: proto.SchemaRequest
+	(*SchemaResult)(nil),                   // 6: proto.SchemaResult
+	(*StartRequest)(nil),                   // 7: proto.StartRequest
+	(*StartResult)(nil),                    // 8: proto.StartResult
+	(*RunRequest)(nil),                     // 9: proto.RunRequest
+	(*RunResult)(nil),                      // 10: proto.RunResult
+	(*BatchRunRequest)(nil),                // 11: proto.BatchRunRequest
+	(*BatchRunResult)(nil),                 // 12: proto.BatchRunResult
+	(*Debug)(nil),                          // 13: proto.Debug
 }
 var file_driver_proto_depIdxs = []int32{
 	0,  // 0: proto.HealthCheckResponse.status:type_name -> proto.HealthCheckResponse.ServingStatus
 	1,  // 1: proto.DriverService.HealthCheck:input_type -> proto.HealthCheckRequest
-	4,  // 2: proto.DriverService.SchemaStream:input_type -> proto.SchemaResult
-	6,  // 3: proto.DriverService.StartStream:input_type -> proto.StartResult
-	8,  // 4: proto.DriverService.RunStream:input_type -> proto.RunResult
-	8,  // 5: proto.DriverService.WriteTagStream:input_type -> proto.RunResult
-	10, // 6: proto.DriverService.BatchRunStream:input_type -> proto.BatchRunResult
-	11, // 7: proto.DriverService.DebugStream:input_type -> proto.Debug
-	2,  // 8: proto.DriverService.HealthCheck:output_type -> proto.HealthCheckResponse
-	3,  // 9: proto.DriverService.SchemaStream:output_type -> proto.SchemaRequest
-	5,  // 10: proto.DriverService.StartStream:output_type -> proto.StartRequest
-	7,  // 11: proto.DriverService.RunStream:output_type -> proto.RunRequest
-	7,  // 12: proto.DriverService.WriteTagStream:output_type -> proto.RunRequest
-	9,  // 13: proto.DriverService.BatchRunStream:output_type -> proto.BatchRunRequest
-	11, // 14: proto.DriverService.DebugStream:output_type -> proto.Debug
-	8,  // [8:15] is the sub-list for method output_type
-	1,  // [1:8] is the sub-list for method input_type
+	3,  // 2: proto.DriverService.Event:input_type -> proto.Request
+	3,  // 3: proto.DriverService.CommandLog:input_type -> proto.Request
+	3,  // 4: proto.DriverService.UpdateTableData:input_type -> proto.Request
+	6,  // 5: proto.DriverService.SchemaStream:input_type -> proto.SchemaResult
+	8,  // 6: proto.DriverService.StartStream:input_type -> proto.StartResult
+	10, // 7: proto.DriverService.RunStream:input_type -> proto.RunResult
+	10, // 8: proto.DriverService.WriteTagStream:input_type -> proto.RunResult
+	12, // 9: proto.DriverService.BatchRunStream:input_type -> proto.BatchRunResult
+	13, // 10: proto.DriverService.DebugStream:input_type -> proto.Debug
+	2,  // 11: proto.DriverService.HealthCheck:output_type -> proto.HealthCheckResponse
+	4,  // 12: proto.DriverService.Event:output_type -> proto.Response
+	4,  // 13: proto.DriverService.CommandLog:output_type -> proto.Response
+	4,  // 14: proto.DriverService.UpdateTableData:output_type -> proto.Response
+	5,  // 15: proto.DriverService.SchemaStream:output_type -> proto.SchemaRequest
+	7,  // 16: proto.DriverService.StartStream:output_type -> proto.StartRequest
+	9,  // 17: proto.DriverService.RunStream:output_type -> proto.RunRequest
+	9,  // 18: proto.DriverService.WriteTagStream:output_type -> proto.RunRequest
+	11, // 19: proto.DriverService.BatchRunStream:output_type -> proto.BatchRunRequest
+	13, // 20: proto.DriverService.DebugStream:output_type -> proto.Debug
+	11, // [11:21] is the sub-list for method output_type
+	1,  // [1:11] is the sub-list for method input_type
 	1,  // [1:1] is the sub-list for extension type_name
 	1,  // [1:1] is the sub-list for extension extendee
 	0,  // [0:1] is the sub-list for field type_name
@@ -885,7 +1038,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SchemaRequest); i {
+			switch v := v.(*Request); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -897,7 +1050,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*SchemaResult); i {
+			switch v := v.(*Response); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -909,7 +1062,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StartRequest); i {
+			switch v := v.(*SchemaRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -921,7 +1074,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*StartResult); i {
+			switch v := v.(*SchemaResult); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -933,7 +1086,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RunRequest); i {
+			switch v := v.(*StartRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -945,7 +1098,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*RunResult); i {
+			switch v := v.(*StartResult); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -957,7 +1110,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BatchRunRequest); i {
+			switch v := v.(*RunRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -969,7 +1122,7 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*BatchRunResult); i {
+			switch v := v.(*RunResult); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -981,6 +1134,30 @@ func file_driver_proto_init() {
 			}
 		}
 		file_driver_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BatchRunRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_driver_proto_msgTypes[11].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*BatchRunResult); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_driver_proto_msgTypes[12].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Debug); i {
 			case 0:
 				return &v.state
@@ -999,7 +1176,7 @@ func file_driver_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_driver_proto_rawDesc,
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -1027,6 +1204,9 @@ const _ = grpc.SupportPackageIsVersion6
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type DriverServiceClient interface {
 	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+	Event(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	CommandLog(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
+	UpdateTableData(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 	SchemaStream(ctx context.Context, opts ...grpc.CallOption) (DriverService_SchemaStreamClient, error)
 	StartStream(ctx context.Context, opts ...grpc.CallOption) (DriverService_StartStreamClient, error)
 	RunStream(ctx context.Context, opts ...grpc.CallOption) (DriverService_RunStreamClient, error)
@@ -1046,6 +1226,33 @@ func NewDriverServiceClient(cc grpc.ClientConnInterface) DriverServiceClient {
 func (c *driverServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
 	out := new(HealthCheckResponse)
 	err := c.cc.Invoke(ctx, "/proto.DriverService/HealthCheck", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *driverServiceClient) Event(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/proto.DriverService/Event", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *driverServiceClient) CommandLog(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/proto.DriverService/CommandLog", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *driverServiceClient) UpdateTableData(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/proto.DriverService/UpdateTableData", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1241,6 +1448,9 @@ func (x *driverServiceDebugStreamClient) Recv() (*Debug, error) {
 // DriverServiceServer is the server API for DriverService service.
 type DriverServiceServer interface {
 	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
+	Event(context.Context, *Request) (*Response, error)
+	CommandLog(context.Context, *Request) (*Response, error)
+	UpdateTableData(context.Context, *Request) (*Response, error)
 	SchemaStream(DriverService_SchemaStreamServer) error
 	StartStream(DriverService_StartStreamServer) error
 	RunStream(DriverService_RunStreamServer) error
@@ -1255,6 +1465,15 @@ type UnimplementedDriverServiceServer struct {
 
 func (*UnimplementedDriverServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
+}
+func (*UnimplementedDriverServiceServer) Event(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Event not implemented")
+}
+func (*UnimplementedDriverServiceServer) CommandLog(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CommandLog not implemented")
+}
+func (*UnimplementedDriverServiceServer) UpdateTableData(context.Context, *Request) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateTableData not implemented")
 }
 func (*UnimplementedDriverServiceServer) SchemaStream(DriverService_SchemaStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method SchemaStream not implemented")
@@ -1293,6 +1512,60 @@ func _DriverService_HealthCheck_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DriverServiceServer).HealthCheck(ctx, req.(*HealthCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DriverService_Event_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DriverServiceServer).Event(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.DriverService/Event",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DriverServiceServer).Event(ctx, req.(*Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DriverService_CommandLog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DriverServiceServer).CommandLog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.DriverService/CommandLog",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DriverServiceServer).CommandLog(ctx, req.(*Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DriverService_UpdateTableData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DriverServiceServer).UpdateTableData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.DriverService/UpdateTableData",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DriverServiceServer).UpdateTableData(ctx, req.(*Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1460,6 +1733,18 @@ var _DriverService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HealthCheck",
 			Handler:    _DriverService_HealthCheck_Handler,
+		},
+		{
+			MethodName: "Event",
+			Handler:    _DriverService_Event_Handler,
+		},
+		{
+			MethodName: "CommandLog",
+			Handler:    _DriverService_CommandLog_Handler,
+		},
+		{
+			MethodName: "UpdateTableData",
+			Handler:    _DriverService_UpdateTableData_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

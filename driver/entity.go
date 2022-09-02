@@ -24,6 +24,12 @@ type Log struct {
 	Desc     string `json:"desc"`     // 描述
 }
 
+type TableData struct {
+	TableID string                 `json:"table"` // 表id
+	ID      string                 `json:"id"`    // 设备编号
+	Data    map[string]interface{} `json:"data"`
+}
+
 // Field 字段
 type Field struct {
 	Tag   interface{} `json:"tag"`   // 数据点

@@ -3,6 +3,7 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,7 +28,7 @@ type Client struct {
 	cleanHealthCheck func()
 }
 
-func (c *Client) Start(app App, driver Driver) {
+func (c *Client) Start(app App, driver Driver) *Client {
 	c.app = app
 	c.driver = driver
 	if err := c.connDriver(); err != nil {
@@ -43,6 +44,7 @@ func (c *Client) Start(app App, driver Driver) {
 	}
 	c.healthCheck(ctxHealth)
 	c.startSteam(ctx)
+	return c
 }
 
 func (c *Client) connDriver() error {
@@ -104,6 +106,72 @@ func (c *Client) healthCheck(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (c *Client) WriteEvent(ctx context.Context, event Event) error {
+	if event.ID == "" || event.EventID == "" {
+		return errors.New("资产或事件ID为空")
+	}
+	b, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	res, err := c.cli.Event(ctx, &pb.Request{
+		Project: C.Project,
+		Data:    b,
+	})
+	if err != nil {
+		return err
+	}
+	if !res.GetStatus() {
+		return fmt.Errorf(res.GetInfo())
+	}
+	return nil
+}
+
+func (c *Client) RunLog(ctx context.Context, l Log) error {
+	if l.SerialNo == "" {
+		return errors.New("流水号为空")
+	}
+	b, err := json.Marshal(l)
+	if err != nil {
+		return err
+	}
+	res, err := c.cli.CommandLog(ctx, &pb.Request{
+		Project: C.Project,
+		Data:    b,
+	})
+	if err != nil {
+		return err
+	}
+	if !res.GetStatus() {
+		return fmt.Errorf(res.GetInfo())
+	}
+	return nil
+}
+
+func (c *Client) UpdateTableData(ctx context.Context, l TableData, result interface{}) error {
+	if l.TableID == "" || l.ID == "" {
+		return errors.New("表或记录id为空")
+	}
+	b, err := json.Marshal(l)
+	if err != nil {
+		return err
+	}
+	res, err := c.cli.UpdateTableData(ctx, &pb.Request{
+		Project: C.Project,
+		Data:    b,
+	})
+	if err != nil {
+		return err
+	}
+	if !res.GetStatus() {
+		return fmt.Errorf(res.GetInfo())
+	}
+	if err := json.Unmarshal(res.GetResult(), result); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) startSteam(ctx context.Context) {
@@ -209,8 +277,8 @@ func (c *Client) Stop() {
 	}
 }
 
-func (d *Client) SchemaStream(ctx context.Context) error {
-	stream, err := d.cli.SchemaStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) SchemaStream(ctx context.Context) error {
+	stream, err := c.cli.SchemaStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("schema stream err,%s", err)
 	}
@@ -224,7 +292,7 @@ func (d *Client) SchemaStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("schema stream err, %s", err)
 		}
-		schema, err := d.driver.Schema(d.app)
+		schema, err := c.driver.Schema(c.app)
 		schemaRes := new(grpcResult)
 		if err != nil {
 			schemaRes.Error = err.Error()
@@ -243,8 +311,8 @@ func (d *Client) SchemaStream(ctx context.Context) error {
 	}
 }
 
-func (d *Client) StartStream(ctx context.Context) error {
-	stream, err := d.cli.StartStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) StartStream(ctx context.Context) error {
+	stream, err := c.cli.StartStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("start stream err,%s", err)
 	}
@@ -259,7 +327,7 @@ func (d *Client) StartStream(ctx context.Context) error {
 			return fmt.Errorf("start stream err, %s", err)
 		}
 		startRes := new(grpcResult)
-		if err := d.driver.Start(d.app, res.Config); err != nil {
+		if err := c.driver.Start(c.app, res.Config); err != nil {
 			startRes.Error = err.Error()
 			startRes.Code = 400
 		} else {
@@ -275,8 +343,8 @@ func (d *Client) StartStream(ctx context.Context) error {
 	}
 }
 
-func (d *Client) RunStream(ctx context.Context) error {
-	stream, err := d.cli.RunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) RunStream(ctx context.Context) error {
+	stream, err := c.cli.RunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("run stream err,%s", err)
 	}
@@ -291,7 +359,7 @@ func (d *Client) RunStream(ctx context.Context) error {
 			return fmt.Errorf("run stream err, %s", err)
 		}
 		gr := new(grpcResult)
-		runRes, err := d.driver.Run(d.app, &Command{
+		runRes, err := c.driver.Run(c.app, &Command{
 			Table:    res.TableId,
 			Id:       res.Id,
 			SerialNo: res.SerialNo,
@@ -314,8 +382,8 @@ func (d *Client) RunStream(ctx context.Context) error {
 	}
 }
 
-func (d *Client) WriteTagStream(ctx context.Context) error {
-	stream, err := d.cli.WriteTagStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) WriteTagStream(ctx context.Context) error {
+	stream, err := c.cli.WriteTagStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("writeTag stream err,%s", err)
 	}
@@ -330,7 +398,7 @@ func (d *Client) WriteTagStream(ctx context.Context) error {
 			return fmt.Errorf("writeTag stream err, %s", err)
 		}
 		gr := new(grpcResult)
-		runRes, err := d.driver.WriteTag(d.app, &Command{
+		runRes, err := c.driver.WriteTag(c.app, &Command{
 			Table:    res.TableId,
 			Id:       res.Id,
 			SerialNo: res.SerialNo,
@@ -353,8 +421,8 @@ func (d *Client) WriteTagStream(ctx context.Context) error {
 	}
 }
 
-func (d *Client) BatchRunStream(ctx context.Context) error {
-	stream, err := d.cli.BatchRunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) BatchRunStream(ctx context.Context) error {
+	stream, err := c.cli.BatchRunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("batchRun stream err,%s", err)
 	}
@@ -369,7 +437,7 @@ func (d *Client) BatchRunStream(ctx context.Context) error {
 			return fmt.Errorf("batchRun stream err, %s", err)
 		}
 		gr := new(grpcResult)
-		runRes, err := d.driver.BatchRun(d.app, &BatchCommand{
+		runRes, err := c.driver.BatchRun(c.app, &BatchCommand{
 			Table:    res.TableId,
 			Ids:      res.Id,
 			SerialNo: res.SerialNo,
@@ -392,8 +460,8 @@ func (d *Client) BatchRunStream(ctx context.Context) error {
 	}
 }
 
-func (d *Client) DebugStream(ctx context.Context) error {
-	stream, err := d.cli.DebugStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+func (c *Client) DebugStream(ctx context.Context) error {
+	stream, err := c.cli.DebugStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
 	if err != nil {
 		return fmt.Errorf("debug stream err,%s", err)
 	}
@@ -408,7 +476,7 @@ func (d *Client) DebugStream(ctx context.Context) error {
 			return fmt.Errorf("debug stream err, %s", err)
 		}
 		gr := new(grpcResult)
-		runRes, err := d.driver.Debug(d.app, res.Data)
+		runRes, err := c.driver.Debug(c.app, res.Data)
 		if err != nil {
 			gr.Error = err.Error()
 			gr.Code = 400
