@@ -62,6 +62,7 @@ func NewMQTTClient(cfg MQTTConfig) (MQ, func(), error) {
 	})
 	opts.SetOrderMatters(false)
 	opts.SetOnConnectHandler(func(client MQTT.Client) {
+		logger.Infof("MQTT 已连接")
 		mqCli.connect()
 	})
 	// Start the connection

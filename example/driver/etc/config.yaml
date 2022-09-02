@@ -1,7 +1,7 @@
 mq:
   type: mqtt
   mqtt:
-    host: 121.89.244.23
+    host: 127.0.0.1
     port: 1883
 
 serviceId: 62678dee5a13cc647f571640
@@ -12,7 +12,7 @@ driver:
   name: test
 
 log:
-  level: 5
+  level: 4
 
 driverGrpc:
   host: 127.0.0.1

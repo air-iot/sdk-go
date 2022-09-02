@@ -117,25 +117,26 @@ func (p *TestDriver) Schema(a driver.App) (string, error) {
 
 // Run 执行指令，实现Driver的Run函数
 func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error) {
+	fmt.Println("run", *cmd)
 	logger.Debugln("run", *cmd)
-	if err := a.RunLog(driver.Log{
-		SerialNo: cmd.SerialNo,
-		Status:   "成功",
-		UnixTime: time.Now().UnixNano() / 1e6,
-		Desc:     "测试",
-	}); err != nil {
-		logger.Errorf("run log: %s", err)
-	}
-
-	if err := a.WriteEvent(driver.Event{
-		Table:    cmd.Table,
-		ID:       cmd.Id,
-		EventID:  "test11",
-		UnixTime: time.Now().UnixNano() / 1e6,
-		Data:     cmd.Command,
-	}); err != nil {
-		logger.Errorf("writeEvent: %s", err)
-	}
+	//if err := a.RunLog(driver.Log{
+	//	SerialNo: cmd.SerialNo,
+	//	Status:   "成功",
+	//	UnixTime: time.Now().UnixNano() / 1e6,
+	//	Desc:     "测试",
+	//}); err != nil {
+	//	logger.Errorf("run log: %s", err)
+	//}
+	//
+	//if err := a.WriteEvent(driver.Event{
+	//	Table:    cmd.Table,
+	//	ID:       cmd.Id,
+	//	EventID:  "test11",
+	//	UnixTime: time.Now().UnixNano() / 1e6,
+	//	Data:     cmd.Command,
+	//}); err != nil {
+	//	logger.Errorf("writeEvent: %s", err)
+	//}
 
 	//if err := a.UpdateNode(cmd.NodeId, map[string]interface{}{"n2": 22}); err != nil {
 	//	a.GetLogger().Errorf("UpdateNode: %s", err)

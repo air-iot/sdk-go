@@ -140,8 +140,14 @@ func (a *app) stop() {
 
 // WritePoints 写数据点数据
 func (a *app) WritePoints(p Point) error {
-	if p.ID == "" || p.Fields == nil || len(p.Fields) == 0 {
-		return fmt.Errorf("数据有空值")
+	if p.Table == "" {
+		return fmt.Errorf("表id为空")
+	}
+	if p.ID == "" {
+		return fmt.Errorf("记录id为空")
+	}
+	if p.Fields == nil || len(p.Fields) == 0 {
+		return fmt.Errorf("采集数据有空值")
 	}
 	fields := make(map[string]interface{})
 	for _, field := range p.Fields {
