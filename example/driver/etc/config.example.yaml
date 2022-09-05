@@ -1,0 +1,20 @@
+mq:
+  type: mqtt
+  mqtt:
+    host: 127.0.0.1
+    port: 1883
+
+serviceId:  # 实例id
+project: # 项目id
+
+driver:
+  id: test
+  name: test
+
+log:
+  # 日志级别(1:fatal 2:error,3:warn,4:info,5:debug,6:trace)
+  level: 4
+
+driverGrpc:
+  host: 127.0.0.1
+  port: 9224

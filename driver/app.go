@@ -72,6 +72,8 @@ func init() {
 	viper.SetDefault("mq.rabbit.port", 5672)
 	viper.SetDefault("mq.rabbit.username", "admin")
 	viper.SetDefault("mq.rabbit.password", "public")
+	viper.SetDefault("driverGrpc.host", "driver")
+	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")

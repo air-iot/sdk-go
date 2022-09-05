@@ -44,17 +44,17 @@ type point struct {
 }
 
 type Command struct {
-	Table    string      `json:"table"`
-	Id       string      `json:"id"`
-	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"command"`
+	Table    string `json:"table"`
+	Id       string `json:"id"`
+	SerialNo string `json:"serialNo"`
+	Command  []byte `json:"command"`
 }
 
 type BatchCommand struct {
-	Table    string      `json:"table"`
-	Ids      []string    `json:"ids"`
-	SerialNo string      `json:"serialNo"`
-	Command  interface{} `json:"command"`
+	Table    string   `json:"table"`
+	Ids      []string `json:"ids"`
+	SerialNo string   `json:"serialNo"`
+	Command  []byte   `json:"command"`
 }
 
 type grpcResult struct {
