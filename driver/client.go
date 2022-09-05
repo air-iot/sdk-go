@@ -278,7 +278,7 @@ func (c *Client) Stop() {
 }
 
 func (c *Client) SchemaStream(ctx context.Context) error {
-	stream, err := c.cli.SchemaStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.SchemaStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("schema stream err,%s", err)
 	}
@@ -312,7 +312,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 }
 
 func (c *Client) StartStream(ctx context.Context) error {
-	stream, err := c.cli.StartStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.StartStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("start stream err,%s", err)
 	}
@@ -344,7 +344,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 }
 
 func (c *Client) RunStream(ctx context.Context) error {
-	stream, err := c.cli.RunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.RunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("run stream err,%s", err)
 	}
@@ -383,7 +383,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 }
 
 func (c *Client) WriteTagStream(ctx context.Context) error {
-	stream, err := c.cli.WriteTagStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.WriteTagStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("writeTag stream err,%s", err)
 	}
@@ -422,7 +422,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 }
 
 func (c *Client) BatchRunStream(ctx context.Context) error {
-	stream, err := c.cli.BatchRunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.BatchRunStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("batchRun stream err,%s", err)
 	}
@@ -461,7 +461,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 }
 
 func (c *Client) DebugStream(ctx context.Context) error {
-	stream, err := c.cli.DebugStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project))
+	stream, err := c.cli.DebugStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
 	if err != nil {
 		return fmt.Errorf("debug stream err,%s", err)
 	}

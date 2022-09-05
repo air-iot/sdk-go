@@ -11,8 +11,8 @@ type Config struct {
 	Port int    `json:"port" yaml:"port"`
 }
 
-func GetGrpcContext(ctx context.Context, serviceId, projectId string) context.Context {
-	md := metadata.New(map[string]string{"serviceId": serviceId, "projectId": projectId})
+func GetGrpcContext(ctx context.Context, serviceId, projectId, driverId, driverName string) context.Context {
+	md := metadata.New(map[string]string{"serviceId": serviceId, "projectId": projectId, "driverId": driverId, "driverName": driverName})
 	// 发送 metadata
 	// 创建带有meta的context
 	return metadata.NewOutgoingContext(ctx, md)
