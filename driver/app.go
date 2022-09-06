@@ -61,6 +61,7 @@ func init() {
 	viper.SetDefault("log.level", 4)
 	viper.SetDefault("log.format", "text")
 	viper.SetDefault("log.output", "stdout")
+	viper.SetDefault("mq.type", "mqtt")
 	viper.SetDefault("mq.mqtt.host", "mqtt")
 	viper.SetDefault("mq.mqtt.port", 1883)
 	viper.SetDefault("mq.mqtt.username", "admin")
