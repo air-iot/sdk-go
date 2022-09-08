@@ -148,7 +148,7 @@ func (a *app) WritePoints(p Point) error {
 	tableId := p.Table
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
-		if ok {
+		if !ok {
 			return fmt.Errorf("传入表id为空且未在配置中找到")
 		}
 		devI, ok := a.cli.cacheConfigNum.Load(p.ID)

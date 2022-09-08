@@ -91,7 +91,7 @@ func (p *TestDriver) Start(a driver.App, bts []byte) error {
 							}
 						}
 						point := driver.Point{
-							Table:      t1.ID,
+							//Table:      t1.ID,
 							ID:         n1.ID,
 							Fields:     fields,
 							FieldTypes: fieldType,
