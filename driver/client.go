@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -26,6 +27,8 @@ type Client struct {
 	driver           Driver
 	cleanStream      func()
 	cleanHealthCheck func()
+	cacheConfig      sync.Map
+	cacheConfigNum   sync.Map
 }
 
 func (c *Client) Start(app App, driver Driver) *Client {
@@ -327,6 +330,38 @@ func (c *Client) StartStream(ctx context.Context) error {
 			return fmt.Errorf("start stream err, %s", err)
 		}
 		startRes := new(grpcResult)
+		var cfg Instance
+		if err := json.Unmarshal(res.Config, &cfg); err != nil {
+			startRes.Error = err.Error()
+			startRes.Code = 400
+			bts, _ := json.Marshal(startRes)
+			if err := stream.Send(&pb.StartResult{
+				Request: res.Request,
+				Message: bts,
+			}); err != nil {
+				logger.Errorf("start stream 发送错误,%s", err)
+			}
+			continue
+		}
+		if cfg.Tables != nil {
+			for _, t := range cfg.Tables {
+				if t.Devices == nil {
+					continue
+				}
+				for _, device := range t.Devices {
+					devM, ok := c.cacheConfigNum.Load(device.Id)
+					var devI map[string]interface{}
+					if ok {
+						devI, _ = devM.(map[string]interface{})
+					} else {
+						devI = map[string]interface{}{}
+					}
+					devI[t.Id] = struct{}{}
+					c.cacheConfigNum.Store(device.Id, devI)
+					c.cacheConfig.Store(device.Id, t.Id)
+				}
+			}
+		}
 		if err := c.driver.Start(c.app, res.Config); err != nil {
 			startRes.Error = err.Error()
 			startRes.Code = 400

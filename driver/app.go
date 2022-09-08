@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -119,7 +120,7 @@ func NewApp() App {
 // Start 开始服务
 func (a *app) Start(driver Driver) {
 	a.stopped = false
-	cli := Client{}
+	cli := Client{cacheConfig: sync.Map{}, cacheConfigNum: sync.Map{}}
 	a.cli = cli.Start(a, driver)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
@@ -144,8 +145,20 @@ func (a *app) stop() {
 
 // WritePoints 写数据点数据
 func (a *app) WritePoints(p Point) error {
-	if p.Table == "" {
-		return fmt.Errorf("表id为空")
+	tableId := p.Table
+	if tableId == "" {
+		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
+		if ok {
+			return fmt.Errorf("传入表id为空且未在配置中找到")
+		}
+		devI, ok := a.cli.cacheConfigNum.Load(p.ID)
+		if ok {
+			devM, _ := devI.(map[string]interface{})
+			if len(devM) >= 2 {
+				return fmt.Errorf("传入表id为空且在配置中找到多个表id")
+			}
+		}
+		tableId = tableIdI.(string)
 	}
 	if p.ID == "" {
 		return fmt.Errorf("记录id为空")
@@ -229,7 +242,7 @@ func (a *app) WritePoints(p Point) error {
 		return err
 	}
 	logger.Debugf("保存数据,%s", string(b))
-	return a.mq.Publish(context.Background(), []string{"data", C.Project, p.Table, p.ID}, b)
+	return a.mq.Publish(context.Background(), []string{"data", C.Project, tableId, p.ID}, b)
 }
 
 func (a *app) WriteEvent(ctx context.Context, event Event) error {

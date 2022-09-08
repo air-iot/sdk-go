@@ -23,3 +23,18 @@ type Range struct {
 	Active     *string  `json:"active"`
 	FixedValue *float64 `json:"fixedValue"`
 }
+
+type Instance struct {
+	ID     string  `json:"id"`
+	Tables []table `json:"tables"`
+}
+
+// table 设置
+type table struct {
+	Id      string   `json:"id"`
+	Devices []Device `json:"devices"`
+}
+
+type Device struct {
+	Id string `json:"id"`
+}
