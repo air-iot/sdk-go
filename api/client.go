@@ -549,7 +549,7 @@ func (p *client) FindWarnById(id string, archive bool, result interface{}) error
 	return p.Get(u, result)
 }
 
-func (p *client) SaveWarn(data, archive bool, result interface{}) error {
+func (p *client) SaveWarn(data interface{}, archive bool, result interface{}) error {
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "warning/warning"}
 	v := url.Values{}
 	v.Set("archive", strconv.FormatBool(archive))

@@ -88,7 +88,7 @@ type Client interface {
 	// 报警
 	FindWarnQuery(archive bool, query, result interface{}) error
 	FindWarnById(id string, archive bool, result interface{}) error
-	SaveWarn(data, archive bool, result interface{}) error
+	SaveWarn(data interface{}, archive bool, result interface{}) error
 	DelWarnById(id string, archive bool, result interface{}) error
 	UpdateWarnById(id string, archive bool, data, result interface{}) error
 	ReplaceWarnById(id string, archive bool, data, result interface{}) error
