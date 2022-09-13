@@ -9,7 +9,7 @@ project: 625f6dbf5433487131f09ff7
 
 driver:
   id: test
-  name: test
+  name: 测试驱动
 
 log:
   level: 4

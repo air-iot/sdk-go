@@ -2,11 +2,13 @@
 // protoc -I . --go_out=plugins=grpc:. ./driver.proto
 syntax = "proto3";
 
-package proto;
+package driver;
 
 option go_package = "./;proto";
 
+
 service DriverService {
+
   rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse) {}
   rpc Event (Request) returns (Response) {}
   rpc CommandLog (Request) returns (Response) {}
@@ -17,7 +19,28 @@ service DriverService {
   rpc WriteTagStream (stream RunResult) returns (stream RunRequest) {}
   rpc BatchRunStream (stream BatchRunResult) returns (stream BatchRunRequest) {}
   rpc DebugStream (stream Debug) returns (stream Debug) {}
+
+  rpc BatchCommand (CreateRequest) returns (Response) {}
+  rpc ChangeCommand (UpdateRequest) returns (Response) {}
 }
+
+
+message UpdateRequest {
+  string id = 1;
+  bytes data = 2;
+}
+
+message CreateRequest {
+  bytes data = 1;
+}
+
+message Response {
+  bool status = 1;
+  int32 code = 2;
+  string info = 3;
+  bytes result = 4;
+}
+
 
 message HealthCheckRequest {
   string service = 1;
@@ -36,13 +59,6 @@ message HealthCheckResponse {
 message Request {
   string project = 1;
   bytes data = 4;
-}
-
-message Response {
-  bool status = 1;
-  int32 code = 2;
-  string info = 3;
-  bytes result = 4;
 }
 
 message SchemaRequest {
