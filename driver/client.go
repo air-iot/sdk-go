@@ -112,8 +112,8 @@ func (c *Client) healthCheck(ctx context.Context) {
 }
 
 func (c *Client) WriteEvent(ctx context.Context, event Event) error {
-	if event.ID == "" || event.EventID == "" {
-		return errors.New("资产或事件ID为空")
+	if event.Table == "" || event.ID == "" || event.EventID == "" {
+		return errors.New("表、资产或事件ID为空")
 	}
 	b, err := json.Marshal(event)
 	if err != nil {
