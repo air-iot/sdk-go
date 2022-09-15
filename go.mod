@@ -18,6 +18,7 @@ require (
 	github.com/streadway/amqp v0.0.0-20200108173154-1c71cc93ed71
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.1
+	gopkg.in/evanphx/json-patch.v5 v5.6.0
 )
 
 require (
