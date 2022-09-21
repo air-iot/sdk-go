@@ -60,5 +60,5 @@ type BatchCommand struct {
 type grpcResult struct {
 	Code   int         `json:"code"`
 	Error  string      `json:"error"`
-	Result interface{} `json:"grpcResult"`
+	Result interface{} `json:"result"`
 }
