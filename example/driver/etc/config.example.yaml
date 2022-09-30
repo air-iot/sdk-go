@@ -4,17 +4,17 @@ mq:
     host: 127.0.0.1
     port: 1883
 
-serviceId:  # 实例id
-project: # 项目id
+serviceId: 62678dee5a13cc647f571640
+project: 625f6dbf5433487131f09ff7
 
 driver:
   id: test
-  name: test
+  name: 测试驱动
 
 log:
-  # 日志级别(1:fatal 2:error,3:warn,4:info,5:debug,6:trace)
   level: 4
 
 driverGrpc:
   host: 127.0.0.1
+  #  host: 192.168.2.130
   port: 9224
