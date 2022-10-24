@@ -4,6 +4,7 @@ package driver
 type Point struct {
 	Table      string            `json:"table"`      // 表id
 	ID         string            `json:"id"`         // 设备编号
+	CID        string            `json:"cid"`        // 子设备编号
 	Fields     []Field           `json:"fields"`     // 数据点
 	UnixTime   int64             `json:"time"`       // 数据采集时间 毫秒数
 	FieldTypes map[string]string `json:"fieldTypes"` // 数据点类型
@@ -38,6 +39,7 @@ type Field struct {
 
 type point struct {
 	ID         string                 `json:"id"`
+	CID        string                 `json:"cid"` // 子设备编号
 	Fields     map[string]interface{} `json:"fields"`
 	UnixTime   int64                  `json:"time"`
 	FieldTypes map[string]string      `json:"fieldTypes"` // 数据点类型
