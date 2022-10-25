@@ -114,7 +114,8 @@ type Field struct {
 
 type pointTmp struct {
 	ID         string                 `json:"id"`
-	CID        string                 `json:"cid"` // 子设备编号
+	CID        string                 `json:"cid"`    // 子设备编号
+	Source     string                 `json:"source"` // 标识设备数据
 	Fields     map[string]interface{} `json:"fields"`
 	UnixTime   int64                  `json:"time"`
 	FieldTypes map[string]string      `json:"fieldTypes"` // 数据点类型
@@ -540,7 +541,7 @@ func (p *app) WritePoints(point Point) error {
 	if point.UnixTime == 0 {
 		point.UnixTime = time.Now().Local().UnixNano() / 1e6
 	}
-	b, err := json.Marshal(&pointTmp{ID: point.ID, CID: point.CID, UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
+	b, err := json.Marshal(&pointTmp{ID: point.ID, CID: point.CID, Source: "device", UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
 	if err != nil {
 		return err
 	}
