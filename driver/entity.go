@@ -39,7 +39,8 @@ type Field struct {
 
 type point struct {
 	ID         string                 `json:"id"`
-	CID        string                 `json:"cid"` // 子设备编号
+	CID        string                 `json:"cid"`    // 子设备编号
+	Source     string                 `json:"source"` // 标识源类型
 	Fields     map[string]interface{} `json:"fields"`
 	UnixTime   int64                  `json:"time"`
 	FieldTypes map[string]string      `json:"fieldTypes"` // 数据点类型

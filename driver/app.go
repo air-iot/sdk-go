@@ -237,7 +237,7 @@ func (a *app) WritePoints(p Point) error {
 	if p.UnixTime == 0 {
 		p.UnixTime = time.Now().Local().UnixNano() / 1e6
 	}
-	b, err := json.Marshal(&point{ID: p.ID, CID: p.CID, UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes})
+	b, err := json.Marshal(&point{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes})
 	if err != nil {
 		return err
 	}
