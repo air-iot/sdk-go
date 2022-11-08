@@ -1,5 +1,4 @@
 // Copyright 2015 The gRPC Authors
-// protoc -I . --go_out=plugins=grpc:. ./driver.proto
 
 // protoc -I ./driver/grpc --go_out=. ./driver/grpc/proto/driver.proto
 // protoc --go-grpc_out=. ./driver/grpc/proto/driver.proto
@@ -8,10 +7,12 @@ syntax = "proto3";
 package driver;
 
 option go_package = "driver/grpc/proto;proto";
-
+option java_package = "cn.airiot.sdk.driver.grpc";
+option java_multiple_files = true;
+option java_generate_equals_and_hash = true;
+option java_generic_services = false;
 
 service DriverService {
-
   rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse) {}
   rpc Event (Request) returns (Response) {}
   rpc CommandLog (Request) returns (Response) {}
