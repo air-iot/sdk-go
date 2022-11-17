@@ -38,6 +38,7 @@ type App interface {
 	LogError(uid string, msg interface{})
 	GetLogger() *logrus.Logger
 	ApiClient() api.Client
+	GetProjectId() string
 	// ConvertValue(tag, raw interface{}) (map[string]interface{}, interface{}, error)
 }
 
@@ -443,6 +444,10 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 // GetLogger 获取日志
 func (p *app) GetLogger() *logrus.Logger {
 	return p.Logger
+}
+
+func (p *app) GetProjectId() string {
+	return p.projectID
 }
 
 // Stop 服务停止
