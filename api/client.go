@@ -641,7 +641,7 @@ func (p *client) GetMediaFile(filePath string) (*MediaFileInfo, error) {
 	}, nil
 }
 
-func (p *client) UploadMediaFile(filename, catalog, action string, reader io.ReadCloser) (string, error) {
+func (p *client) UploadMediaFile(filename, catalog, action string, reader io.Reader) (string, error) {
 	p.checkToken()
 	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "/core/mediaLibrary/upload"}
 	result := make(map[string]string, 1)
