@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"strconv"
@@ -598,4 +600,97 @@ func (p *client) DriverConfig(projectId, driverId, serviceId string) ([]byte, er
 		return resp.Body(), nil
 	}
 	return nil, fmt.Errorf("请求状态:%d,响应:%s", resp.StatusCode(), resp.String())
+}
+
+func (p *client) GetMediaFile(filePath string) (*MediaFileInfo, error) {
+	p.checkToken()
+
+	// /core/fileServer/mediaLibrary/default/123.ntp
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: filePath}
+	resp, err := resty.New().SetTimeout(time.Minute*1).SetDoNotParseResponse(true).R().
+		SetQueryParam(header, p.projectID).
+		SetQueryParam("token", p.Token).
+		Get(u.String())
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode() != 200 {
+		var message string
+		if body := resp.RawBody(); body != nil {
+			buf := make([]byte, 1024)
+			if n, err := body.Read(buf); err != nil {
+				message = string(buf[:n])
+			}
+		}
+		return nil, fmt.Errorf("请求状态:%d,响应:%s", resp.StatusCode(), message)
+	}
+
+	path := u.Path
+	nameIndex := bytes.LastIndexByte([]byte(path), '/')
+	if nameIndex < 0 {
+		return nil, fmt.Errorf("无法从文件路径[%s]中解析出名件名称", filePath)
+	}
+	name := path[nameIndex+1:]
+
+	return &MediaFileInfo{
+		Name:   name,
+		Size:   resp.Size(),
+		reader: resp.RawBody(),
+	}, nil
+}
+
+func (p *client) UploadMediaFile(filename, catalog, action string, reader io.ReadCloser) (string, error) {
+	p.checkToken()
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "/core/mediaLibrary/upload"}
+	result := make(map[string]string, 1)
+	resp, err := resty.New().SetTimeout(time.Minute*1).
+		SetHeader(header, p.projectID).
+		SetHeader("Authorization", p.Token).
+		R().
+		SetFileReader("file", filename, reader).
+		SetQueryParam("catalog", catalog).
+		SetQueryParam("action", action).
+		SetResult(&result).
+		Post(u.String())
+
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode() != 200 {
+		return "", fmt.Errorf("请求状态:%d,响应:%s", resp.StatusCode(), resp.String())
+	}
+
+	fileUrl, ok := result["url"]
+	if !ok {
+		return "", fmt.Errorf("响应结果中未找到 url 信息, %+v", result)
+	}
+
+	return fileUrl, nil
+}
+
+func (p *client) DeleteMediaFile(path string, completeDelete bool) error {
+	p.checkToken()
+	u := url.URL{Scheme: p.protocol, Host: p.host, Path: "/core/mediaLibrary"}
+	result := make(map[string]string, 1)
+	resp, err := resty.New().SetTimeout(time.Minute*1).
+		SetHeader(header, p.projectID).
+		SetHeader("Authorization", p.Token).
+		R().
+		SetQueryParam("path", path).
+		SetQueryParam("completeDelete", strconv.FormatBool(completeDelete)).
+		SetResult(&result).
+		Delete(u.String())
+
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode() != 200 {
+		return fmt.Errorf("请求状态:%d,响应:%s", resp.StatusCode(), resp.String())
+	}
+
+	return nil
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"net/url"
 )
 
@@ -96,4 +97,23 @@ type Client interface {
 	// driver
 	ChangeCommand(id string, data, result interface{}) error
 	DriverConfig(projectId, driverId, serviceId string) ([]byte, error)
+
+	// GetMediaFile 获取媒体库中的指定 path 文件
+	//
+	// 注: 返回值中的 MediaFileInfo.Data 需要手动关闭
+	GetMediaFile(path string) (*MediaFileInfo, error)
+
+	// UploadMediaFile 向媒体库上传文件
+	// 上传成功后返回该文件的 url, 否则返回错误信息
+	//
+	// filename: 文件名称
+	// catalog: 目录
+	// action: 当文件存在时的处理方式. cover: 覆盖, rename: 文件名自动加1
+	UploadMediaFile(filename, catalog, action string, reader io.ReadCloser) (string, error)
+
+	// DeleteMediaFile 删除指定路径的文件
+	//
+	// path: 文件路径, 例如: /chenpc/media_upload_file.txt
+	// completeDelete: 是否彻底删除文件
+	DeleteMediaFile(path string, completeDelete bool) error
 }

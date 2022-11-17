@@ -8,7 +8,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -658,4 +662,103 @@ func TestUser_DelById(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log(r)
+}
+
+func TestClient_UploadMediaFile(t *testing.T) {
+	createFile := func() (string, error) {
+		filename := fmt.Sprintf("%s%cmedia_upload_file.txt", os.TempDir(), os.PathSeparator)
+		tmpFile, err := os.Create(filename)
+		if err != nil {
+			return "", err
+		}
+
+		if _, err = tmpFile.WriteString("the file is used to test upload of media library"); err != nil {
+			return "", err
+		}
+
+		if err = tmpFile.Close(); err != nil {
+			return "", err
+		}
+
+		return tmpFile.Name(), nil
+	}
+
+	filename, err := createFile()
+	if err != nil {
+		t.Fatalf("cannot create tmp file, %+v", err)
+	}
+
+	t.Logf("create a tmp file: %s", filename)
+
+	defer func() {
+		_ = os.Remove(filename)
+	}()
+
+	sep := bytes.LastIndexByte([]byte(filename), os.PathSeparator)
+	name := filename[sep+1:]
+
+	tmpFile, err := os.OpenFile(filename, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		t.Fatalf("open tmp file %s failed, %+v", filename, err)
+	}
+
+	defer tmpFile.Close()
+
+	var client = NewClient("http", "airiot.tech", 31001, "62c4f8aaa0f974f96cca7ddc", "2963577e-d0bb-c8ba-ed5e-7574cd78fbf7", "f160a24b-1780-89e7-cd48-b4c0073bd0fe")
+	url, err := client.UploadMediaFile(name, "chenpc", "cover", tmpFile)
+	if err != nil {
+		t.Fatalf("upload file failed, %+v", err)
+	}
+
+	if len(url) == 0 {
+		t.Fatalf("the url of uploaded file is empty")
+	}
+
+	t.Logf("url: %s", url)
+}
+
+func TestClient_GetMediaFile(t *testing.T) {
+	url := "/core/fileServer/mediaLibrary/62c4f8aaa0f974f96cca7ddc/chenpc/media_upload_file.txt"
+	var client = NewClient("http", "airiot.tech", 31001, "62c4f8aaa0f974f96cca7ddc", "2963577e-d0bb-c8ba-ed5e-7574cd78fbf7", "f160a24b-1780-89e7-cd48-b4c0073bd0fe")
+	file, err := client.GetMediaFile(url)
+	if err != nil {
+		t.Fatalf("download file %s failed, %+v", url, err)
+	}
+
+	if strings.Compare(file.Name, "media_upload_file.txt") != 0 {
+		t.Fatalf("the filename mismatch, expected: media_upload_file.txt, got: %s", file.Name)
+	}
+
+	t.Logf("file size: %d", file.Size)
+
+	defer func() {
+		file.Close()
+	}()
+
+	buf, err := file.ReadAll()
+	if err != nil {
+		t.Fatalf("cannot read file, %+v", err)
+	}
+
+	var size = int64(len(buf))
+	t.Logf("read size: %d", size)
+
+	if file.Size != 0 && file.Size != size {
+		t.Fatalf("invalid file size, expected: %d, got: %d", file.Size, size)
+	}
+
+	content := string(buf[:size])
+
+	if strings.Compare(content, "the file is used to test upload of media library") != 0 {
+		t.Fatalf("the content of file mismatch, expected: 'the file is used to test upload of media library', got: '%s'", content)
+	}
+}
+
+func TestClient_DeleteMediaFile(t *testing.T) {
+	path := "/chenpc/media_upload_file.txt"
+	var client = NewClient("http", "airiot.tech", 31001, "62c4f8aaa0f974f96cca7ddc", "2963577e-d0bb-c8ba-ed5e-7574cd78fbf7", "f160a24b-1780-89e7-cd48-b4c0073bd0fe")
+	err := client.DeleteMediaFile(path, true)
+	if err != nil {
+		t.Fatalf("delete file %s failed, %+v", path, err)
+	}
 }
