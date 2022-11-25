@@ -85,10 +85,11 @@ type app struct {
 
 // Point 存储数据
 type Point struct {
-	ID       string  `json:"id"`     // 设备编号
-	CID      string  `json:"cid"`    // 子设备编号
-	Fields   []Field `json:"fields"` // 数据点
-	UnixTime int64   `json:"time"`   // 数据采集时间 毫秒数
+	ID         string  `json:"id"`         // 设备编号
+	CID        string  `json:"cid"`        // 子设备编号
+	Fields     []Field `json:"fields"`     // 数据点
+	UnixTime   int64   `json:"time"`       // 数据采集时间 毫秒数
+	OnlineType string  `json:"onlineType"` // 资产在线状态类型
 	//
 	FieldTypes map[string]string `json:"fieldTypes"` // 数据点类型
 }
@@ -119,6 +120,7 @@ type pointTmp struct {
 	Source     string                 `json:"source"` // 标识设备数据
 	Fields     map[string]interface{} `json:"fields"`
 	UnixTime   int64                  `json:"time"`
+	OnlineType string                 `json:"onlineType"` // 资产在线状态类型
 	FieldTypes map[string]string      `json:"fieldTypes"` // 数据点类型
 }
 
@@ -546,7 +548,7 @@ func (p *app) WritePoints(point Point) error {
 	if point.UnixTime == 0 {
 		point.UnixTime = time.Now().Local().UnixNano() / 1e6
 	}
-	b, err := json.Marshal(&pointTmp{ID: point.ID, CID: point.CID, Source: "device", UnixTime: point.UnixTime, Fields: fields, FieldTypes: point.FieldTypes})
+	b, err := json.Marshal(&pointTmp{ID: point.ID, CID: point.CID, Source: "device", UnixTime: point.UnixTime, Fields: fields, OnlineType: point.OnlineType, FieldTypes: point.FieldTypes})
 	if err != nil {
 		return err
 	}
