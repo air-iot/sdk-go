@@ -33,6 +33,7 @@ type App interface {
 	LogInfo(table, id string, msg interface{})
 	LogWarn(table, id string, msg interface{})
 	LogError(table, id string, msg interface{})
+	GetProjectId() string
 }
 
 const (
@@ -141,6 +142,10 @@ func (a *app) stop() {
 	if a.clean != nil {
 		a.clean()
 	}
+}
+
+func (a *app) GetProjectId() string {
+	return C.Project
 }
 
 // WritePoints 写数据点数据
