@@ -1,8 +1,9 @@
 package driver
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/air-iot/json"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 )

@@ -2,9 +2,9 @@ package driver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/air-iot/json"
 	"sync"
 	"time"
 
