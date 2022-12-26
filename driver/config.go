@@ -1,9 +1,9 @@
 package driver
 
 import (
+	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/conn/mq"
 	"github.com/air-iot/sdk-go/v4/driver/grpc"
-	"github.com/air-iot/sdk-go/v4/logger"
 )
 
 // C 全局配置(需要先执行MustLoad，否则拿不到配置)

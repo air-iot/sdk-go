@@ -19,8 +19,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/conn/mq"
-	"github.com/air-iot/sdk-go/v4/logger"
 )
 
 type App interface {

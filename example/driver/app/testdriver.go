@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/driver"
-	"github.com/air-iot/sdk-go/v4/logger"
 )
 
 // 驱动配置信息，不同的驱动生成不同的配置信息

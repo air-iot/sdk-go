@@ -8,7 +8,7 @@ import (
 
 	"github.com/streadway/amqp"
 
-	"github.com/air-iot/sdk-go/v4/logger"
+	"github.com/air-iot/logger"
 )
 
 type rabbit struct {

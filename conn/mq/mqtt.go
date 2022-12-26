@@ -9,7 +9,7 @@ import (
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/air-iot/sdk-go/v4/logger"
+	"github.com/air-iot/logger"
 )
 
 type mqtt struct {

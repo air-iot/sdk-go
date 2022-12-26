@@ -11,9 +11,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	pb "github.com/air-iot/api-client-go/v4/driver"
+	"github.com/air-iot/logger"
 	dGrpc "github.com/air-iot/sdk-go/v4/driver/grpc"
-	pb "github.com/air-iot/sdk-go/v4/driver/grpc/proto"
-	"github.com/air-iot/sdk-go/v4/logger"
 )
 
 const (
