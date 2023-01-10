@@ -112,7 +112,7 @@ func (p *TestDriver) Start(a driver.App, bts []byte) error {
 }
 
 func (p *TestDriver) Schema(a driver.App) (string, error) {
-	return "测试", nil
+	return Schema, nil
 }
 
 // Run 执行指令，实现Driver的Run函数

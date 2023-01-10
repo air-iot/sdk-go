@@ -78,13 +78,20 @@ func (c *Client) healthCheck(ctx context.Context) {
 				retry := 3
 				state := false
 				for retry >= 0 {
-					_, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Service: C.ServiceID})
+					healthRes, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Service: C.ServiceID})
 					if err != nil {
 						logger.Errorf("健康检查重试错误,%s", err.Error())
 						state = true
 						time.Sleep(time.Second * time.Duration(wait))
 					} else {
 						state = false
+						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
+							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
+								for _, e := range healthRes.Errors {
+									logger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+								}
+							}
+						}
 						break
 					}
 					retry--

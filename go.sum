@@ -4,8 +4,8 @@ github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/air-iot/api-client-go/v4 v4.0.1 h1:h1dNwihBDcB79394KJOPyww/452OwJmNT1VdMUGX9YI=
-github.com/air-iot/api-client-go/v4 v4.0.1/go.mod h1:OI/+obnmiXKHvtH81oa4/RnVpQGyeaTRPOYXkiQ766I=
+github.com/air-iot/api-client-go/v4 v4.0.4 h1:bSMAQ9fNOFnDbDKP28Uyhe+gcJdiAOX6qLQVsnicDqc=
+github.com/air-iot/api-client-go/v4 v4.0.4/go.mod h1:OI/+obnmiXKHvtH81oa4/RnVpQGyeaTRPOYXkiQ766I=
 github.com/air-iot/json v0.0.0 h1:COcHPcMi5kJWjAfg254jclWRNeyeRFv0CJW0USpjTKo=
 github.com/air-iot/json v0.0.0/go.mod h1:NQ11yRRvXnhHY88rRS/v0pF6p4pct+He5WQ6zIeqOKE=
 github.com/air-iot/logger v0.0.0 h1:MZcrlnLJPVV4PjlEjzdmrvk0jRvbB5V12yZGvBt/ATw=
