@@ -3,7 +3,7 @@ module github.com/air-iot/sdk-go/v4
 go 1.17
 
 require (
-	github.com/air-iot/api-client-go/v4 v4.0.4
+	github.com/air-iot/api-client-go/v4 v4.0.35
 	github.com/air-iot/json v0.0.1
 	github.com/air-iot/logger v0.0.1
 	github.com/eclipse/paho.mqtt.golang v1.2.0
@@ -70,5 +70,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/air-iot/api-client-go/v4 => C:\work\code\airiot\api-client-go
