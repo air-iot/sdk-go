@@ -1,0 +1,10 @@
+flow:
+  name: testHandler
+  mode: service
+
+log:
+  level: 5
+
+flowGrpc:
+  host: 127.0.0.1
+  port: 2333
