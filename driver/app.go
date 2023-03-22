@@ -1,15 +1,18 @@
 package driver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,6 +20,7 @@ import (
 	"github.com/air-iot/sdk-go/conn/mqtt"
 	"github.com/air-iot/sdk-go/conn/rabbit"
 	"github.com/air-iot/sdk-go/conn/websocket"
+	ws1 "github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -53,18 +57,20 @@ type Handler interface {
 // DG 数据采集类
 type app struct {
 	*logrus.Logger
-	sendMethod  string
-	mqtt        *mqtt.Mqtt
-	rabbit      *rabbit.Amqp
-	ws          *websocket.Conn
-	api         api.Client
-	driverId    string
-	serviceId   string
-	driverName  string
-	distributed string
-	host        string
-	port        int
-	emulator    bool
+	sendMethod   string
+	mqtt         *mqtt.Mqtt
+	rabbit       *rabbit.Amqp
+	ws           *websocket.Conn
+	api          api.Client
+	driverId     string
+	serviceId    string
+	driverName   string
+	distributed  string
+	host         string
+	port         int
+	emulator     bool
+	healthTime   int
+	intervalTime int
 }
 
 // 存储数据
@@ -134,6 +140,8 @@ func init() {
 	viper.SetDefault("rabbit.port", 5672)
 	viper.SetDefault("rabbit.username", "admin")
 	viper.SetDefault("rabbit.password", "public")
+	viper.SetDefault("ws.health", 30)
+	viper.SetDefault("ws.interval", 10)
 
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
@@ -160,6 +168,8 @@ func NewApp() App {
 		sendMethod  = viper.GetString("driver.sendMethod")
 		logLevel    = viper.GetString("log.level")
 		emulator    = viper.GetBool("emulator")
+		health      = viper.GetInt("ws.health")
+		interval    = viper.GetInt("ws.interval")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
@@ -188,7 +198,11 @@ func NewApp() App {
 	a.host = host
 	a.port = port
 	a.api = api.NewClient("http", host, port, ak, sk)
-
+	if health == 0 {
+		health = 30
+	}
+	a.healthTime = health
+	a.intervalTime = interval
 	return a
 }
 
@@ -221,10 +235,62 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 					if timeConnect > 5 {
 						timeOut = 60
 					}
-					logrus.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
+					p.Logger.Errorf("尝试重新连接WebSocket第 %d 次失败,%s", timeConnect, err.Error())
 					time.Sleep(time.Second * time.Duration(timeOut))
 					continue
 				}
+				ts := time.Now().Local()
+				p.ws.SetPongHandler(func(appData string) error {
+					log.Printf("pong 值,%s \n", appData)
+					ids := strings.Split(appData, ":")
+					if len(ids) != 2 {
+						log.Printf("pong 值长度错误 \n")
+						return fmt.Errorf("pong 值长度错误")
+					}
+					if ids[1] != p.serviceId {
+						log.Printf("pong 返回服务id错误 \n")
+						return fmt.Errorf("pong 返回服务id错误")
+					}
+					ts = time.Now().Local()
+					return nil
+				})
+				ctx, cancel := context.WithCancel(context.Background())
+				go func() {
+					for {
+						select {
+						case <-ctx.Done():
+							log.Println("关闭心跳检查")
+							return
+						default:
+							log.Println("心跳检查")
+							if err := p.ws.WriteMessage(ws1.PingMessage, []byte(p.serviceId)); err != nil {
+								log.Printf("心跳检查错误,%s \n", err.Error())
+								p.ws.Close()
+								return
+							}
+						}
+						time.Sleep(time.Second * time.Duration(p.healthTime))
+					}
+				}()
+				go func() {
+					for {
+						select {
+						case <-ctx.Done():
+							log.Println("关闭检查周期")
+							return
+						default:
+							log.Printf("心跳检查上次更新时间 %v \n", ts.String())
+							if ts.Add(time.Second * time.Duration(p.healthTime) * 3).After(time.Now().Local()) {
+								log.Printf("健康检查时间 %+v 正常 \n", ts.String())
+							} else {
+								log.Printf("心跳检查时间超时,关闭连接 \n")
+								p.ws.Close()
+								return
+							}
+						}
+						time.Sleep(time.Second * time.Duration(p.intervalTime))
+					}
+				}()
 				var handler = func() {
 					for {
 						var msg1 = new(wsRequest)
@@ -308,6 +374,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				timeOut = 10
 				wsConnected = true
 				handler()
+				cancel()
 			}
 		}()
 		//if p.distributed == "" {

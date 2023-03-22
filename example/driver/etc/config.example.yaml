@@ -1,5 +1,8 @@
 host: localhost # 接口服务地址
 port: 80 # 接口服务端口
+ws:
+  health: 30
+  interval: 1
 
 credentials:
   ak: ak # 平台ak

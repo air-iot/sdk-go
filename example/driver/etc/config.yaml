@@ -1,17 +1,20 @@
 host: 127.0.0.1
-port: 9000
+port: 9003
+ws:
+  health: 30
+  interval: 10
 
 credentials:
   ak: de80a800-cf00-4ed8-2ac3-6b2c4a9424af
   sk: 958eaf9c-5f01-8afe-18cf-9673052f7958
 
 mqtt:
-  host: iot.tmis.top
+  host: airiot.tech
   port: 1883
 
 driver:
-  id: test
-  name: test
+  id: test1
+  name: test1
 
 log:
   level: debug
