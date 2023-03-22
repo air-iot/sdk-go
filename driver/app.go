@@ -1,19 +1,23 @@
 package driver
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	gws "github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
@@ -68,19 +72,21 @@ const (
 // app 数据采集类
 type app struct {
 	*logrus.Logger
-	sendMethod  string
-	mqtt        *mqtt.Mqtt
-	rabbit      *rabbit.Amqp
-	ws          *websocket.Conn
-	api         api.Client
-	driverId    string
-	serviceId   string
-	driverName  string
-	distributed string
-	projectID   string
-	host        string
-	port        int
-	stopped     bool
+	sendMethod   string
+	mqtt         *mqtt.Mqtt
+	rabbit       *rabbit.Amqp
+	ws           *websocket.Conn
+	api          api.Client
+	driverId     string
+	serviceId    string
+	driverName   string
+	distributed  string
+	projectID    string
+	host         string
+	port         int
+	stopped      bool
+	healthTime   int
+	intervalTime int
 }
 
 // Point 存储数据
@@ -162,6 +168,7 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	pflag.String("project", "default", "项目id")
+	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
 
 	viper.SetDefault("log.level", "INFO")
@@ -178,11 +185,13 @@ func init() {
 	viper.SetDefault("rabbit.username", "admin")
 	viper.SetDefault("rabbit.password", "public")
 
+	viper.SetDefault("ws.health", 30)
+	viper.SetDefault("ws.interval", 10)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
-	viper.AddConfigPath("./etc/")
+	viper.AddConfigPath(*cfgPath)
 
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		logrus.Fatalln("读取命令行参数错误,", err.Error())
@@ -206,6 +215,8 @@ func NewApp() App {
 		sendMethod  = viper.GetString("driver.sendMethod")
 		logLevel    = viper.GetString("log.level")
 		projectID   = viper.GetString("project")
+		health      = viper.GetInt("ws.health")
+		interval    = viper.GetInt("ws.interval")
 	)
 	if driverId == "" || driverName == "" {
 		panic("驱动id或name不能为空")
@@ -239,7 +250,14 @@ func NewApp() App {
 	a.port = port
 	a.stopped = false
 	a.api = api.NewClient("http", host, port, projectID, ak, sk)
-
+	if health == 0 {
+		health = 30
+	}
+	if interval == 0 {
+		interval = 10
+	}
+	a.healthTime = health
+	a.intervalTime = interval
 	return a
 }
 
@@ -279,6 +297,60 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				time.Sleep(time.Second * time.Duration(timeOut))
 				continue
 			}
+
+			ts := time.Now().Local()
+			p.ws.SetPongHandler(func(appData string) error {
+				log.Printf("pong 值 %s \n", appData)
+				ids := strings.Split(appData, ":")
+				if len(ids) != 2 {
+					log.Printf("pong 值长度错误 \n")
+					return fmt.Errorf("pong 值长度错误")
+				}
+				if ids[1] != p.serviceId {
+					log.Printf("pong 返回服务id错误 \n")
+					return fmt.Errorf("pong 返回服务id错误")
+				}
+				ts = time.Now().Local()
+				return nil
+			})
+			ctx, cancel := context.WithCancel(context.Background())
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						log.Println("关闭心跳检查")
+						return
+					default:
+						log.Println("心跳检查")
+						if err := p.ws.WriteMessage(gws.PingMessage, []byte(p.serviceId)); err != nil {
+							log.Printf("心跳检查错误,%s \n", err.Error())
+							p.ws.Close()
+							return
+						}
+					}
+					time.Sleep(time.Second * time.Duration(p.healthTime))
+				}
+			}()
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						log.Println("关闭检查周期")
+						return
+					default:
+						log.Printf("心跳检查上次更新时间 %v \n", ts.String())
+						if ts.Add(time.Second * time.Duration(p.healthTime) * 3).After(time.Now().Local()) {
+							log.Printf("健康检查时间 %+v 正常 \n", ts.String())
+						} else {
+							log.Printf("心跳检查时间超时,关闭连接 \n")
+							p.ws.Close()
+							return
+						}
+					}
+					time.Sleep(time.Second * time.Duration(p.intervalTime))
+				}
+			}()
+
 			var handler = func() {
 				for {
 					var msg1 = new(wsRequest)
@@ -396,6 +468,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 			timeOut = 10
 			wsConnected = true
 			handler()
+			cancel()
 		}
 	}()
 	//if p.distributed == "" {

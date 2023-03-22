@@ -1,17 +1,20 @@
 host: localhost
-port: 9000
+port: 9002
 project: 60bf02235196c2b9ae932f01
+ws:
+  health: 30
+  interval: 10
 
 credentials:
   ak: de80a800-cf00-4ed8-2ac3-6b2c4a9424af
   sk: 958eaf9c-5f01-8afe-18cf-9673052f7958
 
 mqtt:
-  host: localhost
-  port: 1883
+  host: airiot.tech
+  port: 11883
 
 driver:
-  id: test
+  id: test1
   name: test
 #  distributed: loadBalance
 
