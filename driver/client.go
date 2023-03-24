@@ -86,11 +86,15 @@ func (c *Client) healthCheck(ctx context.Context) {
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
+							logger.Infof("健康检查正常")
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
 									logger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
 								}
 							}
+						} else if healthRes.GetStatus() == pb.HealthCheckResponse_SERVICE_UNKNOWN {
+							logger.Errorf("健康检查异常,服务端未找到本驱动服务")
+							state = true
 						}
 						break
 					}

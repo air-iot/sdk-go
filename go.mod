@@ -3,7 +3,7 @@ module github.com/air-iot/sdk-go/v4
 go 1.17
 
 require (
-	github.com/air-iot/api-client-go/v4 v4.0.35
+	github.com/air-iot/api-client-go/v4 v4.0.38
 	github.com/air-iot/json v0.0.1
 	github.com/air-iot/logger v0.0.1
 	github.com/eclipse/paho.mqtt.golang v1.2.0
