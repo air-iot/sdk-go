@@ -8,8 +8,13 @@ import (
 )
 
 type Config struct {
-	Host string `json:"host" yaml:"host"`
-	Port int    `json:"port" yaml:"port"`
+	Host   string `json:"host" yaml:"host"`
+	Port   int    `json:"port" yaml:"port"`
+	Health struct {
+		RequestTime int `json:"requestTime" yaml:"requestTime"`
+		Retry       int `json:"retry" yaml:"retry"`
+	} `json:"health" yaml:"health"`
+	WaitTime int `json:"waitTime" yaml:"waitTime"`
 }
 
 func GetGrpcContext(ctx context.Context, serviceId, projectId, driverId, driverName string) context.Context {

@@ -77,6 +77,8 @@ func init() {
 	viper.SetDefault("mq.rabbit.password", "public")
 	viper.SetDefault("driverGrpc.host", "driver")
 	viper.SetDefault("driverGrpc.port", 9224)
+	viper.SetDefault("driverGrpc.health.requestTime", 10)
+	viper.SetDefault("driverGrpc.waitTime", 5)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
@@ -105,6 +107,15 @@ func NewApp() App {
 	}
 	if C.Driver.ID == "" || C.Driver.Name == "" {
 		panic("驱动id或name不能为空")
+	}
+	if C.DriverGrpc.Health.RequestTime == 0 {
+		C.DriverGrpc.Health.RequestTime = 10
+	}
+	if C.DriverGrpc.Health.Retry == 0 {
+		C.DriverGrpc.Health.Retry = 3
+	}
+	if C.DriverGrpc.WaitTime == 0 {
+		C.DriverGrpc.WaitTime = 5
 	}
 	logger.Debugf("配置: %+v", *C)
 	mqConn, clean, err := mq.NewMQ(C.MQ)

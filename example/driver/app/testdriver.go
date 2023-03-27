@@ -64,7 +64,7 @@ func (p *TestDriver) Start(a driver.App, bts []byte) error {
 		for {
 			select {
 			case <-p.Ctx.Done():
-				fmt.Println("结束")
+				logger.Infof("测试驱动停止")
 				return
 			default:
 				for _, t1 := range config.Tables {

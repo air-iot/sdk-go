@@ -18,3 +18,5 @@ driverGrpc:
   host: 127.0.0.1
   #  host: 192.168.2.130
   port: 9224
+  healthRequestTime: 10
+  waitTime: 5

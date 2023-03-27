@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/air-iot/json"
 	"sync"
 	"time"
 
+	"github.com/air-iot/json"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -16,38 +16,51 @@ import (
 	dGrpc "github.com/air-iot/sdk-go/v4/driver/grpc"
 )
 
-const (
-	wait = 5
-)
-
 type Client struct {
-	conn             *grpc.ClientConn
-	cli              pb.DriverServiceClient
-	app              App
-	driver           Driver
-	cleanStream      func()
-	cleanHealthCheck func()
-	cacheConfig      sync.Map
-	cacheConfigNum   sync.Map
+	conn           *grpc.ClientConn
+	cli            pb.DriverServiceClient
+	app            App
+	driver         Driver
+	clean          func()
+	cacheConfig    sync.Map
+	cacheConfigNum sync.Map
+	//healthTime        time.Time
 }
 
 func (c *Client) Start(app App, driver Driver) *Client {
 	c.app = app
 	c.driver = driver
+	c.start()
+	return c
+}
+
+func (c *Client) start() {
 	if err := c.connDriver(); err != nil {
 		logger.Errorln(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	ctxHealth, cancelHealth := context.WithCancel(context.Background())
-	c.cleanStream = func() {
+	c.clean = func() {
 		cancel()
 	}
-	c.cleanHealthCheck = func() {
-		cancelHealth()
-	}
-	c.healthCheck(ctxHealth)
+	c.healthCheck(ctx)
 	c.startSteam(ctx)
-	return c
+}
+
+func (c *Client) Stop() {
+	if c.clean != nil {
+		c.clean()
+	}
+	if c.conn != nil {
+		if err := c.conn.Close(); err != nil {
+			logger.Errorf("grpc close error: %s", err.Error())
+		}
+	}
+}
+
+func (c *Client) restart() {
+	logger.Infof("重启驱动管理连接")
+	c.Stop()
+	c.start()
 }
 
 func (c *Client) connDriver() error {
@@ -66,23 +79,23 @@ func (c *Client) connDriver() error {
 }
 
 func (c *Client) healthCheck(ctx context.Context) {
-	logger.Infof("健康检查开始")
+	logger.Infof("健康检查启动")
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("健康检查结束")
+				logger.Infof("健康检查停止")
 				return
 			default:
-				logger.Infof("健康检查")
-				retry := 3
+				logger.Infof("健康检查开始")
+				retry := C.DriverGrpc.Health.Retry
 				state := false
 				for retry >= 0 {
-					healthRes, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Service: C.ServiceID})
+					healthRes, err := c.healthRequest(ctx)
 					if err != nil {
-						logger.Errorf("健康检查重试错误,%s", err.Error())
+						logger.Errorf("健康检查错误,%s", err.Error())
 						state = true
-						time.Sleep(time.Second * time.Duration(wait))
+						time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
@@ -101,25 +114,19 @@ func (c *Client) healthCheck(ctx context.Context) {
 					retry--
 				}
 				if state {
-					c.cleanStream()
-					if c.conn != nil {
-						if err := c.conn.Close(); err != nil {
-							logger.Errorf("grpc close error: %s", err.Error())
-						}
-					}
-					if err := c.connDriver(); err != nil {
-						logger.Errorln(err)
-					}
-					ctx1, cancel1 := context.WithCancel(context.Background())
-					c.startSteam(ctx1)
-					c.cleanStream = func() {
-						cancel1()
-					}
+					c.restart()
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
+}
+
+func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, error) {
+	reqCtx, reqCancel := context.WithTimeout(ctx, time.Second*time.Duration(C.DriverGrpc.Health.RequestTime))
+	defer reqCancel()
+	healthRes, err := c.cli.HealthCheck(reqCtx, &pb.HealthCheckRequest{Service: C.ServiceID})
+	return healthRes, err
 }
 
 func (c *Client) WriteEvent(ctx context.Context, event Event) error {
@@ -200,7 +207,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.SchemaStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
@@ -215,7 +222,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.StartStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
@@ -230,7 +237,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.RunStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
@@ -245,7 +252,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.WriteTagStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
@@ -260,7 +267,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.BatchRunStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
@@ -275,20 +282,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.DebugStream(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
-				time.Sleep(time.Second * time.Duration(wait))
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
 			}
 		}
 	}()
-}
-
-func (c *Client) Stop() {
-	c.cleanStream()
-	c.cleanHealthCheck()
-	if c.conn != nil {
-		if err := c.conn.Close(); err != nil {
-			logger.Errorf("grpc close error: %s", err.Error())
-		}
-	}
 }
 
 func (c *Client) SchemaStream(ctx context.Context) error {
