@@ -21,6 +21,7 @@ import (
 
 	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/conn/mq"
+	"github.com/air-iot/sdk-go/v4/utils/numberx"
 )
 
 type App interface {
@@ -182,26 +183,29 @@ func (a *app) WritePoints(p Point) error {
 	if p.Fields == nil || len(p.Fields) == 0 {
 		return fmt.Errorf("采集数据有空值")
 	}
+	return a.writePoints(context.Background(), tableId, p)
+}
+
+func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 	fields := make(map[string]interface{})
 	for _, field := range p.Fields {
 		if field.Tag == nil || field.Value == nil {
-			logger.Warnf("资产 [%s] 数据点为空", p.ID)
+			logger.Warnf("表 %s 资产 %s 数据点为空", tableId, p.ID)
 			continue
 		}
 		tagByte, err := json.Marshal(field.Tag)
 		if err != nil {
-			logger.Warnf("资产 [%s] 数据点序列化错误: %s", p.ID, err.Error())
+			logger.Warnf("表 %s 资产 %s 数据点序列化错误: %s", tableId, p.ID, err.Error())
 			continue
 		}
 
 		tag := new(Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
-			logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", p.ID, err.Error())
+			logger.Warnf("表 %s 资产 %s 数据点序列化tag结构体错误: %s", tableId, p.ID, err.Error())
 			continue
 		}
 		var value decimal.Decimal
-		//vType := reflect.TypeOf(raw).String()
 		switch valueTmp := field.Value.(type) {
 		case float32:
 			value = decimal.NewFromFloat32(valueTmp)
@@ -228,22 +232,23 @@ func (a *app) WritePoints(p Point) error {
 		case int64:
 			value = decimal.NewFromInt(valueTmp)
 		default:
-			fields[tag.ID] = field.Value
+			valTmp, err := numberx.GetValueByType("", field.Value)
+			if err != nil {
+				logger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				continue
+			}
+			fields[tag.ID] = valTmp
 			continue
 		}
 
 		val := a.convertRange(tag.Range, a.convertValue(tag, value))
 		if val != nil {
-			if fieldType, ok := p.FieldTypes[tag.ID]; ok {
-				switch fieldType {
-				case Integer:
-					fields[tag.ID] = int(*val)
-				default:
-					fields[tag.ID] = val
-				}
-			} else {
-				fields[tag.ID] = val
+			valTmp, err := numberx.GetValueByType("", val)
+			if err != nil {
+				logger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				continue
 			}
+			fields[tag.ID] = valTmp
 		}
 	}
 
@@ -258,7 +263,8 @@ func (a *app) WritePoints(p Point) error {
 		return err
 	}
 	logger.Debugf("保存数据,%s", string(b))
-	return a.mq.Publish(context.Background(), []string{"data", C.Project, tableId, p.ID}, b)
+	return a.mq.Publish(ctx, []string{"data", C.Project, tableId, p.ID}, b)
+	//return nil
 }
 
 func (a *app) WriteEvent(ctx context.Context, event Event) error {

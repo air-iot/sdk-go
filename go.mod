@@ -1,6 +1,6 @@
 module github.com/air-iot/sdk-go/v4
 
-go 1.17
+go 1.20
 
 require (
 	github.com/air-iot/api-client-go/v4 v4.0.38
