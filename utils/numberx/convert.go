@@ -2,6 +2,7 @@ package numberx
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -31,6 +32,9 @@ func (v FieldType) String() string {
 }
 
 func GetValueByType(valueType FieldType, v interface{}) (interface{}, error) {
+	if reflect.TypeOf(v).Kind() == reflect.Ptr {
+		v = reflect.ValueOf(v).Elem().Interface()
+	}
 	switch valueType {
 	case String:
 		val, err := GetString(v)
