@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"github.com/spf13/viper"
 	"testing"
 )
@@ -17,15 +18,13 @@ func TestApp_WritePoints(t *testing.T) {
 	//var MaxRaw float64 = 300
 	var Fixed int32 = 2
 	var Mod float64 = 2
-	var FixedS = "boundary"
-
 	point := Point{
 		ID: "b1",
 		Fields: []Field{
-			{Tag: Tag{
+			{Tag: entity.Tag{
 				ID:       "p1",
 				Name:     "p1",
-				TagValue: &TagValue{
+				TagValue: &entity.TagValue{
 					//MinValue: &minValue,
 					//MaxValue: &MaxValue,
 					//MinRaw:   &MinRaw,
@@ -33,10 +32,10 @@ func TestApp_WritePoints(t *testing.T) {
 				},
 				Fixed: &Fixed,
 				Mod:   &Mod,
-				Range: &Range{
+				Range: &entity.Range{
 					MinValue:   &minValue,
 					MaxValue:   &MaxValue,
-					Active:     &FixedS,
+					Active:     entity.Active_Boundary,
 					FixedValue: &Mod,
 				},
 			},
@@ -60,15 +59,13 @@ func Test_wp(t *testing.T) {
 	//var MaxRaw float64 = 300
 	var Fixed int32 = 2
 	var Mod float64 = 2
-	var FixedS = "boundary"
-
 	point := Point{
 		ID: "b1",
 		Fields: []Field{
-			{Tag: Tag{
+			{Tag: entity.Tag{
 				ID:       "p1",
 				Name:     "p1",
-				TagValue: &TagValue{
+				TagValue: &entity.TagValue{
 					//MinValue: &minValue,
 					//MaxValue: &MaxValue,
 					//MinRaw:   &MinRaw,
@@ -76,10 +73,10 @@ func Test_wp(t *testing.T) {
 				},
 				Fixed: &Fixed,
 				Mod:   &Mod,
-				Range: &Range{
+				Range: &entity.Range{
 					MinValue:   &minValue,
 					MaxValue:   &MaxValue,
-					Active:     &FixedS,
+					Active:     entity.Active_Boundary,
 					FixedValue: &Mod,
 				},
 			},

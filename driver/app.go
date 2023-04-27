@@ -9,18 +9,20 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/air-iot/json"
+	"github.com/air-iot/logger"
 	"github.com/shopspring/decimal"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/conn/mq"
+	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"github.com/air-iot/sdk-go/v4/utils/numberx"
 )
 
@@ -51,6 +53,8 @@ type app struct {
 	stopped bool
 	cli     *Client
 	clean   func()
+
+	cacheValue sync.Map
 }
 
 func init() {
@@ -127,6 +131,7 @@ func NewApp() App {
 	a.clean = func() {
 		clean()
 	}
+	a.cacheValue = sync.Map{}
 	return a
 }
 
@@ -199,10 +204,14 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			continue
 		}
 
-		tag := new(Tag)
+		tag := new(entity.Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
-			logger.Warnf("表 %s 资产 %s 数据点序列化tag结构体错误: %s", tableId, p.ID, err.Error())
+			logger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %s", tableId, p.ID, err.Error())
+			continue
+		}
+		if strings.TrimSpace(tag.ID) == "" {
+			logger.Errorf("表 %s 资产 %s 数据点标识为空", tableId, p.ID)
 			continue
 		}
 		var value decimal.Decimal
@@ -240,18 +249,38 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			fields[tag.ID] = valTmp
 			continue
 		}
-
-		val := a.convertRange(tag.Range, a.convertValue(tag, value))
-		if val != nil {
-			valTmp, err := numberx.GetValueByType("", val)
+		val := entity.ConvertValue(tag, value)
+		cacheKey := fmt.Sprintf("%s__%s__%s", tableId, p.ID, tag.ID)
+		preValF, ok := a.cacheValue.Load(cacheKey)
+		var preVal *decimal.Decimal
+		if ok {
+			preF, ok := preValF.(*float64)
+			if ok && preF != nil {
+				preValue := decimal.NewFromFloat(*preF)
+				preVal = &preValue
+			}
+		}
+		newVal, rawVal, save := entity.ConvertRange(tag.Range, preVal, &val)
+		if newVal != nil {
+			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
 				logger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
-				continue
+			} else {
+				fields[tag.ID] = valTmp
+				if save {
+					a.cacheValue.Store(cacheKey, newVal)
+				}
 			}
-			fields[tag.ID] = valTmp
+		}
+		if rawVal != nil {
+			valTmp, err := numberx.GetValueByType("", rawVal)
+			if err != nil {
+				logger.Errorf("表 %s 资产 %s 原始数据点转类型错误: %v", tableId, p.ID, err)
+			} else {
+				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
+			}
 		}
 	}
-
 	if len(fields) == 0 {
 		return errors.New("数据点为空值")
 	}
@@ -281,82 +310,6 @@ func (a *app) UpdateTableData(ctx context.Context, table, id string, custom map[
 		ID:      id,
 		Data:    custom,
 	}, &map[string]interface{}{})
-}
-
-// active fixed  boundary  discard
-func (a *app) convertRange(tagRange *Range, raw decimal.Decimal) (val *float64) {
-	value, _ := raw.Float64()
-	if tagRange == nil {
-		return &value
-	}
-	if tagRange.MinValue == nil || tagRange.MaxValue == nil || tagRange.Active == nil {
-		return &value
-	}
-	minValue := decimal.NewFromFloat(*tagRange.MinValue)
-	maxValue := decimal.NewFromFloat(*tagRange.MaxValue)
-	if raw.GreaterThanOrEqual(minValue) && raw.LessThanOrEqual(maxValue) {
-		return &value
-	}
-	switch *tagRange.Active {
-	case "fixed":
-		if tagRange.FixedValue == nil {
-			return &value
-		}
-		return tagRange.FixedValue
-	case "boundary":
-		if raw.LessThan(minValue) {
-			return tagRange.MinValue
-		}
-		if raw.GreaterThan(maxValue) {
-			return tagRange.MaxValue
-		}
-	case "discard":
-		return nil
-	default:
-		return &value
-	}
-	return &value
-}
-
-// ConvertValue 数据点值转换
-func (a *app) convertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
-	var value = raw
-	if tagTemp.TagValue != nil {
-		if tagTemp.TagValue.MinRaw != nil {
-			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
-			if value.LessThan(minRaw) {
-				value = minRaw
-			}
-		}
-
-		if tagTemp.TagValue.MaxRaw != nil {
-			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
-			if value.GreaterThan(maxRaw) {
-				value = maxRaw
-			}
-		}
-
-		if tagTemp.TagValue.MinRaw != nil && tagTemp.TagValue.MaxRaw != nil && tagTemp.TagValue.MinValue != nil && tagTemp.TagValue.MaxValue != nil {
-			//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
-			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
-			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
-			minValue := decimal.NewFromFloat(*tagTemp.TagValue.MinValue)
-			maxValue := decimal.NewFromFloat(*tagTemp.TagValue.MaxValue)
-			if !maxRaw.Equal(minRaw) {
-				value = raw.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
-			}
-		}
-	}
-
-	if tagTemp.Fixed != nil {
-		value = value.Round(*tagTemp.Fixed)
-	}
-
-	if tagTemp.Mod != nil {
-		value = value.Mul(decimal.NewFromFloat(*tagTemp.Mod))
-	}
-
-	return value
 }
 
 // Log 写日志数据

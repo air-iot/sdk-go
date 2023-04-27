@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"sync"
 	"time"
 
@@ -338,7 +339,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 			return fmt.Errorf("start stream err, %s", err)
 		}
 		startRes := new(grpcResult)
-		var cfg Instance
+		var cfg entity.Instance
 		if err := json.Unmarshal(res.Config, &cfg); err != nil {
 			startRes.Error = err.Error()
 			startRes.Code = 400
