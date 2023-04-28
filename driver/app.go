@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -87,6 +88,7 @@ type app struct {
 	stopped      bool
 	healthTime   int
 	intervalTime int
+	cacheValue   sync.Map
 }
 
 // Point 存储数据
@@ -258,6 +260,7 @@ func NewApp() App {
 	}
 	a.healthTime = health
 	a.intervalTime = interval
+	a.cacheValue = sync.Map{}
 	return a
 }
 
@@ -368,6 +371,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
+							p.cacheValue = sync.Map{}
 							if err := driver.Start(p, c); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
@@ -380,6 +384,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						if err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: fmt.Sprintf("查询配置错误,%s", err.Error())}}
 						} else {
+							p.cacheValue = sync.Map{}
 							if err := driver.Reload(p, c); err != nil {
 								r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 							} else {
@@ -599,20 +604,40 @@ func (p *app) WritePoints(point Point) error {
 			fields[tag.ID] = field.Value
 			continue
 		}
-
-		val := p.convertRange(tag.Range, p.convertValue(tag, value))
-		if val != nil {
-			if fieldType, ok := point.FieldTypes[tag.ID]; ok {
-				switch fieldType {
-				case Integer:
-					fields[tag.ID] = int(*val)
-				default:
-					fields[tag.ID] = val
-				}
-			} else {
-				fields[tag.ID] = val
+		val := ConvertValue(tag, value)
+		cacheKey := fmt.Sprintf("%s__%s", point.ID, tag.ID)
+		preValF, ok := p.cacheValue.Load(cacheKey)
+		var preVal *decimal.Decimal
+		if ok {
+			preF, ok := preValF.(*float64)
+			if ok && preF != nil {
+				preValue := decimal.NewFromFloat(*preF)
+				preVal = &preValue
 			}
 		}
+		newVal, rawVal, save := ConvertRange(tag.Range, preVal, &val)
+		if newVal != nil {
+			fields[tag.ID] = newVal
+			if save {
+				p.cacheValue.Store(cacheKey, newVal)
+			}
+		}
+		if rawVal != nil {
+			fields[fmt.Sprintf("%s__invalid", tag.ID)] = rawVal
+		}
+		//val := p.convertRange(tag.Range, p.convertValue(tag, value))
+		//if val != nil {
+		//	if fieldType, ok := point.FieldTypes[tag.ID]; ok {
+		//		switch fieldType {
+		//		case Integer:
+		//			fields[tag.ID] = int(*val)
+		//		default:
+		//			fields[tag.ID] = val
+		//		}
+		//	} else {
+		//		fields[tag.ID] = val
+		//	}
+		//}
 	}
 
 	if len(fields) == 0 {
@@ -674,83 +699,83 @@ func (p *app) UpdateNode(id string, custom map[string]interface{}) error {
 	return nil
 }
 
-// active fixed  boundary  discard
-func (p *app) convertRange(tagRange *Range, raw decimal.Decimal) (val *float64) {
-	value, _ := raw.Float64()
-	if tagRange == nil {
-		return &value
-	}
-	if tagRange.MinValue == nil || tagRange.MaxValue == nil || tagRange.Active == nil {
-		return &value
-	}
-	minValue := decimal.NewFromFloat(*tagRange.MinValue)
-	maxValue := decimal.NewFromFloat(*tagRange.MaxValue)
-
-	if raw.GreaterThanOrEqual(minValue) && raw.LessThanOrEqual(maxValue) {
-		return &value
-	}
-
-	switch *tagRange.Active {
-	case "fixed":
-		if tagRange.FixedValue == nil {
-			return &value
-		}
-		return tagRange.FixedValue
-	case "boundary":
-		if raw.LessThan(minValue) {
-			return tagRange.MinValue
-		}
-		if raw.GreaterThan(maxValue) {
-			return tagRange.MaxValue
-		}
-	case "discard":
-		return nil
-	default:
-		return &value
-	}
-	return &value
-}
-
-// ConvertValue 数据点值转换
-func (p *app) convertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
-	var value = raw
-	if tagTemp.TagValue != nil {
-		if tagTemp.TagValue.MinRaw != nil {
-			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
-			if value.LessThan(minRaw) {
-				value = minRaw
-			}
-		}
-
-		if tagTemp.TagValue.MaxRaw != nil {
-			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
-			if value.GreaterThan(maxRaw) {
-				value = maxRaw
-			}
-		}
-
-		if tagTemp.TagValue.MinRaw != nil && tagTemp.TagValue.MaxRaw != nil && tagTemp.TagValue.MinValue != nil && tagTemp.TagValue.MaxValue != nil {
-			//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
-			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
-			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
-			minValue := decimal.NewFromFloat(*tagTemp.TagValue.MinValue)
-			maxValue := decimal.NewFromFloat(*tagTemp.TagValue.MaxValue)
-			if !maxRaw.Equal(minRaw) {
-				value = raw.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
-			}
-		}
-	}
-
-	if tagTemp.Fixed != nil {
-		value = value.Round(*tagTemp.Fixed)
-	}
-
-	if tagTemp.Mod != nil {
-		value = value.Mul(decimal.NewFromFloat(*tagTemp.Mod))
-	}
-
-	return value
-}
+//// active fixed  boundary  discard
+//func (p *app) convertRange(tagRange *Range, raw decimal.Decimal) (val *float64) {
+//	value, _ := raw.Float64()
+//	if tagRange == nil {
+//		return &value
+//	}
+//	if tagRange.MinValue == nil || tagRange.MaxValue == nil || tagRange.Active == nil {
+//		return &value
+//	}
+//	minValue := decimal.NewFromFloat(*tagRange.MinValue)
+//	maxValue := decimal.NewFromFloat(*tagRange.MaxValue)
+//
+//	if raw.GreaterThanOrEqual(minValue) && raw.LessThanOrEqual(maxValue) {
+//		return &value
+//	}
+//
+//	switch *tagRange.Active {
+//	case "fixed":
+//		if tagRange.FixedValue == nil {
+//			return &value
+//		}
+//		return tagRange.FixedValue
+//	case "boundary":
+//		if raw.LessThan(minValue) {
+//			return tagRange.MinValue
+//		}
+//		if raw.GreaterThan(maxValue) {
+//			return tagRange.MaxValue
+//		}
+//	case "discard":
+//		return nil
+//	default:
+//		return &value
+//	}
+//	return &value
+//}
+//
+//// ConvertValue 数据点值转换
+//func (p *app) convertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
+//	var value = raw
+//	if tagTemp.TagValue != nil {
+//		if tagTemp.TagValue.MinRaw != nil {
+//			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
+//			if value.LessThan(minRaw) {
+//				value = minRaw
+//			}
+//		}
+//
+//		if tagTemp.TagValue.MaxRaw != nil {
+//			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
+//			if value.GreaterThan(maxRaw) {
+//				value = maxRaw
+//			}
+//		}
+//
+//		if tagTemp.TagValue.MinRaw != nil && tagTemp.TagValue.MaxRaw != nil && tagTemp.TagValue.MinValue != nil && tagTemp.TagValue.MaxValue != nil {
+//			//value = (((rawTmp - minRaw) / (maxRaw - minRaw)) * (maxValue - minValue)) + minValue
+//			minRaw := decimal.NewFromFloat(*tagTemp.TagValue.MinRaw)
+//			maxRaw := decimal.NewFromFloat(*tagTemp.TagValue.MaxRaw)
+//			minValue := decimal.NewFromFloat(*tagTemp.TagValue.MinValue)
+//			maxValue := decimal.NewFromFloat(*tagTemp.TagValue.MaxValue)
+//			if !maxRaw.Equal(minRaw) {
+//				value = raw.Sub(minRaw).Div(maxRaw.Sub(minRaw)).Mul(maxValue.Sub(minValue)).Add(minValue)
+//			}
+//		}
+//	}
+//
+//	if tagTemp.Fixed != nil {
+//		value = value.Round(*tagTemp.Fixed)
+//	}
+//
+//	if tagTemp.Mod != nil {
+//		value = value.Mul(decimal.NewFromFloat(*tagTemp.Mod))
+//	}
+//
+//	return value
+//}
 
 // Log 写日志数据
 func (p *app) Log(topic string, msg interface{}) {

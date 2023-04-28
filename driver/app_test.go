@@ -16,7 +16,6 @@ func TestApp_WritePoints(t *testing.T) {
 	//var MaxRaw float64 = 300
 	var Fixed int32 = 2
 	var Mod float64 = 2
-	var FixedS = "boundary"
 
 	point := Point{
 		ID: "b1",
@@ -35,7 +34,7 @@ func TestApp_WritePoints(t *testing.T) {
 				Range: &Range{
 					MinValue:   &minValue,
 					MaxValue:   &MaxValue,
-					Active:     &FixedS,
+					Active:     Active_Boundary,
 					FixedValue: &Mod,
 				},
 			},
