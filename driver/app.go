@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/air-iot/sdk-go/v4/conn/mq"
+	"github.com/air-iot/sdk-go/v4/driver/convert"
 	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"github.com/air-iot/sdk-go/v4/utils/numberx"
 )
@@ -249,7 +250,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			fields[tag.ID] = valTmp
 			continue
 		}
-		val := entity.ConvertValue(tag, value)
+		val := convert.ConvertValue(tag, value)
 		cacheKey := fmt.Sprintf("%s__%s__%s", tableId, p.ID, tag.ID)
 		preValF, ok := a.cacheValue.Load(cacheKey)
 		var preVal *decimal.Decimal
@@ -260,7 +261,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 				preVal = &preValue
 			}
 		}
-		newVal, rawVal, save := entity.ConvertRange(tag.Range, preVal, &val)
+		newVal, rawVal, save := convert.ConvertRange(tag.Range, preVal, &val)
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
