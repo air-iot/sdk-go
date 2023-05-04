@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/air-iot/sdk-go/driver/convert"
 	"log"
 	"math/rand"
 	"net/http"
@@ -567,7 +568,7 @@ func (p *app) WritePoints(point Point) error {
 			continue
 		}
 
-		tag := new(Tag)
+		tag := new(convert.Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
 			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())
@@ -604,7 +605,7 @@ func (p *app) WritePoints(point Point) error {
 			fields[tag.ID] = field.Value
 			continue
 		}
-		val := ConvertValue(tag, value)
+		val := convert.ConvertValue(tag, value)
 		cacheKey := fmt.Sprintf("%s__%s", point.ID, tag.ID)
 		preValF, ok := p.cacheValue.Load(cacheKey)
 		var preVal *decimal.Decimal
@@ -615,7 +616,7 @@ func (p *app) WritePoints(point Point) error {
 				preVal = &preValue
 			}
 		}
-		newVal, rawVal, save := ConvertRange(tag.Range, preVal, &val)
+		newVal, rawVal, save := convert.ConvertRange(tag.Range, preVal, &val)
 		if newVal != nil {
 			fields[tag.ID] = newVal
 			if save {

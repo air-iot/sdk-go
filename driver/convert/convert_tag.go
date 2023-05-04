@@ -1,6 +1,8 @@
-package driver
+package convert
 
-import "github.com/shopspring/decimal"
+import (
+	"github.com/shopspring/decimal"
+)
 
 func ConvertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
 	var value = raw

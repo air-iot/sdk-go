@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"github.com/air-iot/sdk-go/driver/convert"
 	"github.com/spf13/viper"
 	"testing"
 )
@@ -20,10 +21,10 @@ func TestApp_WritePoints(t *testing.T) {
 	point := Point{
 		ID: "b1",
 		Fields: []Field{
-			{Tag: Tag{
+			{Tag: convert.Tag{
 				ID:       "p1",
 				Name:     "p1",
-				TagValue: &TagValue{
+				TagValue: &convert.TagValue{
 					//MinValue: &minValue,
 					//MaxValue: &MaxValue,
 					//MinRaw:   &MinRaw,
@@ -31,10 +32,10 @@ func TestApp_WritePoints(t *testing.T) {
 				},
 				Fixed: &Fixed,
 				Mod:   &Mod,
-				Range: &Range{
+				Range: &convert.Range{
 					MinValue:   &minValue,
 					MaxValue:   &MaxValue,
-					Active:     Active_Boundary,
+					Active:     convert.Active_Boundary,
 					FixedValue: &Mod,
 				},
 			},
