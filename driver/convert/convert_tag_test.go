@@ -2,13 +2,14 @@ package convert
 
 import (
 	"encoding/json"
+	"github.com/air-iot/sdk-go/driver/entity"
 	"github.com/shopspring/decimal"
 	"testing"
 )
 
 func TestConvertRange1(t *testing.T) {
 	rangeStr := `{"conditions":[{"mode":"number","condition":"range","minValue":0,"maxValue":10,"value":10,"defaultCondition":true}],"active":"boundary","fixedValue":10,"invalidAction":"save"}`
-	var tagRange Range
+	var tagRange entity.Range
 
 	if err := json.Unmarshal([]byte(rangeStr), &tagRange); err != nil {
 		t.Fatal(err)
@@ -27,7 +28,7 @@ func TestConvertRange1(t *testing.T) {
 
 func TestConvertRange2(t *testing.T) {
 	rangeStr := `{"conditions":[{"mode":"number","condition":"range","minValue":0,"maxValue":10,"value":10,"defaultCondition":true}],"active":"boundary","fixedValue":10,"invalidAction":"save"}`
-	var tagRange Range
+	var tagRange entity.Range
 
 	if err := json.Unmarshal([]byte(rangeStr), &tagRange); err != nil {
 		t.Fatal(err)
@@ -46,7 +47,7 @@ func TestConvertRange2(t *testing.T) {
 
 func Test_ConvertRange3(t *testing.T) {
 	rangeStr := `{"conditions":[{"mode":"number","condition":"range","minValue":0,"maxValue":10,"value":10,"defaultCondition":true}],"active":"fixed","fixedValue":10,"invalidAction":"save"}`
-	var tagRange Range
+	var tagRange entity.Range
 
 	if err := json.Unmarshal([]byte(rangeStr), &tagRange); err != nil {
 		t.Fatal(err)

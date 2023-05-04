@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/air-iot/sdk-go/driver/convert"
 	"log"
 	"math/rand"
 	"net/http"
@@ -29,6 +28,8 @@ import (
 	"github.com/air-iot/sdk-go/conn/mqtt"
 	"github.com/air-iot/sdk-go/conn/rabbit"
 	"github.com/air-iot/sdk-go/conn/websocket"
+	"github.com/air-iot/sdk-go/driver/convert"
+	"github.com/air-iot/sdk-go/driver/entity"
 	"github.com/air-iot/sdk-go/logger"
 )
 
@@ -568,7 +569,7 @@ func (p *app) WritePoints(point Point) error {
 			continue
 		}
 
-		tag := new(convert.Tag)
+		tag := new(entity.Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
 			p.Logger.Warnf("资产 [%s] 数据点序列化tag结构体错误: %s", point.ID, err.Error())

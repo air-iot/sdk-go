@@ -1,10 +1,11 @@
 package convert
 
 import (
+	"github.com/air-iot/sdk-go/driver/entity"
 	"github.com/shopspring/decimal"
 )
 
-func ConvertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
+func ConvertValue(tagTemp *entity.Tag, raw decimal.Decimal) (val decimal.Decimal) {
 	var value = raw
 	if tagTemp.TagValue != nil {
 		if tagTemp.TagValue.MinRaw != nil {
@@ -44,7 +45,7 @@ func ConvertValue(tagTemp *Tag, raw decimal.Decimal) (val decimal.Decimal) {
 	return value
 }
 
-func ConvertRange(tagRange *Range, preVal, raw *decimal.Decimal) (newValue, rawValue *float64, isSave bool) {
+func ConvertRange(tagRange *entity.Range, preVal, raw *decimal.Decimal) (newValue, rawValue *float64, isSave bool) {
 	if raw == nil {
 		return nil, nil, false
 	}
@@ -61,21 +62,21 @@ func ConvertRange(tagRange *Range, preVal, raw *decimal.Decimal) (newValue, rawV
 		return &value, nil, false
 	}
 	switch tagRange.Active {
-	case Active_Fixed:
+	case entity.Active_Fixed:
 		if tagRange.FixedValue == nil {
 			return &value, nil, false
 		}
 		return tagRange.FixedValue, nil, false
-	case Active_Boundary:
+	case entity.Active_Boundary:
 		if raw.LessThan(minValue) {
 			return tagRange.MinValue, nil, false
 		}
 		if raw.GreaterThan(maxValue) {
 			return tagRange.MaxValue, nil, false
 		}
-	case Active_Discard:
+	case entity.Active_Discard:
 		return nil, nil, false
-	case Active_Latest:
+	case entity.Active_Latest:
 		if preVal == nil {
 			return nil, nil, false
 		}
@@ -85,7 +86,7 @@ func ConvertRange(tagRange *Range, preVal, raw *decimal.Decimal) (newValue, rawV
 	return &value, nil, false
 }
 
-func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue, rawValue *float64, isSave bool) {
+func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (newValue, rawValue *float64, isSave bool) {
 	if raw == nil {
 		return
 	}
@@ -95,23 +96,23 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 		return
 	}
 	switch tagRange.InvalidAction {
-	case InvalidAction_Save:
+	case entity.InvalidAction_Save:
 		rawValue = &value
 	}
 	if tagRange.Conditions == nil || len(tagRange.Conditions) == 0 {
 		newValue = &value
 		return
 	}
-	var defaultCondition *RangeCondition = nil
+	var defaultCondition *entity.RangeCondition = nil
 	for i, condition := range tagRange.Conditions {
 		if condition.DefaultCondition {
 			defaultCondition = &tagRange.Conditions[i]
 		}
 		var currentValue *decimal.Decimal = nil
 		switch condition.Mode {
-		case ConditionMode_Number:
+		case entity.ConditionMode_Number:
 			currentValue = raw
-		case ConditionMode_Rate:
+		case entity.ConditionMode_Rate:
 			if !isSave {
 				isSave = true
 			}
@@ -124,7 +125,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 			}
 			rateValue := ((raw.Sub(*preVal)).Div(*preVal)).Mul(decimal.NewFromInt(100))
 			currentValue = &rateValue
-		case ConditionMode_Delta:
+		case entity.ConditionMode_Delta:
 			if !isSave {
 				isSave = true
 			}
@@ -136,7 +137,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 		}
 		if currentValue != nil {
 			switch condition.Condition {
-			case Condition_Range:
+			case entity.Condition_Range:
 				if condition.MinValue != nil && condition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*condition.MinValue)
 					maxValue := decimal.NewFromFloat(*condition.MaxValue)
@@ -145,7 +146,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 						return
 					}
 				}
-			case Condition_Greater:
+			case entity.Condition_Greater:
 				if condition.Value != nil {
 					valueTmp := decimal.NewFromFloat(*condition.Value)
 					if currentValue.GreaterThan(valueTmp) {
@@ -153,7 +154,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 						return
 					}
 				}
-			case Condition_Less:
+			case entity.Condition_Less:
 				if condition.Value != nil {
 					valueTmp := decimal.NewFromFloat(*condition.Value)
 					if currentValue.LessThan(valueTmp) {
@@ -165,22 +166,22 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 		}
 	}
 	switch tagRange.Active {
-	case Active_Fixed:
+	case entity.Active_Fixed:
 		if tagRange.FixedValue == nil {
 			newValue = nil
 			return
 		}
 		newValue = tagRange.FixedValue
 		return
-	case Active_Boundary:
+	case entity.Active_Boundary:
 		if defaultCondition == nil {
 			newValue = nil
 			return
 		}
 		switch defaultCondition.Mode {
-		case ConditionMode_Number:
+		case entity.ConditionMode_Number:
 			switch defaultCondition.Condition {
-			case Condition_Range:
+			case entity.Condition_Range:
 				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
 					if raw.LessThan(minValue) {
@@ -196,11 +197,11 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 					newValue = nil
 					return
 				}
-			case Condition_Greater, Condition_Less:
+			case entity.Condition_Greater, entity.Condition_Less:
 				newValue = defaultCondition.Value
 				return
 			}
-		case ConditionMode_Rate:
+		case entity.ConditionMode_Rate:
 			if preVal == nil {
 				newValue = &value
 				return
@@ -213,7 +214,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 			rateValue := (raw.Sub(*preVal)).Div(*preVal).Mul(decimal.NewFromInt(100))
 			one := decimal.NewFromInt(1)
 			switch defaultCondition.Condition {
-			case Condition_Range:
+			case entity.Condition_Range:
 				// x = (min + 1) * pre
 				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
@@ -229,7 +230,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 						return
 					}
 				}
-			case Condition_Greater, Condition_Less:
+			case entity.Condition_Greater, entity.Condition_Less:
 				if defaultCondition.Value == nil {
 					newValue = nil
 					return
@@ -240,14 +241,14 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 				return
 
 			}
-		case ConditionMode_Delta:
+		case entity.ConditionMode_Delta:
 			if preVal == nil {
 				newValue = &value
 				return
 			}
 			deltaValue := raw.Sub(*preVal)
 			switch defaultCondition.Condition {
-			case Condition_Range:
+			case entity.Condition_Range:
 				// x = (min +1)*pre
 				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
@@ -263,7 +264,7 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 						return
 					}
 				}
-			case Condition_Greater, Condition_Less:
+			case entity.Condition_Greater, entity.Condition_Less:
 				if defaultCondition.Value == nil {
 					newValue = nil
 					return
@@ -274,10 +275,10 @@ func convertConditions(tagRange *Range, preVal, raw *decimal.Decimal) (newValue,
 				return
 			}
 		}
-	case Active_Discard:
+	case entity.Active_Discard:
 		newValue = nil
 		return
-	case Active_Latest:
+	case entity.Active_Latest:
 		if !isSave {
 			isSave = true
 		}

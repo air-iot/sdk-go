@@ -1,4 +1,4 @@
-package convert
+package entity
 
 type Tag struct {
 	ID   string `json:"id" description:"ID"`
