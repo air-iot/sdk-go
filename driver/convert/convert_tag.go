@@ -90,6 +90,7 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 	if raw == nil {
 		return
 	}
+	isSave = true
 	value, _ := raw.Float64()
 	if tagRange == nil {
 		newValue = &value
@@ -113,9 +114,6 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		case entity.ConditionMode_Number:
 			currentValue = raw
 		case entity.ConditionMode_Rate:
-			if !isSave {
-				isSave = true
-			}
 			if preVal == nil {
 				continue
 			}
@@ -126,9 +124,6 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 			rateValue := ((raw.Sub(*preVal)).Div(*preVal)).Mul(decimal.NewFromInt(100))
 			currentValue = &rateValue
 		case entity.ConditionMode_Delta:
-			if !isSave {
-				isSave = true
-			}
 			if preVal == nil {
 				continue
 			}
@@ -279,9 +274,6 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		newValue = nil
 		return
 	case entity.Active_Latest:
-		if !isSave {
-			isSave = true
-		}
 		if preVal == nil {
 			newValue = &value
 			return
