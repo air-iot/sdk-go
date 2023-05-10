@@ -265,10 +265,11 @@ func NewApp() App {
 	a.healthTime = health
 	a.intervalTime = interval
 	a.cacheValue = sync.Map{}
-	_, pluginFilePath, _, _ := runtime.Caller(1)
+	_, pluginFilePath, _, _ := runtime.Caller(0)
 	configDir := filepath.Dir(pluginFilePath)
 	if parts := strings.Split(configDir, "@"); len(parts) > 1 {
-		a.Version = parts[len(parts)-1]
+		a.Version = strings.TrimSuffix(strings.TrimPrefix(parts[len(parts)-1], "v"), "/driver")
+		a.Version = strings.TrimSuffix(a.Version, "\\driver")
 	} else {
 		a.Version = pluginFilePath
 	}
