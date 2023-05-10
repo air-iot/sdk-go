@@ -59,6 +59,7 @@ type Driver interface {
 	Debug(App, []byte) (interface{}, error)
 	Stop(App) error
 	Schema(App) (string, error)
+	GetVersion() string
 }
 
 type Handler interface {
@@ -469,6 +470,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						if r1, err := driver.Schema(p); err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 						} else {
+							r1 = strings.ReplaceAll(r1, "__version__", driver.GetVersion())
 							r1 = strings.ReplaceAll(r1, "__sdk_version__", p.Version)
 							r = result{Code: http.StatusOK, Result: r1}
 						}
