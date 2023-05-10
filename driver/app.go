@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -91,6 +92,7 @@ type app struct {
 	healthTime   int
 	intervalTime int
 	cacheValue   sync.Map
+	Version      string
 }
 
 // Point 存储数据
@@ -263,6 +265,13 @@ func NewApp() App {
 	a.healthTime = health
 	a.intervalTime = interval
 	a.cacheValue = sync.Map{}
+	_, pluginFilePath, _, _ := runtime.Caller(1)
+	configDir := filepath.Dir(pluginFilePath)
+	if parts := strings.Split(configDir, "@"); len(parts) > 1 {
+		a.Version = parts[len(parts)-1]
+	} else {
+		a.Version = pluginFilePath
+	}
 	return a
 }
 
@@ -459,6 +468,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						if r1, err := driver.Schema(p); err != nil {
 							r = result{Code: http.StatusBadRequest, Result: resultMsg{Message: err.Error()}}
 						} else {
+							r1 = strings.ReplaceAll(r1, "sdkVersion", p.Version)
 							r = result{Code: http.StatusOK, Result: r1}
 						}
 					default:
