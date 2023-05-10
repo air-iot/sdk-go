@@ -96,10 +96,7 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		newValue = &value
 		return
 	}
-	switch tagRange.InvalidAction {
-	case entity.InvalidAction_Save:
-		rawValue = &value
-	}
+
 	if tagRange.Conditions == nil || len(tagRange.Conditions) == 0 {
 		newValue = &value
 		return
@@ -159,6 +156,10 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 				}
 			}
 		}
+	}
+	switch tagRange.InvalidAction {
+	case entity.InvalidAction_Save:
+		rawValue = &value
 	}
 	switch tagRange.Active {
 	case entity.Active_Fixed:
