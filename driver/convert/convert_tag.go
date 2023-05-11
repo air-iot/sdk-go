@@ -215,13 +215,13 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
 					if rateValue.LessThan(minValue) {
-						sub, _ := (minValue.Add(one)).Mul(*preVal).Float64()
+						sub, _ := (minValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 						newValue = &sub
 						return
 					}
 					maxValue := decimal.NewFromFloat(*defaultCondition.MaxValue)
 					if rateValue.GreaterThan(maxValue) {
-						sub, _ := (maxValue.Add(one)).Mul(*preVal).Float64()
+						sub, _ := (maxValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 						newValue = &sub
 						return
 					}
@@ -232,7 +232,7 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 					return
 				}
 				defaultValue := decimal.NewFromFloat(*defaultCondition.Value)
-				sub, _ := (defaultValue.Add(one)).Mul(*preVal).Float64()
+				sub, _ := (defaultValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 				newValue = &sub
 				return
 
