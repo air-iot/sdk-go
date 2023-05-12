@@ -90,15 +90,13 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 	if raw == nil {
 		return
 	}
+	isSave = true
 	value, _ := raw.Float64()
 	if tagRange == nil {
 		newValue = &value
 		return
 	}
-	switch tagRange.InvalidAction {
-	case entity.InvalidAction_Save:
-		rawValue = &value
-	}
+
 	if tagRange.Conditions == nil || len(tagRange.Conditions) == 0 {
 		newValue = &value
 		return
@@ -113,18 +111,16 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		case entity.ConditionMode_Number:
 			currentValue = raw
 		case entity.ConditionMode_Rate:
-			if !isSave {
-				isSave = true
-			}
 			if preVal == nil {
+				continue
+			}
+			pf, _ := preVal.Float64()
+			if pf == 0 {
 				continue
 			}
 			rateValue := ((raw.Sub(*preVal)).Div(*preVal)).Mul(decimal.NewFromInt(100))
 			currentValue = &rateValue
 		case entity.ConditionMode_Delta:
-			if !isSave {
-				isSave = true
-			}
 			if preVal == nil {
 				continue
 			}
@@ -161,6 +157,10 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 			}
 		}
 	}
+	switch tagRange.InvalidAction {
+	case entity.InvalidAction_Save:
+		rawValue = &value
+	}
 	switch tagRange.Active {
 	case entity.Active_Fixed:
 		if tagRange.FixedValue == nil {
@@ -178,19 +178,20 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		case entity.ConditionMode_Number:
 			switch defaultCondition.Condition {
 			case entity.Condition_Range:
-				if defaultCondition.MinValue != nil {
+				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
 					if raw.LessThan(minValue) {
 						newValue = defaultCondition.MinValue
 						return
 					}
-				}
-				if defaultCondition.MaxValue != nil {
 					maxValue := decimal.NewFromFloat(*defaultCondition.MaxValue)
 					if raw.GreaterThan(maxValue) {
 						newValue = defaultCondition.MaxValue
 						return
 					}
+				} else {
+					newValue = nil
+					return
 				}
 			case entity.Condition_Greater, entity.Condition_Less:
 				newValue = defaultCondition.Value
@@ -198,7 +199,12 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 			}
 		case entity.ConditionMode_Rate:
 			if preVal == nil {
-				newValue = nil
+				newValue = &value
+				return
+			}
+			pf, _ := preVal.Float64()
+			if pf == 0 {
+				newValue = &value
 				return
 			}
 			rateValue := (raw.Sub(*preVal)).Div(*preVal).Mul(decimal.NewFromInt(100))
@@ -206,51 +212,47 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 			switch defaultCondition.Condition {
 			case entity.Condition_Range:
 				// x = (min + 1) * pre
-				if defaultCondition.MinValue != nil {
+				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
 					if rateValue.LessThan(minValue) {
-						sub, _ := (minValue.Add(one)).Mul(*preVal).Float64()
+						sub, _ := (minValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 						newValue = &sub
 						return
 					}
-				}
-				if defaultCondition.MaxValue != nil {
 					maxValue := decimal.NewFromFloat(*defaultCondition.MaxValue)
 					if rateValue.GreaterThan(maxValue) {
-						sub, _ := (maxValue.Add(one)).Mul(*preVal).Float64()
+						sub, _ := (maxValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 						newValue = &sub
 						return
 					}
 				}
 			case entity.Condition_Greater, entity.Condition_Less:
 				if defaultCondition.Value == nil {
-					newValue = defaultCondition.Value
+					newValue = nil
 					return
 				}
 				defaultValue := decimal.NewFromFloat(*defaultCondition.Value)
-				sub, _ := (defaultValue.Add(one)).Mul(*preVal).Float64()
+				sub, _ := (defaultValue.Div(decimal.NewFromInt(100)).Add(one)).Mul(*preVal).Float64()
 				newValue = &sub
 				return
 
 			}
 		case entity.ConditionMode_Delta:
 			if preVal == nil {
-				newValue = nil
+				newValue = &value
 				return
 			}
 			deltaValue := raw.Sub(*preVal)
 			switch defaultCondition.Condition {
 			case entity.Condition_Range:
 				// x = (min +1)*pre
-				if defaultCondition.MinValue != nil {
+				if defaultCondition.MinValue != nil && defaultCondition.MaxValue != nil {
 					minValue := decimal.NewFromFloat(*defaultCondition.MinValue)
 					if deltaValue.LessThan(minValue) {
 						sub, _ := (minValue.Add(*preVal)).Float64()
 						newValue = &sub
 						return
 					}
-				}
-				if defaultCondition.MaxValue != nil {
 					maxValue := decimal.NewFromFloat(*defaultCondition.MaxValue)
 					if deltaValue.GreaterThan(maxValue) {
 						sub, _ := (maxValue.Add(*preVal)).Float64()
@@ -260,7 +262,7 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 				}
 			case entity.Condition_Greater, entity.Condition_Less:
 				if defaultCondition.Value == nil {
-					newValue = defaultCondition.Value
+					newValue = nil
 					return
 				}
 				defaultValue := decimal.NewFromFloat(*defaultCondition.Value)
@@ -274,7 +276,7 @@ func convertConditions(tagRange *entity.Range, preVal, raw *decimal.Decimal) (ne
 		return
 	case entity.Active_Latest:
 		if preVal == nil {
-			newValue = nil
+			newValue = &value
 			return
 		}
 		preValue, _ := preVal.Float64()
