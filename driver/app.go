@@ -341,6 +341,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						if err := p.ws.WriteMessage(gws.PingMessage, []byte(p.serviceId)); err != nil {
 							log.Printf("心跳检查错误,%s \n", err.Error())
 							p.ws.Close()
+							time.Sleep(time.Second * time.Duration(p.healthTime))
 							return
 						}
 					}
@@ -360,6 +361,7 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 						} else {
 							log.Printf("心跳检查时间超时,关闭连接 \n")
 							p.ws.Close()
+							time.Sleep(time.Second * time.Duration(p.intervalTime))
 							return
 						}
 					}
