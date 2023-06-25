@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/air-iot/sdk-go/v4/driver/entity"
+	"net/http"
 	"sync"
 	"time"
 
@@ -287,6 +288,22 @@ func (c *Client) startSteam(ctx context.Context) {
 			}
 		}
 	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Infof("http proxy stream break")
+				return
+			default:
+				logger.Infof("http proxy stream")
+				if err := c.HttpProxyStream(context.Background()); err != nil {
+					logger.Errorln(err)
+				}
+				time.Sleep(time.Second * time.Duration(C.DriverGrpc.WaitTime))
+			}
+		}
+	}()
 }
 
 func (c *Client) SchemaStream(ctx context.Context) error {
@@ -534,6 +551,59 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			Data:    bts,
 		}); err != nil {
 			logger.Errorf("debug stream 发送错误,%s", err)
+		}
+	}
+}
+
+func (c *Client) HttpProxyStream(ctx context.Context) error {
+	stream, err := c.cli.HttpProxyStream(dGrpc.GetGrpcContext(ctx, C.ServiceID, C.Project, C.Driver.ID, C.Driver.Name))
+	if err != nil {
+		return fmt.Errorf("http proxy stream err,%s", err)
+	}
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logger.Infof("http proxy stream close err,%s", err)
+		}
+	}()
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			return fmt.Errorf("http proxy stream err, %s", err)
+		}
+		gr := new(grpcResult)
+		var header http.Header
+
+		if res.GetHeaders() != nil {
+			if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
+				gr.Error = fmt.Sprintf("http proxy stream err, %s", err)
+				gr.Code = 400
+			} else {
+				runRes, err := c.driver.HttpProxy(c.app, res.GetType(), header, res.GetData())
+				if err != nil {
+					gr.Error = err.Error()
+					gr.Code = 400
+				} else {
+					gr.Result = runRes
+					gr.Code = 200
+				}
+			}
+		} else {
+			runRes, err := c.driver.HttpProxy(c.app, res.GetType(), header, res.GetData())
+			if err != nil {
+				gr.Error = err.Error()
+				gr.Code = 400
+			} else {
+				gr.Result = runRes
+				gr.Code = 200
+			}
+		}
+
+		bts, _ := json.Marshal(gr)
+		if err := stream.Send(&pb.HttpProxyResult{
+			Request: res.Request,
+			Data:    bts,
+		}); err != nil {
+			logger.Errorf("http proxy stream 发送错误,%s", err)
 		}
 	}
 }

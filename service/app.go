@@ -3,12 +3,12 @@ package service
 import (
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/labstack/echo/v4"
-	mw "github.com/labstack/echo/v4/middleware"
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -16,7 +16,7 @@ import (
 type App interface {
 	Start(service Service)
 	GetLogger() *logrus.Logger
-	GetHttpServer() *echo.Echo
+	GetHttpServer() *gin.Engine
 }
 
 type Service interface {
@@ -42,16 +42,17 @@ func init() {
 // 任务服务
 type app struct {
 	*logrus.Logger
-	*echo.Echo
+	*gin.Engine
+	srv *http.Server
 }
 
 // NewApp 创建DG
 func NewApp() App {
 	//var logLevel = viper.GetString("log.level")
 	a := new(app)
-	e := echo.New()
-	e.Use(mw.Recover())
-	a.Echo = echo.New()
+	g := gin.New()
+	g.Use(RecoveryMiddleware())
+	a.Engine = g
 	//a.Logger = logger.NewLogger(logLevel)
 	return a
 }
@@ -63,10 +64,13 @@ func (p *app) Start(service Service) {
 	if err := service.Start(p); err != nil {
 		panic(err)
 	}
+	p.srv = &http.Server{
+		Addr:    net.JoinHostPort("", viper.GetString("server.port")),
+		Handler: p.Engine,
+	}
 	go func() {
-		if err := p.Echo.Start(net.JoinHostPort("", viper.GetString("server.port"))); err != nil {
-			p.Logger.Errorln("启动http服务,", err)
-			os.Exit(1)
+		if err := p.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 	p.Logger.Infoln("启动服务")
@@ -81,7 +85,7 @@ func (p *app) Start(service Service) {
 }
 
 func (p *app) stop() {
-	if err := p.Echo.Close(); err != nil {
+	if err := p.srv.Close(); err != nil {
 		p.Logger.Errorln("关闭http服务,", err)
 	}
 }
@@ -91,6 +95,6 @@ func (p *app) GetLogger() *logrus.Logger {
 	return p.Logger
 }
 
-func (p *app) GetHttpServer() *echo.Echo {
-	return p.Echo
+func (p *app) GetHttpServer() *gin.Engine {
+	return p.Engine
 }

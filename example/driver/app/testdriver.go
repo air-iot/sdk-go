@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/air-iot/json"
 	"math/rand"
+	"net/http"
 	"time"
 
 	"github.com/air-iot/logger"
@@ -172,4 +173,8 @@ func (p *TestDriver) Stop(a driver.App) error {
 	logger.Debugln("stop")
 	p.Cancel()
 	return nil
+}
+
+func (p *TestDriver) HttpProxy(a driver.App, t string, header http.Header, data []byte) (interface{}, error) {
+	return Schema, nil
 }
