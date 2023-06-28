@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -316,14 +315,14 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 
 			ts := time.Now().Local()
 			p.ws.SetPongHandler(func(appData string) error {
-				log.Printf("pong 值 %s \n", appData)
+				logrus.Infof("pong 值 %v", appData)
 				ids := strings.Split(appData, ":")
 				if len(ids) != 2 {
-					log.Printf("pong 值长度错误 \n")
+					logrus.Infoln("pong 值长度错误")
 					return fmt.Errorf("pong 值长度错误")
 				}
 				if ids[1] != p.serviceId {
-					log.Printf("pong 返回服务id错误 \n")
+					logrus.Infoln("pong 返回服务id错误")
 					return fmt.Errorf("pong 返回服务id错误")
 				}
 				ts = time.Now().Local()
@@ -334,12 +333,12 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				for {
 					select {
 					case <-ctx.Done():
-						log.Println("关闭心跳检查")
+						logrus.Infoln("关闭心跳检查")
 						return
 					default:
-						log.Println("心跳检查")
+						logrus.Infoln("心跳检查")
 						if err := p.ws.WriteMessage(gws.PingMessage, []byte(p.serviceId)); err != nil {
-							log.Printf("心跳检查错误,%s \n", err.Error())
+							logrus.Errorf("心跳检查错误,%s", err.Error())
 							p.ws.Close()
 							time.Sleep(time.Second * time.Duration(p.healthTime))
 							return
@@ -352,14 +351,14 @@ func (p *app) Start(driver Driver, handlers ...Handler) {
 				for {
 					select {
 					case <-ctx.Done():
-						log.Println("关闭检查周期")
+						logrus.Infoln("关闭检查周期")
 						return
 					default:
-						log.Printf("心跳检查上次更新时间 %v \n", ts.String())
+						logrus.Infof("心跳检查上次更新时间 %v", ts.String())
 						if ts.Add(time.Second * time.Duration(p.healthTime) * 3).After(time.Now().Local()) {
-							log.Printf("健康检查时间 %+v 正常 \n", ts.String())
+							logrus.Infof("健康检查时间 %v 正常", ts.String())
 						} else {
-							log.Printf("心跳检查时间超时,关闭连接 \n")
+							logrus.Errorln("心跳检查时间超时,关闭连接")
 							p.ws.Close()
 							time.Sleep(time.Second * time.Duration(p.intervalTime))
 							return
