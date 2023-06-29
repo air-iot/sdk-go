@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -241,6 +242,9 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			value = decimal.NewFromInt32(valueTmp)
 		case int64:
 			value = decimal.NewFromInt(valueTmp)
+		case []byte:
+			fields[tag.ID] = fmt.Sprintf("hex__%s", hex.EncodeToString(valueTmp))
+			continue
 		default:
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
