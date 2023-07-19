@@ -21,7 +21,7 @@ func Test_ConvertRange_1(t *testing.T) {
 	}
 	preVal := decimal.NewFromInt(8)
 	raw := decimal.NewFromFloat(120)
-	gotNewValue, gotRawValue, gotIsSave := ConvertRange(&tagRange, &preVal, &raw)
+	gotNewValue, gotRawValue, _, gotIsSave := Range(&tagRange, &preVal, &raw)
 	t.Logf("new %+v , old %+v ,%t", gotNewValue, gotRawValue, gotIsSave)
 	if gotNewValue != nil {
 		t.Log(*gotNewValue)
@@ -45,7 +45,7 @@ func Test_ConvertRange_2(t *testing.T) {
 	}
 	preVal := decimal.NewFromInt(8)
 	raw := decimal.NewFromFloat(120)
-	gotNewValue, gotRawValue, gotIsSave := ConvertRange(&tagRange, &preVal, &raw)
+	gotNewValue, gotRawValue, _, gotIsSave := Range(&tagRange, &preVal, &raw)
 	t.Logf("new %+v , old %+v ,%t", gotNewValue, gotRawValue, gotIsSave)
 	if gotNewValue != nil {
 		t.Log(*gotNewValue)
@@ -69,7 +69,7 @@ func Test_ConvertRange_3(t *testing.T) {
 	}
 	preVal := decimal.NewFromInt(8)
 	raw := decimal.NewFromFloat(120)
-	gotNewValue, gotRawValue, gotIsSave := ConvertRange(&tagRange, &preVal, &raw)
+	gotNewValue, gotRawValue, _, gotIsSave := Range(&tagRange, &preVal, &raw)
 	t.Logf("new %+v , old %+v ,%t", gotNewValue, gotRawValue, gotIsSave)
 	if gotNewValue != nil {
 		t.Log(*gotNewValue)

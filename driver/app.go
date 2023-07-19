@@ -254,7 +254,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			fields[tag.ID] = valTmp
 			continue
 		}
-		val := convert.ConvertValue(tag, value)
+		val := convert.Value(tag, value)
 		cacheKey := fmt.Sprintf("%s__%s__%s", tableId, p.ID, tag.ID)
 		preValF, ok := a.cacheValue.Load(cacheKey)
 		var preVal *decimal.Decimal
@@ -265,7 +265,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 				preVal = &preValue
 			}
 		}
-		newVal, rawVal, save := convert.ConvertRange(tag.Range, preVal, &val)
+		newVal, rawVal, invalidType, save := convert.Range(tag.Range, preVal, &val)
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
@@ -284,6 +284,9 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
+		}
+		if invalidType != "" {
+			fields[fmt.Sprintf("%s__invalid__type", tag.ID)] = invalidType
 		}
 	}
 	if len(fields) == 0 {

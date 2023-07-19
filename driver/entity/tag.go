@@ -17,6 +17,13 @@ type TagValue struct {
 	MaxRaw   *float64 `json:"maxRaw"`
 }
 
+type RangeMethod string
+
+const (
+	RangeMethod_Valid   = "valid"
+	RangeMethod_Invalid = "invalid"
+)
+
 type Active string
 
 const (
@@ -33,6 +40,7 @@ const (
 )
 
 type Range struct {
+	Method        RangeMethod      `json:"method"`
 	MinValue      *float64         `json:"minValue"`
 	MaxValue      *float64         `json:"maxValue"`
 	Conditions    []RangeCondition `json:"conditions"`
@@ -64,6 +72,7 @@ type RangeCondition struct {
 	MaxValue         *float64      `json:"maxValue"`
 	Value            *float64      `json:"value"`
 	DefaultCondition bool          `json:"defaultCondition"`
+	InvalidType      string        `json:"invalidType"`
 }
 
 type Instance struct {
