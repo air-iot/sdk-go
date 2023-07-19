@@ -631,7 +631,7 @@ func (p *app) WritePoints(point Point) error {
 				preVal = &preValue
 			}
 		}
-		newVal, rawVal, save := convert.ConvertRange(tag.Range, preVal, &val)
+		newVal, rawVal, invalidType, save := convert.ConvertRange(tag.Range, preVal, &val)
 		if newVal != nil {
 			fields[tag.ID] = newVal
 			if save {
@@ -640,6 +640,9 @@ func (p *app) WritePoints(point Point) error {
 		}
 		if rawVal != nil {
 			fields[fmt.Sprintf("%s__invalid", tag.ID)] = rawVal
+		}
+		if invalidType != "" {
+			fields[fmt.Sprintf("%s__invalid__type", tag.ID)] = invalidType
 		}
 		//val := p.convertRange(tag.Range, p.convertValue(tag, value))
 		//if val != nil {

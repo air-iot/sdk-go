@@ -40,6 +40,11 @@ type (
 // TestDriver 定义测试驱动结构体
 type TestDriver struct{}
 
+func (p *TestDriver) GetVersion() string {
+	//TODO implement me
+	panic("implement me")
+}
+
 // Start 驱动执行，实现Driver的Start函数
 func (p *TestDriver) Start(a driver.App, models []byte) error {
 	a.GetLogger().Debugln("start", string(models))

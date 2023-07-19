@@ -3,13 +3,20 @@ package entity
 type Tag struct {
 	ID   string `json:"id" description:"ID"`
 	Name string `json:"name" description:"自定义名称"`
-
+	//Period int    `json:"period" description:"周期"`
 	//以下为通用值计算相关属性
 	TagValue *TagValue `json:"tagValue"`
 	Fixed    *int32    `json:"fixed"`
 	Mod      *float64  `json:"mod"`
 	Range    *Range    `json:"range"`
 }
+
+type RangeMethod string
+
+const (
+	RangeMethod_Valid   = "valid"
+	RangeMethod_Invalid = "invalid"
+)
 
 type Active string
 
@@ -27,6 +34,7 @@ const (
 )
 
 type Range struct {
+	Method        RangeMethod      `json:"method"`
 	MinValue      *float64         `json:"minValue"`
 	MaxValue      *float64         `json:"maxValue"`
 	Conditions    []RangeCondition `json:"conditions"`
@@ -58,6 +66,7 @@ type RangeCondition struct {
 	MaxValue         *float64      `json:"maxValue"`
 	Value            *float64      `json:"value"`
 	DefaultCondition bool          `json:"defaultCondition"`
+	InvalidType      string        `json:"invalidType"`
 }
 
 type TagValue struct {
