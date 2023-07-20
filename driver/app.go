@@ -293,7 +293,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 		return errors.New("数据点为空值")
 	}
 	if p.UnixTime == 0 {
-		p.UnixTime = time.Now().Local().UnixNano() / 1e6
+		p.UnixTime = time.Now().Local().UnixMilli()
 	}
 	b, err := json.Marshal(&point{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes})
 	if err != nil {
