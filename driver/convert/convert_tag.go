@@ -385,7 +385,6 @@ loop:
 		//invalidValue = &value
 		default:
 			invalidValue = nil
-			invalidType = ""
 		}
 		switch tagRange.Active {
 		case entity.Active_Fixed:
