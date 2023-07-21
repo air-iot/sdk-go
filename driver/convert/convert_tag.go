@@ -320,6 +320,7 @@ func convertInvalidConditions(tagRange *entity.Range, preVal, raw *decimal.Decim
 	}
 	//var isInvalid bool
 	//var defaultCondition *entity.RangeCondition = nil
+loop:
 	for _, condition := range tagRange.Conditions {
 		//if condition.DefaultCondition {
 		//	defaultCondition = &tagRange.Conditions[i]
@@ -354,7 +355,7 @@ func convertInvalidConditions(tagRange *entity.Range, preVal, raw *decimal.Decim
 					if currentValue.GreaterThanOrEqual(minValue) && currentValue.LessThanOrEqual(maxValue) {
 						invalidValue = &value
 						invalidType = condition.InvalidType
-						break
+						break loop
 					}
 				}
 			case entity.Condition_Greater:
@@ -363,7 +364,7 @@ func convertInvalidConditions(tagRange *entity.Range, preVal, raw *decimal.Decim
 					if currentValue.GreaterThan(valueTmp) {
 						invalidValue = &value
 						invalidType = condition.InvalidType
-						break
+						break loop
 					}
 				}
 			case entity.Condition_Less:
@@ -372,7 +373,7 @@ func convertInvalidConditions(tagRange *entity.Range, preVal, raw *decimal.Decim
 					if currentValue.LessThan(valueTmp) {
 						invalidValue = &value
 						invalidType = condition.InvalidType
-						break
+						break loop
 					}
 				}
 			}
