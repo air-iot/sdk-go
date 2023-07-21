@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/air-iot/json"
+	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"math/rand"
 	"net/http"
 	"time"
@@ -76,22 +77,22 @@ func (p *TestDriver) Start(a driver.App, bts []byte) error {
 						//if n1.Device.Tags == nil {
 						//	continue
 						//}
-						fields := make([]driver.Field, 0)
+						fields := make([]entity.Field, 0)
 						fieldType := make(map[string]string)
 						if t1.Device.Tags != nil {
 							for _, t1 := range t1.Device.Tags {
 								// fields[t1.ID] = rand.Intn(100)
-								fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
+								fields = append(fields, entity.Field{Tag: t1, Value: rand.Intn(100)})
 								fieldType[t1.ID] = driver.Integer
 							}
 						}
 						if n1.Device.Tags != nil {
 							for _, t1 := range n1.Device.Tags {
 								// fields[t1.ID] = rand.Intn(100)
-								fields = append(fields, driver.Field{Tag: t1, Value: rand.Intn(100)})
+								fields = append(fields, entity.Field{Tag: t1, Value: rand.Intn(100)})
 							}
 						}
-						point := driver.Point{
+						point := entity.Point{
 							//Table:      t1.ID,
 							ID:         n1.ID,
 							Fields:     fields,
@@ -117,7 +118,7 @@ func (p *TestDriver) Schema(a driver.App) (string, error) {
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error) {
+func (p *TestDriver) Run(a driver.App, cmd *entity.Command) (interface{}, error) {
 	fmt.Println("run", *cmd)
 	logger.Debugln("run", *cmd)
 	//if err := a.RunLog(driver.Log{
@@ -146,9 +147,9 @@ func (p *TestDriver) Run(a driver.App, cmd *driver.Command) (interface{}, error)
 }
 
 // BatchRun 批量执行指令，实现Driver的Run函数
-func (p *TestDriver) BatchRun(a driver.App, cmd *driver.BatchCommand) (interface{}, error) {
+func (p *TestDriver) BatchRun(a driver.App, cmd *entity.BatchCommand) (interface{}, error) {
 	logger.Debugln("BatchRun", *cmd)
-	if err := a.RunLog(context.Background(), driver.Log{
+	if err := a.RunLog(context.Background(), entity.Log{
 		SerialNo: cmd.SerialNo,
 		Status:   "成功",
 		UnixTime: time.Now().UnixNano() / 1e6,
@@ -159,7 +160,7 @@ func (p *TestDriver) BatchRun(a driver.App, cmd *driver.BatchCommand) (interface
 	return nil, nil
 }
 
-func (p *TestDriver) WriteTag(a driver.App, cmd *driver.Command) (interface{}, error) {
+func (p *TestDriver) WriteTag(a driver.App, cmd *entity.Command) (interface{}, error) {
 	logger.Debugln("WriteTag", *cmd)
 	return nil, nil
 }

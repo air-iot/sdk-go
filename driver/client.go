@@ -131,7 +131,7 @@ func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, er
 	return healthRes, err
 }
 
-func (c *Client) WriteEvent(ctx context.Context, event Event) error {
+func (c *Client) WriteEvent(ctx context.Context, event entity.Event) error {
 	if event.Table == "" || event.ID == "" || event.EventID == "" {
 		return errors.New("表、资产或事件ID为空")
 	}
@@ -152,7 +152,7 @@ func (c *Client) WriteEvent(ctx context.Context, event Event) error {
 	return nil
 }
 
-func (c *Client) RunLog(ctx context.Context, l Log) error {
+func (c *Client) RunLog(ctx context.Context, l entity.Log) error {
 	if l.SerialNo == "" {
 		return errors.New("流水号为空")
 	}
@@ -173,7 +173,7 @@ func (c *Client) RunLog(ctx context.Context, l Log) error {
 	return nil
 }
 
-func (c *Client) UpdateTableData(ctx context.Context, l TableData, result interface{}) error {
+func (c *Client) UpdateTableData(ctx context.Context, l entity.TableData, result interface{}) error {
 	if l.TableID == "" || l.ID == "" {
 		return errors.New("表或记录id为空")
 	}
@@ -322,7 +322,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			return fmt.Errorf("schema stream err, %s", err)
 		}
 		schema, err := c.driver.Schema(c.app)
-		schemaRes := new(grpcResult)
+		schemaRes := new(entity.GrpcResult)
 		if err != nil {
 			schemaRes.Error = err.Error()
 			schemaRes.Code = 400
@@ -355,7 +355,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("start stream err, %s", err)
 		}
-		startRes := new(grpcResult)
+		startRes := new(entity.GrpcResult)
 		var cfg entity.Instance
 		if err := json.Unmarshal(res.Config, &cfg); err != nil {
 			startRes.Error = err.Error()
@@ -419,8 +419,8 @@ func (c *Client) RunStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("run stream err, %s", err)
 		}
-		gr := new(grpcResult)
-		runRes, err := c.driver.Run(c.app, &Command{
+		gr := new(entity.GrpcResult)
+		runRes, err := c.driver.Run(c.app, &entity.Command{
 			Table:    res.TableId,
 			Id:       res.Id,
 			SerialNo: res.SerialNo,
@@ -458,8 +458,8 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("writeTag stream err, %s", err)
 		}
-		gr := new(grpcResult)
-		runRes, err := c.driver.WriteTag(c.app, &Command{
+		gr := new(entity.GrpcResult)
+		runRes, err := c.driver.WriteTag(c.app, &entity.Command{
 			Table:    res.TableId,
 			Id:       res.Id,
 			SerialNo: res.SerialNo,
@@ -497,8 +497,8 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("batchRun stream err, %s", err)
 		}
-		gr := new(grpcResult)
-		runRes, err := c.driver.BatchRun(c.app, &BatchCommand{
+		gr := new(entity.GrpcResult)
+		runRes, err := c.driver.BatchRun(c.app, &entity.BatchCommand{
 			Table:    res.TableId,
 			Ids:      res.Id,
 			SerialNo: res.SerialNo,
@@ -536,7 +536,7 @@ func (c *Client) DebugStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("debug stream err, %s", err)
 		}
-		gr := new(grpcResult)
+		gr := new(entity.GrpcResult)
 		runRes, err := c.driver.Debug(c.app, res.Data)
 		if err != nil {
 			gr.Error = err.Error()
@@ -570,7 +570,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("http proxy stream err, %s", err)
 		}
-		gr := new(grpcResult)
+		gr := new(entity.GrpcResult)
 		var header http.Header
 
 		if res.GetHeaders() != nil {

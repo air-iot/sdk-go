@@ -18,9 +18,9 @@ func TestApp_WritePoints(t *testing.T) {
 	//var MaxRaw float64 = 300
 	var Fixed int32 = 2
 	var Mod float64 = 2
-	point := Point{
+	point := entity.Point{
 		ID: "b1",
-		Fields: []Field{
+		Fields: []entity.Field{
 			{Tag: entity.Tag{
 				ID:       "p1",
 				Name:     "p1",
@@ -59,9 +59,9 @@ func Test_wp(t *testing.T) {
 	//var MaxRaw float64 = 300
 	var Fixed int32 = 2
 	var Mod float64 = 2
-	point := Point{
+	point := entity.Point{
 		ID: "b1",
-		Fields: []Field{
+		Fields: []entity.Field{
 			{Tag: entity.Tag{
 				ID:       "p1",
 				Name:     "p1",

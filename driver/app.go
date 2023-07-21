@@ -30,9 +30,9 @@ import (
 
 type App interface {
 	Start(Driver)
-	WritePoints(Point) error
-	WriteEvent(context.Context, Event) error
-	RunLog(context.Context, Log) error
+	WritePoints(entity.Point) error
+	WriteEvent(context.Context, entity.Event) error
+	RunLog(context.Context, entity.Log) error
 	UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error
 	LogDebug(table, id string, msg interface{})
 	LogInfo(table, id string, msg interface{})
@@ -168,7 +168,7 @@ func (a *app) GetProjectId() string {
 }
 
 // WritePoints 写数据点数据
-func (a *app) WritePoints(p Point) error {
+func (a *app) WritePoints(p entity.Point) error {
 	tableId := p.Table
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
@@ -193,7 +193,7 @@ func (a *app) WritePoints(p Point) error {
 	return a.writePoints(context.Background(), tableId, p)
 }
 
-func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
+func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) error {
 	fields := make(map[string]interface{})
 	for _, field := range p.Fields {
 		if field.Tag == nil || field.Value == nil {
@@ -295,7 +295,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 	if p.UnixTime == 0 {
 		p.UnixTime = time.Now().Local().UnixMilli()
 	}
-	b, err := json.Marshal(&point{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes})
+	b, err := json.Marshal(&entity.WritePoint{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes})
 	if err != nil {
 		return err
 	}
@@ -304,16 +304,16 @@ func (a *app) writePoints(ctx context.Context, tableId string, p Point) error {
 	//return nil
 }
 
-func (a *app) WriteEvent(ctx context.Context, event Event) error {
+func (a *app) WriteEvent(ctx context.Context, event entity.Event) error {
 	return a.cli.WriteEvent(ctx, event)
 }
 
-func (a *app) RunLog(ctx context.Context, l Log) error {
+func (a *app) RunLog(ctx context.Context, l entity.Log) error {
 	return a.cli.RunLog(ctx, l)
 }
 
 func (a *app) UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error {
-	return a.cli.UpdateTableData(ctx, TableData{
+	return a.cli.UpdateTableData(ctx, entity.TableData{
 		TableID: table,
 		ID:      id,
 		Data:    custom,
