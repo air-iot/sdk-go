@@ -3,9 +3,9 @@ package driver
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -17,6 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/air-iot/sdk-go/util/aaes"
+	"github.com/air-iot/sdk-go/util/json"
+	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/google/uuid"
 	gws "github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
@@ -124,6 +127,14 @@ type Log struct {
 type Field struct {
 	Tag   interface{} `json:"tag"`   // 数据点
 	Value interface{} `json:"value"` // 数据采集值
+}
+
+// MQTT mqtt配置参数
+type MQTT struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type pointTmp struct {
@@ -239,7 +250,18 @@ func NewApp() App {
 	a.serviceId = uuid.New().String()
 	a.projectID = projectID
 	logrus.Infof("项目ID: %s", projectID)
-	mqttCli, err := mqtt.NewMqtt(viper.GetString("mqtt.host"), viper.GetInt("mqtt.port"), viper.GetString("mqtt.username"), viper.GetString("mqtt.password"))
+
+	mqttConf := new(MQTT)
+	mqttConf.Host = viper.GetString("mqtt.host")
+	mqttConf.Port = viper.GetInt("mqtt.port")
+	mqttConf.Username = viper.GetString("mqtt.username")
+	mqttConf.Password = viper.GetString("mqtt.password")
+
+	logrus.Infof("项目ID[%s]处理前配置: %+v", projectID, mqttConf)
+	DecryptConfig(mqttConf)
+	logrus.Infof("项目ID[%s]处理后配置: %+v", projectID, mqttConf)
+
+	mqttCli, err := mqtt.NewMqtt(mqttConf.Host, mqttConf.Port, mqttConf.Username, mqttConf.Password)
 	if err != nil {
 		logrus.Fatalln("连接mqtt错误,", err.Error())
 	}
@@ -274,6 +296,76 @@ func NewApp() App {
 		a.Version = pluginFilePath
 	}
 	return a
+}
+
+func DecryptConfig(c interface{}) {
+
+	var cfg map[string]interface{}
+	err := json.CopyByJson(&cfg, c)
+	if err != nil {
+		log.Fatalln("struct to map fail: ", err.Error())
+	}
+
+	for k, v := range cfg {
+		cfg[k] = decryptConfig(v)
+	}
+
+	err = json.CopyByJson(c, &cfg)
+	if err != nil {
+		log.Fatalln("map to struct fail: ", err.Error())
+	}
+}
+
+func decryptConfig(old interface{}) interface{} {
+	switch val := old.(type) {
+	case map[string]interface{}:
+		for k, v := range val {
+			val[k] = decryptConfig(v)
+		}
+		return val
+	case *map[string]interface{}:
+		for k, v := range *val {
+			(*val)[k] = decryptConfig(v)
+		}
+		return val
+	case []interface{}:
+		for i, v := range val {
+			val[i] = decryptConfig(v)
+		}
+		return val
+	case *[]interface{}:
+		for i, v := range *val {
+			(*val)[i] = decryptConfig(v)
+		}
+		return val
+	case []map[string]interface{}:
+		var tmp = make([]interface{}, len(val))
+		for i, v := range val {
+			tmp[i] = decryptConfig(v)
+		}
+		return tmp
+	case *[]map[string]interface{}:
+		var tmp = make([]interface{}, len(*val))
+		for i, v := range *val {
+			tmp[i] = decryptConfig(v)
+		}
+		return tmp
+	case string:
+		if strings.HasPrefix(val, "ENC(") && strings.HasSuffix(val, ")") {
+			vStr := strings.TrimSuffix(strings.TrimPrefix(val, "ENC("), ")")
+			return cryptor.Base64StdDecode(vStr)
+		} else if strings.HasPrefix(val, "AES(") && strings.HasSuffix(val, ")") {
+			vStr := strings.TrimSuffix(strings.TrimPrefix(val, "AES("), ")")
+			desVal, err := aaes.Decrypt(vStr, aaes.GetPKey())
+			if err != nil {
+				panic(fmt.Sprintf("解析密码错误,%v", err))
+			}
+			return string(desVal)
+		}
+		return val
+	default:
+		return val
+	}
 }
 
 // Start 开始服务
