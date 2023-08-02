@@ -1,0 +1,14 @@
+serviceId: 62678dee5a13cc647f571641
+
+algorithm:
+  id: test
+  name: 测试算法
+
+log:
+  level: 5
+
+algorithmGrpc:
+  host: 121.89.244.23
+  port: 9236
+#  healthRequestTime: 10
+#  waitTime: 5
