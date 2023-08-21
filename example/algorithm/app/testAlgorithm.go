@@ -12,13 +12,13 @@ import (
 
 var _ algorithm.Service = &TestAlgorithm{}
 
-// TestAlgorithm 定义测试驱动结构体
+// TestAlgorithm 定义测试算法结构体
 type TestAlgorithm struct {
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
 
-// Start 驱动执行，实现Driver的Start函数
+// Start 算法执行，实现Driver的Start函数
 func (p *TestAlgorithm) Start(_ algorithm.App) error {
 	logger.Debugln("start")
 	p.Ctx, p.Cancel = context.WithCancel(context.Background())

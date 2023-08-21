@@ -109,7 +109,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 								}
 							}
 						} else if healthRes.GetStatus() == pb.HealthCheckResponse_SERVICE_UNKNOWN {
-							logger.Errorf("健康检查异常,服务端未找到本驱动服务")
+							logger.Errorf("健康检查异常,服务端未找到本算法服务")
 							state = true
 						}
 						break
