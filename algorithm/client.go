@@ -210,25 +210,27 @@ func (c *Client) RunStream(ctx context.Context) error {
 		}
 	}()
 	for {
-		res, err := stream.Recv()
+		res0, err := stream.Recv()
 		if err != nil {
 			return fmt.Errorf("run stream err, %s", err)
 		}
-		gr := new(grpcResult)
-		runRes, err := c.algorithmService.Run(c.app, res.Data)
-		if err != nil {
-			gr.Error = err.Error()
-			gr.Code = 400
-		} else {
-			gr.Result = runRes
-			gr.Code = 200
-		}
-		bts, _ := json.Marshal(gr)
-		if err := stream.Send(&pb.RunResult{
-			Request: res.Request,
-			Message: bts,
-		}); err != nil {
-			logger.Errorf("run stream 发送错误,%s", err)
-		}
+		go func(res *pb.RunRequest) {
+			gr := new(grpcResult)
+			runRes, err := c.algorithmService.Run(c.app, res.Data)
+			if err != nil {
+				gr.Error = err.Error()
+				gr.Code = 400
+			} else {
+				gr.Result = runRes
+				gr.Code = 200
+			}
+			bts, _ := json.Marshal(gr)
+			if err := stream.Send(&pb.RunResult{
+				Request: res.Request,
+				Message: bts,
+			}); err != nil {
+				logger.Errorf("run stream 发送错误,%s", err)
+			}
+		}(res0)
 	}
 }

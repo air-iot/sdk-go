@@ -7,6 +7,7 @@ import (
 	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/algorithm"
 	"math"
+	"strconv"
 )
 
 var _ algorithm.Service = &TestAlgorithm{}
@@ -55,25 +56,57 @@ func (p *TestAlgorithm) Run(_ algorithm.App, bts []byte) (interface{}, error) {
 
 			var num1, num2 float64
 
-			num1Raw, ok := runConfig.Input["num1"]
-			if !ok {
-				logger.Errorln("未找到num1")
-				return nil, errors.New("未找到num1")
+			{
+				num1Raw, ok := runConfig.Input["num1"]
+				if !ok {
+					logger.Errorln("未找到num1")
+					return nil, errors.New("未找到num1")
+				}
+				switch num1Raw.(type) {
+				case string:
+					num1, err = strconv.ParseFloat(num1Raw.(string), 10)
+					if err != nil {
+						logger.Errorln("num1类型错误")
+						return nil, errors.New("num1类型错误")
+					}
+				case float64:
+					num1, ok = num1Raw.(float64)
+					if !ok {
+						logger.Errorln("num1类型错误")
+						return nil, errors.New("num1类型错误")
+					}
+				case map[string]interface{}:
+
+				default:
+					logger.Errorln("num1类型错误")
+					return nil, errors.New("num1类型错误")
+				}
 			}
-			num1, ok = num1Raw.(float64)
-			if !ok {
-				logger.Errorln("num1类型错误")
-				return nil, errors.New("num1类型错误")
-			}
-			num2Raw, ok := runConfig.Input["num2"]
-			if !ok {
-				logger.Errorln("未找到num2")
-				return nil, errors.New("未找到num2")
-			}
-			num2, ok = num2Raw.(float64)
-			if !ok {
-				logger.Errorln("num2类型错误")
-				return nil, errors.New("num2类型错误")
+			{
+				num2Raw, ok := runConfig.Input["num2"]
+				if !ok {
+					logger.Errorln("未找到num2")
+					return nil, errors.New("未找到num2")
+				}
+				switch num2Raw.(type) {
+				case string:
+					num2, err = strconv.ParseFloat(num2Raw.(string), 10)
+					if err != nil {
+						logger.Errorln("num2类型错误")
+						return nil, errors.New("num2类型错误")
+					}
+				case float64:
+					num2, ok = num2Raw.(float64)
+					if !ok {
+						logger.Errorln("num2类型错误")
+						return nil, errors.New("num2类型错误")
+					}
+				case map[string]interface{}:
+
+				default:
+					logger.Errorln("num2类型错误")
+					return nil, errors.New("num2类型错误")
+				}
 			}
 
 			return map[string]float64{"res": num1 + num2}, nil
@@ -92,7 +125,25 @@ func (p *TestAlgorithm) Run(_ algorithm.App, bts []byte) (interface{}, error) {
 				logger.Errorln("未找到num1")
 				return nil, errors.New("未找到num1")
 			}
-			num1, ok = num1Raw.(float64)
+			switch num1Raw.(type) {
+			case string:
+				num1, err = strconv.ParseFloat(num1Raw.(string), 10)
+				if err != nil {
+					logger.Errorln("num1类型错误")
+					return nil, errors.New("num1类型错误")
+				}
+			case float64:
+				num1, ok = num1Raw.(float64)
+				if !ok {
+					logger.Errorln("num1类型错误")
+					return nil, errors.New("num1类型错误")
+				}
+			case map[string]interface{}:
+
+			default:
+				logger.Errorln("num1类型错误")
+				return nil, errors.New("num1类型错误")
+			}
 			return map[string]float64{"res": math.Abs(num1)}, nil
 
 		}

@@ -9,12 +9,10 @@ var Schema = `[
       "properties": {
         "num1": {
           "title": "参数1",
-          "key": "num1",
           "type": "number"
         },
         "num2": {
           "title": "参数2",
-          "key": "num2",
           "type": "number"
         }
       },
@@ -28,7 +26,6 @@ var Schema = `[
       "properties": {
         "num1": {
           "title": "结果",
-          "key": "res",
           "type": "number"
         }
       }
@@ -42,7 +39,6 @@ var Schema = `[
       "properties": {
         "num1": {
           "title": "参数1",
-          "key": "num1",
           "type": "number"
         }
       },
@@ -53,9 +49,8 @@ var Schema = `[
     "output": {
       "type": "object",
       "properties": {
-        "num1": {
+        "res": {
           "title": "结果",
-          "key": "res",
           "type": "number"
         }
       }
