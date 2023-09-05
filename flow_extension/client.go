@@ -1,11 +1,11 @@
-package flow
+package flow_extionsion
 
 import (
 	"context"
 	"fmt"
-	"github.com/air-iot/json"
 	"time"
 
+	"github.com/air-iot/json"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -19,16 +19,16 @@ const (
 
 type Client struct {
 	conn             *grpc.ClientConn
-	cli              pb.PluginServiceClient
+	cli              pb.ExtensionServiceClient
 	app              App
-	flow             Flow
+	extension        Extension
 	cleanStream      func()
 	cleanHealthCheck func()
 }
 
-func (c *Client) Start(app App, flow Flow) *Client {
+func (c *Client) Start(app App, extension Extension) *Client {
 	c.app = app
-	c.flow = flow
+	c.extension = extension
 	if err := c.connFlow(); err != nil {
 		logger.Errorln(err)
 	}
@@ -54,9 +54,8 @@ func (c *Client) connFlow() error {
 	if err != nil {
 		return fmt.Errorf("grpc.Dial error: %s", err)
 	}
-	cli := pb.NewPluginServiceClient(conn)
 	c.conn = conn
-	c.cli = cli
+	c.cli = pb.NewExtensionServiceClient(conn)
 	return nil
 }
 
@@ -73,14 +72,14 @@ func (c *Client) healthCheck(ctx context.Context) {
 				retry := 3
 				state := false
 				for retry >= 0 {
-					healthRes, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Name: Cfg.Flow.Name})
+					healthRes, err := c.cli.HealthCheck(ctx, &pb.ExtensionHealthCheckRequest{Id: Cfg.Extension.Id})
 					if err != nil {
 						logger.Errorf("健康检查重试错误,%s", err.Error())
 						state = true
 						time.Sleep(time.Second * time.Duration(wait))
 					} else {
 						state = false
-						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
+						if healthRes.GetStatus() == pb.ExtensionHealthCheckResponse_SERVING {
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
 									logger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
@@ -118,11 +117,27 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("stream break")
+				logger.Infof("schema stream break")
 				return
 			default:
-				logger.Infof("stream")
-				if err := c.Handler(context.Background()); err != nil {
+				logger.Infof("schema stream")
+				if err := c.Schema(context.Background()); err != nil {
+					logger.Errorln(err)
+				}
+				time.Sleep(time.Second * time.Duration(wait))
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Infof("run stream break")
+				return
+			default:
+				logger.Infof("run stream")
+				if err := c.Run(context.Background()); err != nil {
 					logger.Errorln(err)
 				}
 				time.Sleep(time.Second * time.Duration(wait))
@@ -141,14 +156,14 @@ func (c *Client) Stop() {
 	}
 }
 
-func (c *Client) Handler(ctx context.Context) error {
-	stream, err := c.cli.Register(GetGrpcContext(ctx, Cfg.Flow.Name, Cfg.Flow.Mode))
+func (c *Client) Schema(ctx context.Context) error {
+	stream, err := c.cli.SchemaStream(GetGrpcContext(ctx, Cfg.Extension.Id, Cfg.Extension.Name))
 	if err != nil {
-		return fmt.Errorf("stream err,%s", err)
+		return fmt.Errorf("schema stream err,%s", err)
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("stream close err,%s", err)
+			logger.Infof("schema stream close err,%s", err)
 		}
 	}()
 	for {
@@ -156,16 +171,41 @@ func (c *Client) Handler(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		result, err := c.flow.Handler(c.app, &Request{
-			ProjectId:  res.ProjectId,
-			FlowId:     res.FlowId,
-			Job:        res.Job,
-			ElementId:  res.ElementId,
-			ElementJob: res.ElementJob,
-			Config:     res.Config,
-		})
-		gr := &pb.FlowResponse{
-			ElementJob: res.ElementJob,
+		result, err := c.extension.Schema(c.app)
+		gr := &pb.ExtensionResult{
+			Request: res.GetRequest(),
+		}
+		if err != nil {
+			gr.Status = false
+			gr.Info = err.Error()
+		} else {
+			gr.Status = true
+			gr.Result = []byte(result)
+		}
+		if err := stream.Send(gr); err != nil {
+			logger.Errorf("schema stream 发送错误,%s", err)
+		}
+	}
+}
+
+func (c *Client) Run(ctx context.Context) error {
+	stream, err := c.cli.RunStream(GetGrpcContext(ctx, Cfg.Extension.Id, Cfg.Extension.Name))
+	if err != nil {
+		return fmt.Errorf("run stream err,%s", err)
+	}
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logger.Infof("run stream close err,%s", err)
+		}
+	}()
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			return fmt.Errorf("stream err, %s", err)
+		}
+		result, err := c.extension.Run(c.app, res.GetData())
+		gr := &pb.ExtensionResult{
+			Request: res.GetRequest(),
 		}
 		if err != nil {
 			gr.Status = false
@@ -179,7 +219,7 @@ func (c *Client) Handler(ctx context.Context) error {
 		b, _ := json.Marshal(result)
 		gr.Result = b
 		if err := stream.Send(gr); err != nil {
-			logger.Errorf("stream 发送错误,%s", err)
+			logger.Errorf("run stream 发送错误,%s", err)
 		}
 	}
 }

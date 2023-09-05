@@ -1,6 +1,6 @@
-flow:
-  name: testHandler
-  mode: service
+extension:
+  id: testflowext
+  name: 测试扩展
 
 log:
   level: 5

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/air-iot/logger"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -57,7 +58,7 @@ func init() {
 	viper.SetDefault("log.level", 4)
 	viper.SetDefault("log.format", "text")
 	viper.SetDefault("log.output", "stdout")
-	viper.SetDefault("algorithmGrpc.host", "algorithmService")
+	viper.SetDefault("algorithmGrpc.host", "algorithm")
 	viper.SetDefault("algorithmGrpc.port", 9236)
 	viper.SetDefault("algorithmGrpc.health.requestTime", 10)
 	viper.SetDefault("algorithmGrpc.waitTime", 5)
@@ -83,11 +84,12 @@ func NewApp() App {
 	if _, err := logger.NewLogger(C.Log); err != nil {
 		panic(fmt.Errorf("初始化日志错误,%s", err))
 	}
-	if C.ServiceID == "" {
-		panic("服务id不能为空")
-	}
+
 	if C.Algorithm.ID == "" || C.Algorithm.Name == "" {
 		panic("算法id或name不能为空")
+	}
+	if C.ServiceID == "" {
+		C.ServiceID = fmt.Sprintf("%s_%s", C.Algorithm.ID, uuid.New().String())
 	}
 	if C.AlgorithmGrpc.Health.RequestTime == 0 {
 		C.AlgorithmGrpc.Health.RequestTime = 10

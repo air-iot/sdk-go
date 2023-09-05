@@ -1,24 +1,21 @@
-package flow
+package flow_extionsion
 
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
-	"time"
 
+	"github.com/air-iot/logger"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/air-iot/logger"
 )
 
 type App interface {
-	Start(flow Flow)
+	Start(ext Extension)
 }
 
 // app 数据采集类
@@ -31,7 +28,6 @@ type app struct {
 
 func init() {
 	// 设置随机数种子
-	rand.Seed(time.Now().Unix())
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
@@ -44,6 +40,7 @@ func init() {
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
+	log.Println("配置文件路径", *cfgPath)
 	viper.AddConfigPath(*cfgPath)
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
 		log.Fatalln("读取命令行参数错误,", err.Error())
@@ -63,8 +60,8 @@ func NewApp() App {
 	if _, err := logger.NewLogger(Cfg.Log); err != nil {
 		panic(fmt.Errorf("初始化日志错误,%w", err))
 	}
-	if Cfg.Flow.Mode == "" || Cfg.Flow.Name == "" {
-		panic("流程节点name和模式不能为空")
+	if Cfg.Extension.Id == "" || Cfg.Extension.Name == "" {
+		panic("流程扩展服务 id 和 name 不能为空")
 	}
 	logger.Debugf("配置: %+v", *Cfg)
 	a.clean = func() {}
@@ -72,10 +69,10 @@ func NewApp() App {
 }
 
 // Start 开始服务
-func (a *app) Start(flow Flow) {
+func (a *app) Start(ext Extension) {
 	a.stopped = false
 	cli := Client{}
-	a.cli = cli.Start(a, flow)
+	a.cli = cli.Start(a, ext)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	sig := <-ch

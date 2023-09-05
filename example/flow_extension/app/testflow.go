@@ -1,0 +1,35 @@
+package app
+
+import (
+	"context"
+	"encoding/json"
+	flowextionsion "github.com/air-iot/sdk-go/v4/flow_extension"
+
+	"github.com/air-iot/logger"
+)
+
+// TestFlow 定义测试驱动结构体
+type TestFlow struct {
+	Ctx    context.Context
+	Cancel context.CancelFunc
+}
+
+type Input struct {
+	Num1 int `json:"num1"`
+	Num2 int `json:"num2"`
+}
+
+func (p *TestFlow) Schema(a flowextionsion.App) (string, error) {
+	logger.Infof("查询schema")
+	return schema, nil
+}
+
+func (p *TestFlow) Run(a flowextionsion.App, input []byte) (map[string]interface{}, error) {
+	logger.Infof("执行run,%s", string(input))
+	var in Input
+	err := json.Unmarshal(input, &in)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"num1": in.Num1 + in.Num2}, nil
+}
