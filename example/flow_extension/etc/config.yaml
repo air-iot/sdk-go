@@ -1,6 +1,6 @@
 extension:
-  id: testflowext
-  name: 测试扩展
+  id: go-flow-ext-demo
+  name: 测试go扩展节点服务
 
 log:
   level: 5

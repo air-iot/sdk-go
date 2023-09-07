@@ -10,6 +10,14 @@ type Request struct {
 }
 
 type Extension interface {
-	Schema(app App) (string, error)
-	Run(app App, input []byte) (map[string]interface{}, error)
+	// Schema
+	// @description 查询schema
+	// @return schema "驱动配置schema"
+	Schema(app App) (schema string, err error)
+
+	// Run
+	// @description 执行算法服务
+	// @param input 执行参数 {} input 执行参数,应与输出的schema格式相同
+	// @return result "自定义返回的格式,应与输出的schema格式相同"
+	Run(app App, input []byte) (result map[string]interface{}, err error)
 }

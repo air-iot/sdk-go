@@ -1,0 +1,3 @@
+extension:
+  id: go-flow-ext-demo
+  name: 测试go扩展节点服务

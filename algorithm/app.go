@@ -24,10 +24,24 @@ type App interface {
 }
 
 type Service interface {
+	// Schema
+	// @description 查询schema
+	// @return result "算法配置schema,返回字符串"
+	Schema(App) (result string, err error)
+
+	// Start
+	// @description 启动算法服务
 	Start(App) error
+
+	// Run
+	// @description 执行算法服务
+	// @param bts 执行参数 {"function":"算法名","input":{}} input 算法执行参数,应与输出的schema格式相同
+	// @return result "自定义返回的格式,应与输出的schema格式相同"
+	Run(app App, bts []byte) (result interface{}, err error)
+
+	// Stop
+	// @description 停止算法服务
 	Stop(App) error
-	Run(app App, bts []byte) (interface{}, error)
-	Schema(App) (string, error)
 }
 
 //const (
