@@ -1,0 +1,21 @@
+mq:
+  type: mqtt
+  mqtt:
+    host: 127.0.0.1
+    port: 1883
+
+serviceId: go-driver-mqtt-demo
+project: 625f6dbf5433487131f09ff9
+
+driver:
+  id: go-driver-mqtt-demo
+  name: 测试驱动
+
+log:
+  level: 5
+
+driverGrpc:
+  host: 127.0.0.1
+  port: 9224
+  healthRequestTime: 10
+  waitTime: 5
