@@ -86,6 +86,7 @@ func init() {
 	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetDefault("driverGrpc.health.requestTime", 10)
 	viper.SetDefault("driverGrpc.waitTime", 5)
+	viper.SetDefault("driver.timeout", 600)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")

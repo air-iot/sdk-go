@@ -336,23 +336,27 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("schema stream err, %w", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_SCHEMA)
-		schema, err := c.driver.Schema(ctx1, c.app)
-		schemaRes := new(entity.GrpcResult)
-		if err != nil {
-			schemaRes.Error = err.Error()
-			schemaRes.Code = 400
-		} else {
-			schemaRes.Result = schema
-			schemaRes.Code = 200
-		}
-		bts, _ := json.Marshal(schemaRes)
-		if err := stream.Send(&pb.SchemaResult{
-			Request: res.Request,
-			Message: bts,
-		}); err != nil {
-			logger.WithContext(ctx1).Errorf("驱动配置(schema)返回到驱动管理错误,%v", err)
-		}
+		go func(res *pb.SchemaRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_SCHEMA)
+			schema, err := c.driver.Schema(ctx1, c.app)
+			schemaRes := new(entity.GrpcResult)
+			if err != nil {
+				schemaRes.Error = err.Error()
+				schemaRes.Code = 400
+			} else {
+				schemaRes.Result = schema
+				schemaRes.Code = 200
+			}
+			bts, _ := json.Marshal(schemaRes)
+			if err := stream.Send(&pb.SchemaResult{
+				Request: res.Request,
+				Message: bts,
+			}); err != nil {
+				logger.WithContext(ctx1).Errorf("驱动配置(schema)返回到驱动管理错误,%v", err)
+			}
+		}(res)
 	}
 }
 
@@ -371,54 +375,58 @@ func (c *Client) StartStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("start stream err, %w", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
-		newLogger := logger.WithContext(ctx1)
-		startRes := new(entity.GrpcResult)
-		var cfg entity.Instance
-		if err := json.Unmarshal(res.Config, &cfg); err != nil {
-			startRes.Error = err.Error()
-			startRes.Code = 400
+		go func(res *pb.StartRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_START)
+			newLogger := logger.WithContext(ctx1)
+			startRes := new(entity.GrpcResult)
+			var cfg entity.Instance
+			if err := json.Unmarshal(res.Config, &cfg); err != nil {
+				startRes.Error = err.Error()
+				startRes.Code = 400
+				bts, _ := json.Marshal(startRes)
+				if err := stream.Send(&pb.StartResult{
+					Request: res.Request,
+					Message: bts,
+				}); err != nil {
+					newLogger.Errorf("启动驱动(start)时(解析配置的错误)返回到驱动管理错误,%v", err)
+				}
+				return
+			}
+			if cfg.Tables != nil {
+				for _, t := range cfg.Tables {
+					if t.Devices == nil {
+						continue
+					}
+					for _, device := range t.Devices {
+						devM, ok := c.cacheConfigNum.Load(device.Id)
+						var devI map[string]interface{}
+						if ok {
+							devI, _ = devM.(map[string]interface{})
+						} else {
+							devI = map[string]interface{}{}
+						}
+						devI[t.Id] = struct{}{}
+						c.cacheConfigNum.Store(device.Id, devI)
+						c.cacheConfig.Store(device.Id, t.Id)
+					}
+				}
+			}
+			if err := c.driver.Start(ctx1, c.app, res.Config); err != nil {
+				startRes.Error = err.Error()
+				startRes.Code = 400
+			} else {
+				startRes.Code = 200
+			}
 			bts, _ := json.Marshal(startRes)
 			if err := stream.Send(&pb.StartResult{
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				newLogger.Errorf("启动驱动(start)时(解析配置的错误)返回到驱动管理错误,%v", err)
+				newLogger.Errorf("启动驱动(start)结果返回到驱动管理错误,%v", err)
 			}
-			continue
-		}
-		if cfg.Tables != nil {
-			for _, t := range cfg.Tables {
-				if t.Devices == nil {
-					continue
-				}
-				for _, device := range t.Devices {
-					devM, ok := c.cacheConfigNum.Load(device.Id)
-					var devI map[string]interface{}
-					if ok {
-						devI, _ = devM.(map[string]interface{})
-					} else {
-						devI = map[string]interface{}{}
-					}
-					devI[t.Id] = struct{}{}
-					c.cacheConfigNum.Store(device.Id, devI)
-					c.cacheConfig.Store(device.Id, t.Id)
-				}
-			}
-		}
-		if err := c.driver.Start(ctx1, c.app, res.Config); err != nil {
-			startRes.Error = err.Error()
-			startRes.Code = 400
-		} else {
-			startRes.Code = 200
-		}
-		bts, _ := json.Marshal(startRes)
-		if err := stream.Send(&pb.StartResult{
-			Request: res.Request,
-			Message: bts,
-		}); err != nil {
-			newLogger.Errorf("启动驱动(start)结果返回到驱动管理错误,%v", err)
-		}
+		}(res)
 	}
 }
 
@@ -438,7 +446,9 @@ func (c *Client) RunStream(ctx context.Context) error {
 			return fmt.Errorf("run stream err, %w", err)
 		}
 		go func(res *pb.RunRequest) {
-			ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_RUN)
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_RUN)
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.Run(ctx1, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -480,7 +490,9 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			return fmt.Errorf("writeTag stream err, %w", err)
 		}
 		go func(res *pb.RunRequest) {
-			ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_WRITETAG)
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_WRITETAG)
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.WriteTag(ctx1, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -522,7 +534,9 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			return fmt.Errorf("batchRun stream err, %w", err)
 		}
 		go func(res *pb.BatchRunRequest) {
-			ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_BATCHRUN)
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_BATCHRUN)
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(ctx1, c.app, &entity.BatchCommand{
 				Table:    res.TableId,
@@ -563,23 +577,27 @@ func (c *Client) DebugStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("debug stream err, %s", err)
 		}
-		gr := new(entity.GrpcResult)
-		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_DEBUG)
-		runRes, err := c.driver.Debug(ctx1, c.app, res.Data)
-		if err != nil {
-			gr.Error = err.Error()
-			gr.Code = 400
-		} else {
-			gr.Result = runRes
-			gr.Code = 200
-		}
-		bts, _ := json.Marshal(gr)
-		if err := stream.Send(&pb.Debug{
-			Request: res.Request,
-			Data:    bts,
-		}); err != nil {
-			logger.WithContext(ctx1).Errorf("调试(debug)结果返回到驱动管理错误,%v", err)
-		}
+		go func(res *pb.Debug) {
+			gr := new(entity.GrpcResult)
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_DEBUG)
+			runRes, err := c.driver.Debug(ctx1, c.app, res.Data)
+			if err != nil {
+				gr.Error = err.Error()
+				gr.Code = 400
+			} else {
+				gr.Result = runRes
+				gr.Code = 200
+			}
+			bts, _ := json.Marshal(gr)
+			if err := stream.Send(&pb.Debug{
+				Request: res.Request,
+				Data:    bts,
+			}); err != nil {
+				logger.WithContext(ctx1).Errorf("调试(debug)结果返回到驱动管理错误,%v", err)
+			}
+		}(res)
 	}
 }
 
@@ -598,13 +616,26 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("http proxy stream err, %s", err)
 		}
-		gr := new(entity.GrpcResult)
-		var header http.Header
-		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_HTTPPROXY)
-		if res.GetHeaders() != nil {
-			if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
-				gr.Error = fmt.Sprintf("http proxy stream err, %v", err)
-				gr.Code = 400
+		go func(res *pb.HttpProxyRequest) {
+			gr := new(entity.GrpcResult)
+			var header http.Header
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_HTTPPROXY)
+			if res.GetHeaders() != nil {
+				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
+					gr.Error = fmt.Sprintf("http proxy stream err, %v", err)
+					gr.Code = 400
+				} else {
+					runRes, err := c.driver.HttpProxy(ctx1, c.app, res.GetType(), header, res.GetData())
+					if err != nil {
+						gr.Error = err.Error()
+						gr.Code = 400
+					} else {
+						gr.Result = runRes
+						gr.Code = 200
+					}
+				}
 			} else {
 				runRes, err := c.driver.HttpProxy(ctx1, c.app, res.GetType(), header, res.GetData())
 				if err != nil {
@@ -615,23 +646,13 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 					gr.Code = 200
 				}
 			}
-		} else {
-			runRes, err := c.driver.HttpProxy(ctx1, c.app, res.GetType(), header, res.GetData())
-			if err != nil {
-				gr.Error = err.Error()
-				gr.Code = 400
-			} else {
-				gr.Result = runRes
-				gr.Code = 200
+			bts, _ := json.Marshal(gr)
+			if err := stream.Send(&pb.HttpProxyResult{
+				Request: res.Request,
+				Data:    bts,
+			}); err != nil {
+				logger.WithContext(ctx1).Errorf("http代理(httpProxy)请求结果返回到驱动管理错误,%v", err)
 			}
-		}
-
-		bts, _ := json.Marshal(gr)
-		if err := stream.Send(&pb.HttpProxyResult{
-			Request: res.Request,
-			Data:    bts,
-		}); err != nil {
-			logger.WithContext(ctx1).Errorf("http代理(httpProxy)请求结果返回到驱动管理错误,%v", err)
-		}
+		}(res)
 	}
 }

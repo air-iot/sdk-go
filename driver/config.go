@@ -13,8 +13,9 @@ type Config struct {
 	ServiceID string `json:"serviceId" yaml:"serviceId" mapstructure:"serviceId"`
 	Project   string `json:"project" yaml:"project" mapstructure:"project"`
 	Driver    struct {
-		ID   string `json:"id" yaml:"id"`
-		Name string `json:"name" yaml:"name"`
+		ID      string `json:"id" yaml:"id"`
+		Name    string `json:"name" yaml:"name"`
+		Timeout uint   `json:"timeout" yaml:"timeout"`
 	} `json:"driver" yaml:"driver"`
 	DriverGrpc grpc.Config   `json:"driverGrpc" yaml:"driverGrpc"`
 	Log        logger.Config `json:"log" yaml:"log"`
