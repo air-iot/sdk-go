@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
@@ -79,9 +80,9 @@ type cmdResult struct {
 }
 
 // Start 驱动执行，实现Driver的Start函数
-func (p *TestDriver) Start(a driver.App, bts []byte) error {
+func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error {
 	logger.Debugln("start", string(bts))
-	if err := p.Stop(a); err != nil {
+	if err := p.Stop(ctx, a); err != nil {
 		return err
 	}
 	var config DriverInstanceConfig
@@ -147,12 +148,12 @@ func (p *TestDriver) Start(a driver.App, bts []byte) error {
 	return nil
 }
 
-func (p *TestDriver) Schema(_ driver.App) (string, error) {
+func (p *TestDriver) Schema(ctx context.Context, _ driver.App) (string, error) {
 	return Schema, nil
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestDriver) Run(_ driver.App, cmd *entity.Command) (interface{}, error) {
+func (p *TestDriver) Run(ctx context.Context, _ driver.App, cmd *entity.Command) (interface{}, error) {
 	logger.Debugln("执行指令", *cmd)
 	var c map[string]interface{}
 	err := json.Unmarshal(cmd.Command, &c)
@@ -174,22 +175,22 @@ func (p *TestDriver) Run(_ driver.App, cmd *entity.Command) (interface{}, error)
 }
 
 // BatchRun 批量执行指令，实现Driver的Run函数
-func (p *TestDriver) BatchRun(_ driver.App, cmd *entity.BatchCommand) (interface{}, error) {
+func (p *TestDriver) BatchRun(ctx context.Context, _ driver.App, cmd *entity.BatchCommand) (interface{}, error) {
 	logger.Debugln("批量执行指令", *cmd)
 	return nil, nil
 }
 
-func (p *TestDriver) WriteTag(_ driver.App, cmd *entity.Command) (interface{}, error) {
+func (p *TestDriver) WriteTag(ctx context.Context, _ driver.App, cmd *entity.Command) (interface{}, error) {
 	logger.Debugln("写数据点", *cmd)
 	return nil, nil
 }
 
-func (p *TestDriver) Debug(_ driver.App, b []byte) (interface{}, error) {
+func (p *TestDriver) Debug(ctx context.Context, _ driver.App, b []byte) (interface{}, error) {
 	logger.Debugln("调试", string(b))
 	return []int{}, nil
 }
 
-func (p *TestDriver) Stop(_ driver.App) error {
+func (p *TestDriver) Stop(ctx context.Context, _ driver.App) error {
 	logger.Debugln("停止")
 	p.parseVm = nil
 	p.parseHandler = nil
@@ -202,7 +203,7 @@ func (p *TestDriver) Stop(_ driver.App) error {
 	return nil
 }
 
-func (p *TestDriver) HttpProxy(_ driver.App, t string, header http.Header, data []byte) (interface{}, error) {
+func (p *TestDriver) HttpProxy(ctx context.Context, _ driver.App, t string, header http.Header, data []byte) (interface{}, error) {
 	logger.Debugln("Http代理", t, header, string(data))
 	return Schema, nil
 }

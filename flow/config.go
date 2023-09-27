@@ -15,8 +15,8 @@ type Config struct {
 		Name string   `json:"name" yaml:"name"`
 		Mode TaskMode `json:"mode" yaml:"mode"`
 	} `json:"flow" yaml:"flow"`
-	FlowEngine Grpc       `json:"flowEngine" yaml:"flowEngine"`
-	Log        logger.Log `json:"log" yaml:"log"`
+	FlowEngine Grpc          `json:"flowEngine" yaml:"flowEngine"`
+	Log        logger.Config `json:"log" yaml:"log"`
 }
 
 type Grpc struct {

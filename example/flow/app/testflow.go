@@ -12,7 +12,7 @@ type TestFlow struct {
 	Cancel context.CancelFunc
 }
 
-func (p *TestFlow) Handler(app flow.App, request *flow.Request) (map[string]interface{}, error) {
+func (p *TestFlow) Handler(ctx context.Context, app flow.App, request *flow.Request) (map[string]interface{}, error) {
 	logger.Infof("配置: %+v", *request)
 	return map[string]interface{}{"a": 1}, nil
 }

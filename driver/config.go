@@ -16,7 +16,7 @@ type Config struct {
 		ID   string `json:"id" yaml:"id"`
 		Name string `json:"name" yaml:"name"`
 	} `json:"driver" yaml:"driver"`
-	DriverGrpc grpc.Config `json:"driverGrpc" yaml:"driverGrpc"`
-	Log        logger.Log  `json:"log" yaml:"log"`
-	MQ         mq.Config   `json:"mq" yaml:"mq"`
+	DriverGrpc grpc.Config   `json:"driverGrpc" yaml:"driverGrpc"`
+	Log        logger.Config `json:"log" yaml:"log"`
+	MQ         mq.Config     `json:"mq" yaml:"mq"`
 }

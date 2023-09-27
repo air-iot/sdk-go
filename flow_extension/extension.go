@@ -1,5 +1,7 @@
 package flow_extionsion
 
+import "context"
+
 type Request struct {
 	ProjectId  string `json:"projectId,omitempty"`
 	FlowId     string `json:"flowId,omitempty"`
@@ -13,11 +15,11 @@ type Extension interface {
 	// Schema
 	// @description 查询schema
 	// @return schema "驱动配置schema"
-	Schema(app App) (schema string, err error)
+	Schema(ctx context.Context, app App) (schema string, err error)
 
 	// Run
 	// @description 执行算法服务
 	// @param input 执行参数 {} input 执行参数,应与输出的schema格式相同
 	// @return result "自定义返回的格式,应与输出的schema格式相同"
-	Run(app App, input []byte) (result map[string]interface{}, err error)
+	Run(ctx context.Context, app App, input []byte) (result map[string]interface{}, err error)
 }

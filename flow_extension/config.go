@@ -12,8 +12,8 @@ import (
 var Cfg = new(Config)
 
 type Config struct {
-	Log        logger.Log `json:"log" yaml:"log"`
-	FlowEngine Grpc       `json:"flowEngine" yaml:"flowEngine"`
+	Log        logger.Config `json:"log" yaml:"log"`
+	FlowEngine Grpc          `json:"flowEngine" yaml:"flowEngine"`
 	Extension  struct {
 		Id   string `json:"id" yaml:"id"`
 		Name string `json:"name" yaml:"name"`

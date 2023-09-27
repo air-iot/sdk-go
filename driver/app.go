@@ -68,7 +68,7 @@ func init() {
 	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
 	viper.SetDefault("log.level", 4)
-	viper.SetDefault("log.format", "text")
+	viper.SetDefault("log.format", "json")
 	viper.SetDefault("log.output", "stdout")
 	viper.SetDefault("mq.type", "mqtt")
 	viper.SetDefault("mq.mqtt.host", "mqtt")
@@ -106,9 +106,6 @@ func init() {
 // NewApp 创建App
 func NewApp() App {
 	a := new(app)
-	if _, err := logger.NewLogger(C.Log); err != nil {
-		panic(fmt.Errorf("初始化日志错误,%s", err))
-	}
 	if C.ServiceID == "" {
 		panic("服务id不能为空")
 	}
@@ -124,6 +121,9 @@ func NewApp() App {
 	if C.DriverGrpc.WaitTime == 0 {
 		C.DriverGrpc.WaitTime = 5
 	}
+	C.Log.Syslog.ProjectId = C.Project
+	C.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", C.Project, C.ServiceID, C.Driver.ID)
+	logger.InitLogger(C.Log)
 	logger.Debugf("配置: %+v", *C)
 	mqConn, clean, err := mq.NewMQ(C.MQ)
 	if err != nil {
@@ -146,7 +146,7 @@ func (a *app) Start(driver Driver) {
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	sig := <-ch
 	close(ch)
-	if err := driver.Stop(a); err != nil {
+	if err := driver.Stop(context.Background(), a); err != nil {
 		logger.Warnln("驱动停止,", err.Error())
 	}
 	cli.Stop()
@@ -169,6 +169,7 @@ func (a *app) GetProjectId() string {
 
 // WritePoints 写数据点数据
 func (a *app) WritePoints(p entity.Point) error {
+	ctx := logger.NewModuleContext(context.Background(), entity.MODULE_WRITEPOINT)
 	tableId := p.Table
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
@@ -190,30 +191,31 @@ func (a *app) WritePoints(p entity.Point) error {
 	if p.Fields == nil || len(p.Fields) == 0 {
 		return fmt.Errorf("采集数据有空值")
 	}
-	return a.writePoints(context.Background(), tableId, p)
+	return a.writePoints(ctx, tableId, p)
 }
 
 func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) error {
 	fields := make(map[string]interface{})
+	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
 		if field.Tag == nil || field.Value == nil {
-			logger.Warnf("表 %s 资产 %s 数据点为空", tableId, p.ID)
+			newLogger.Warnf("表 %s 资产 %s 数据点为空", tableId, p.ID)
 			continue
 		}
 		tagByte, err := json.Marshal(field.Tag)
 		if err != nil {
-			logger.Warnf("表 %s 资产 %s 数据点序列化错误: %s", tableId, p.ID, err.Error())
+			newLogger.Warnf("表 %s 资产 %s 数据点序列化错误: %v", tableId, p.ID, err)
 			continue
 		}
 
 		tag := new(entity.Tag)
 		err = json.Unmarshal(tagByte, tag)
 		if err != nil {
-			logger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %s", tableId, p.ID, err.Error())
+			newLogger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
 			continue
 		}
 		if strings.TrimSpace(tag.ID) == "" {
-			logger.Errorf("表 %s 资产 %s 数据点标识为空", tableId, p.ID)
+			newLogger.Errorf("表 %s 资产 %s 数据点标识为空", tableId, p.ID)
 			continue
 		}
 		var value decimal.Decimal
@@ -248,7 +250,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		default:
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
-				logger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -269,7 +271,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
-				logger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
 			} else {
 				fields[tag.ID] = valTmp
 				if save {
@@ -280,7 +282,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if rawVal != nil {
 			valTmp, err := numberx.GetValueByType("", rawVal)
 			if err != nil {
-				logger.Errorf("表 %s 资产 %s 原始数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("表 %s 资产 %s 原始数据点转类型错误: %v", tableId, p.ID, err)
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
@@ -299,7 +301,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	if err != nil {
 		return err
 	}
-	logger.Debugf("保存数据,%s", string(b))
+	newLogger.Debugf("保存数据,%s", string(b))
 	return a.mq.Publish(ctx, []string{"data", C.Project, tableId, p.ID}, b)
 	//return nil
 }

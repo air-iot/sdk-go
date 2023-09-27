@@ -69,13 +69,14 @@ func (c *Client) healthCheck(ctx context.Context) {
 				logger.Infof("健康检查结束")
 				return
 			default:
-				logger.Infof("健康检查")
+				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK))
+				newLogger.Infof("健康检查开始")
 				retry := 3
 				state := false
 				for retry >= 0 {
 					healthRes, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Name: Cfg.Flow.Name})
 					if err != nil {
-						logger.Errorf("健康检查重试错误,%s", err.Error())
+						newLogger.Errorf("健康检查重试错误,%v", err)
 						state = true
 						time.Sleep(time.Second * time.Duration(wait))
 					} else {
@@ -83,7 +84,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
-									logger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+									newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
 								}
 							}
 						}
@@ -95,11 +96,11 @@ func (c *Client) healthCheck(ctx context.Context) {
 					c.cleanStream()
 					if c.conn != nil {
 						if err := c.conn.Close(); err != nil {
-							logger.Errorf("grpc close error: %s", err.Error())
+							newLogger.Errorf("grpc close error: %s", err.Error())
 						}
 					}
 					if err := c.connFlow(); err != nil {
-						logger.Errorln(err)
+						newLogger.Errorln(err)
 					}
 					ctx1, cancel1 := context.WithCancel(context.Background())
 					c.startSteam(ctx1)
@@ -121,9 +122,11 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("stream break")
 				return
 			default:
-				logger.Infof("stream")
-				if err := c.Handler(context.Background()); err != nil {
-					logger.Errorln(err)
+				ctx1 := context.Background()
+				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_HANDLER))
+				newLogger.Infof("启动start stream")
+				if err := c.Handler(ctx1); err != nil {
+					newLogger.Errorf("start stream错误,%v", err)
 				}
 				time.Sleep(time.Second * time.Duration(wait))
 			}
@@ -136,7 +139,7 @@ func (c *Client) Stop() {
 	c.cleanHealthCheck()
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
-			logger.Errorf("grpc close error: %s", err.Error())
+			logger.Errorf("grpc close error: %v", err)
 		}
 	}
 }
@@ -144,11 +147,11 @@ func (c *Client) Stop() {
 func (c *Client) Handler(ctx context.Context) error {
 	stream, err := c.cli.Register(GetGrpcContext(ctx, Cfg.Flow.Name, Cfg.Flow.Mode))
 	if err != nil {
-		return fmt.Errorf("stream err,%s", err)
+		return fmt.Errorf("stream err,%w", err)
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("stream close err,%s", err)
+			logger.Infof("stream close err,%v", err)
 		}
 	}()
 	for {
@@ -156,7 +159,8 @@ func (c *Client) Handler(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		result, err := c.flow.Handler(c.app, &Request{
+		ctx1 := logger.NewModuleContext(context.Background(), MODULE_HANDLER)
+		result, err := c.flow.Handler(ctx1, c.app, &Request{
 			ProjectId:  res.ProjectId,
 			FlowId:     res.FlowId,
 			Job:        res.Job,
@@ -179,7 +183,7 @@ func (c *Client) Handler(ctx context.Context) error {
 		b, _ := json.Marshal(result)
 		gr.Result = b
 		if err := stream.Send(gr); err != nil {
-			logger.Errorf("stream 发送错误,%s", err)
+			logger.WithContext(ctx1).Errorf("执行(handler)结果返回到流程引擎错误,%v", err)
 		}
 	}
 }

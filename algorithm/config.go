@@ -16,8 +16,8 @@ type Config struct {
 		ID   string `json:"id" yaml:"id"`
 		Name string `json:"name" yaml:"name"`
 	} `json:"algorithm" yaml:"algorithm"`
-	AlgorithmGrpc GrpcConfig `json:"algorithmGrpc" yaml:"algorithmGrpc"`
-	Log           logger.Log `json:"log" yaml:"log"`
+	AlgorithmGrpc GrpcConfig    `json:"algorithmGrpc" yaml:"algorithmGrpc"`
+	Log           logger.Config `json:"log" yaml:"log"`
 	//MQ         mq.Config   `json:"mq" yaml:"mq"`
 }
 

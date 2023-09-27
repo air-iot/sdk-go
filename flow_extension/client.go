@@ -68,13 +68,14 @@ func (c *Client) healthCheck(ctx context.Context) {
 				logger.Infof("健康检查结束")
 				return
 			default:
-				logger.Infof("健康检查")
+				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK))
+				newLogger.Infof("健康检查开始")
 				retry := 3
 				state := false
 				for retry >= 0 {
 					healthRes, err := c.cli.HealthCheck(ctx, &pb.ExtensionHealthCheckRequest{Id: Cfg.Extension.Id})
 					if err != nil {
-						logger.Errorf("健康检查重试错误,%s", err.Error())
+						newLogger.Errorf("健康检查重试错误,%v", err)
 						state = true
 						time.Sleep(time.Second * time.Duration(wait))
 					} else {
@@ -82,7 +83,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 						if healthRes.GetStatus() == pb.ExtensionHealthCheckResponse_SERVING {
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
-									logger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+									newLogger.Errorf("执行 %s, 错误为 %s", e.Code.String(), e.Message)
 								}
 							}
 						}
@@ -94,7 +95,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 					c.cleanStream()
 					if c.conn != nil {
 						if err := c.conn.Close(); err != nil {
-							logger.Errorf("grpc close error: %s", err.Error())
+							newLogger.Errorf("grpc close error: %v", err)
 						}
 					}
 					if err := c.connFlow(); err != nil {
@@ -120,9 +121,11 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("schema stream break")
 				return
 			default:
-				logger.Infof("schema stream")
+				ctx1 := context.Background()
+				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_SCHEMA))
+				newLogger.Infof("启动schema stream")
 				if err := c.Schema(context.Background()); err != nil {
-					logger.Errorln(err)
+					newLogger.Errorf("schema stream错误,%v", err)
 				}
 				time.Sleep(time.Second * time.Duration(wait))
 			}
@@ -136,9 +139,11 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("run stream break")
 				return
 			default:
-				logger.Infof("run stream")
+				ctx1 := context.Background()
+				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_RUN))
+				newLogger.Infof("启动run stream")
 				if err := c.Run(context.Background()); err != nil {
-					logger.Errorln(err)
+					newLogger.Errorf("run stream错误,%v", err)
 				}
 				time.Sleep(time.Second * time.Duration(wait))
 			}
@@ -171,7 +176,8 @@ func (c *Client) Schema(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		result, err := c.extension.Schema(c.app)
+		ctx1 := logger.NewModuleContext(context.Background(), MODULE_SCHEMA)
+		result, err := c.extension.Schema(ctx1, c.app)
 		gr := &pb.ExtensionResult{
 			Request: res.GetRequest(),
 		}
@@ -183,7 +189,7 @@ func (c *Client) Schema(ctx context.Context) error {
 			gr.Result = []byte(result)
 		}
 		if err := stream.Send(gr); err != nil {
-			logger.Errorf("schema stream 发送错误,%s", err)
+			logger.WithContext(ctx1).Errorf("配置(schema)返回到流程扩展节点错误,%v", err)
 		}
 	}
 }
@@ -203,7 +209,8 @@ func (c *Client) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		result, err := c.extension.Run(c.app, res.GetData())
+		ctx1 := logger.NewModuleContext(context.Background(), MODULE_RUN)
+		result, err := c.extension.Run(ctx1, c.app, res.GetData())
 		gr := &pb.ExtensionResult{
 			Request: res.GetRequest(),
 		}
@@ -219,7 +226,7 @@ func (c *Client) Run(ctx context.Context) error {
 		b, _ := json.Marshal(result)
 		gr.Result = b
 		if err := stream.Send(gr); err != nil {
-			logger.Errorf("run stream 发送错误,%s", err)
+			logger.WithContext(ctx1).Errorf("执行(run)结果返回到流程扩展节点错误,%v", err)
 		}
 	}
 }

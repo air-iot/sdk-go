@@ -19,23 +19,23 @@ type TestAlgorithm struct {
 }
 
 // Start 算法执行，实现Driver的Start函数
-func (p *TestAlgorithm) Start(_ algorithm.App) error {
+func (p *TestAlgorithm) Start(_ context.Context, _ algorithm.App) error {
 	logger.Debugln("start")
 	p.Ctx, p.Cancel = context.WithCancel(context.Background())
 	return nil
 }
-func (p *TestAlgorithm) Stop(_ algorithm.App) error {
+func (p *TestAlgorithm) Stop(_ context.Context, _ algorithm.App) error {
 	logger.Debugln("stop")
 	p.Cancel()
 	return nil
 }
 
-func (p *TestAlgorithm) Schema(_ algorithm.App) (string, error) {
+func (p *TestAlgorithm) Schema(_ context.Context, _ algorithm.App) (string, error) {
 	return Schema, nil
 }
 
 // Run 执行指令，实现Driver的Run函数
-func (p *TestAlgorithm) Run(_ algorithm.App, bts []byte) (interface{}, error) {
+func (p *TestAlgorithm) Run(_ context.Context, _ algorithm.App, bts []byte) (interface{}, error) {
 	logger.Debugln("run")
 	if bts != nil {
 		logger.Debugln(string(bts))

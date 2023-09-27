@@ -1,7 +1,7 @@
 package flow
 
+import "C"
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -36,7 +36,7 @@ func init() {
 	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
 	viper.SetDefault("log.level", 4)
-	viper.SetDefault("log.format", "text")
+	viper.SetDefault("log.format", "json")
 	viper.SetDefault("log.output", "stdout")
 	viper.SetDefault("flowEngine.host", "flow-engine")
 	viper.SetDefault("flowEngine.port", 2333)
@@ -60,12 +60,11 @@ func init() {
 // NewApp 创建App
 func NewApp() App {
 	a := new(app)
-	if _, err := logger.NewLogger(Cfg.Log); err != nil {
-		panic(fmt.Errorf("初始化日志错误,%w", err))
-	}
 	if Cfg.Flow.Mode == "" || Cfg.Flow.Name == "" {
 		panic("流程节点name和模式不能为空")
 	}
+	C.Log.Syslog.ServiceName = Cfg.Flow.Name
+	logger.InitLogger(C.Log)
 	logger.Debugf("配置: %+v", *Cfg)
 	a.clean = func() {}
 	return a

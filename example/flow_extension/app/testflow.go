@@ -19,12 +19,12 @@ type Input struct {
 	Num2 int `json:"num2"`
 }
 
-func (p *TestFlow) Schema(a flowextionsion.App) (string, error) {
+func (p *TestFlow) Schema(ctx context.Context, a flowextionsion.App) (string, error) {
 	logger.Infof("查询schema")
 	return schema, nil
 }
 
-func (p *TestFlow) Run(a flowextionsion.App, input []byte) (map[string]interface{}, error) {
+func (p *TestFlow) Run(ctx context.Context, a flowextionsion.App, input []byte) (map[string]interface{}, error) {
 	logger.Infof("执行run,%s", string(input))
 	var in Input
 	err := json.Unmarshal(input, &in)

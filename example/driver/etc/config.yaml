@@ -1,7 +1,7 @@
 mq:
   type: mqtt
   mqtt:
-    host: 127.0.0.1
+    host: 121.89.244.23
     port: 1883
 
 serviceId: go-driver-mqtt-demo
@@ -13,9 +13,11 @@ driver:
 
 log:
   level: 5
+  format: json
+
 
 driverGrpc:
-  host: 127.0.0.1
+  host: 121.89.244.23
   port: 9224
   healthRequestTime: 10
   waitTime: 5

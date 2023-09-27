@@ -1,21 +1,19 @@
 package algorithm
 
 import (
+	"context"
 	"fmt"
-	"log"
-	"math/rand"
-	"os"
-	"os/signal"
-	"runtime"
-	"sync"
-	"syscall"
-	"time"
-
 	"github.com/air-iot/logger"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"log"
+	"os"
+	"os/signal"
+	"runtime"
+	"sync"
+	"syscall"
 )
 
 type App interface {
@@ -27,21 +25,21 @@ type Service interface {
 	// Schema
 	// @description 查询schema
 	// @return result "算法配置schema,返回字符串"
-	Schema(App) (result string, err error)
+	Schema(context.Context, App) (result string, err error)
 
 	// Start
 	// @description 启动算法服务
-	Start(App) error
+	Start(context.Context, App) error
 
 	// Run
 	// @description 执行算法服务
 	// @param bts 执行参数 {"function":"算法名","input":{}} input 算法执行参数,应与输出的schema格式相同
 	// @return result "自定义返回的格式,应与输出的schema格式相同"
-	Run(app App, bts []byte) (result interface{}, err error)
+	Run(ctx context.Context, app App, bts []byte) (result interface{}, err error)
 
 	// Stop
 	// @description 停止算法服务
-	Stop(App) error
+	Stop(context.Context, App) error
 }
 
 //const (
@@ -55,22 +53,20 @@ type Service interface {
 type app struct {
 	*logrus.Logger
 	//mq      mq.MQ
-	stopped bool
-	cli     *Client
-	clean   func()
-
+	stopped    bool
+	cli        *Client
+	clean      func()
 	cacheValue sync.Map
 }
 
 func init() {
 	// 设置随机数种子
-	rand.Seed(time.Now().Unix())
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	pflag.String("serviceId", "", "服务id")
 	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
 	viper.SetDefault("log.level", 4)
-	viper.SetDefault("log.format", "text")
+	viper.SetDefault("log.format", "json")
 	viper.SetDefault("log.output", "stdout")
 	viper.SetDefault("algorithmGrpc.host", "algorithm")
 	viper.SetDefault("algorithmGrpc.port", 9236)
@@ -95,9 +91,6 @@ func init() {
 // NewApp 创建App
 func NewApp() App {
 	a := new(app)
-	if _, err := logger.NewLogger(C.Log); err != nil {
-		panic(fmt.Errorf("初始化日志错误,%s", err))
-	}
 
 	if C.Algorithm.ID == "" || C.Algorithm.Name == "" {
 		panic("算法id或name不能为空")
@@ -114,6 +107,8 @@ func NewApp() App {
 	if C.AlgorithmGrpc.WaitTime == 0 {
 		C.AlgorithmGrpc.WaitTime = 5
 	}
+	C.Log.Syslog.ServiceName = C.ServiceID
+	logger.InitLogger(C.Log)
 	logger.Debugf("配置: %+v", *C)
 
 	a.cacheValue = sync.Map{}
@@ -130,7 +125,7 @@ func (a *app) Start(service Service) {
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	sig := <-ch
 	close(ch)
-	if err := service.Stop(a); err != nil {
+	if err := service.Stop(context.Background(), a); err != nil {
 		logger.Warnln("算法停止,", err.Error())
 	}
 	cli.Stop()

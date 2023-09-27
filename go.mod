@@ -1,12 +1,12 @@
 module github.com/air-iot/sdk-go/v4
 
-go 1.20
+go 1.21.0
 
 require (
 	github.com/air-iot/api-client-go/v4 v4.3.0
 	github.com/air-iot/errors v0.0.4
-	github.com/air-iot/json v0.0.1
-	github.com/air-iot/logger v0.0.1
+	github.com/air-iot/json v0.0.3
+	github.com/air-iot/logger v1.0.4
 	github.com/dop251/goja v0.0.0-20230828202809-3dbe69dd2b8e
 	github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d
 	github.com/eclipse/paho.mqtt.golang v1.2.0
@@ -70,6 +70,8 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.9 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.9 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.9 // indirect
+	go.opentelemetry.io/otel v1.18.0 // indirect
+	go.opentelemetry.io/otel/trace v1.18.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
@@ -83,5 +85,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230530153820-e85fd2cbaebc // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
