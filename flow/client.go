@@ -159,31 +159,35 @@ func (c *Client) Handler(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), MODULE_HANDLER)
-		result, err := c.flow.Handler(ctx1, c.app, &Request{
-			ProjectId:  res.ProjectId,
-			FlowId:     res.FlowId,
-			Job:        res.Job,
-			ElementId:  res.ElementId,
-			ElementJob: res.ElementJob,
-			Config:     res.Config,
-		})
-		gr := &pb.FlowResponse{
-			ElementJob: res.ElementJob,
-		}
-		if err != nil {
-			gr.Status = false
-			gr.Info = err.Error()
-		} else {
-			gr.Status = true
-		}
-		if result == nil {
-			result = map[string]interface{}{}
-		}
-		b, _ := json.Marshal(result)
-		gr.Result = b
-		if err := stream.Send(gr); err != nil {
-			logger.WithContext(ctx1).Errorf("执行(handler)结果返回到流程引擎错误,%v", err)
-		}
+		go func(res *pb.FlowRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_HANDLER)
+			result, err := c.flow.Handler(ctx1, c.app, &Request{
+				ProjectId:  res.ProjectId,
+				FlowId:     res.FlowId,
+				Job:        res.Job,
+				ElementId:  res.ElementId,
+				ElementJob: res.ElementJob,
+				Config:     res.Config,
+			})
+			gr := &pb.FlowResponse{
+				ElementJob: res.ElementJob,
+			}
+			if err != nil {
+				gr.Status = false
+				gr.Info = err.Error()
+			} else {
+				gr.Status = true
+			}
+			if result == nil {
+				result = map[string]interface{}{}
+			}
+			b, _ := json.Marshal(result)
+			gr.Result = b
+			if err := stream.Send(gr); err != nil {
+				logger.WithContext(ctx1).Errorf("执行(handler)结果返回到流程引擎错误,%v", err)
+			}
+		}(res)
 	}
 }

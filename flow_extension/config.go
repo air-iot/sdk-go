@@ -15,8 +15,9 @@ type Config struct {
 	Log        logger.Config `json:"log" yaml:"log"`
 	FlowEngine Grpc          `json:"flowEngine" yaml:"flowEngine"`
 	Extension  struct {
-		Id   string `json:"id" yaml:"id"`
-		Name string `json:"name" yaml:"name"`
+		Id      string `json:"id" yaml:"id"`
+		Name    string `json:"name" yaml:"name"`
+		Timeout uint   `json:"timeout" yaml:"timeout"`
 	} `json:"extension" yaml:"extension"`
 }
 

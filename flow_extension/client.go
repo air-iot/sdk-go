@@ -176,21 +176,25 @@ func (c *Client) Schema(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), MODULE_SCHEMA)
-		result, err := c.extension.Schema(ctx1, c.app)
-		gr := &pb.ExtensionResult{
-			Request: res.GetRequest(),
-		}
-		if err != nil {
-			gr.Status = false
-			gr.Info = err.Error()
-		} else {
-			gr.Status = true
-			gr.Result = []byte(result)
-		}
-		if err := stream.Send(gr); err != nil {
-			logger.WithContext(ctx1).Errorf("配置(schema)返回到流程扩展节点错误,%v", err)
-		}
+		go func(res *pb.ExtensionSchemaRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Extension.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_SCHEMA)
+			result, err := c.extension.Schema(ctx1, c.app)
+			gr := &pb.ExtensionResult{
+				Request: res.GetRequest(),
+			}
+			if err != nil {
+				gr.Status = false
+				gr.Info = err.Error()
+			} else {
+				gr.Status = true
+				gr.Result = []byte(result)
+			}
+			if err := stream.Send(gr); err != nil {
+				logger.WithContext(ctx1).Errorf("配置(schema)返回到流程扩展节点错误,%v", err)
+			}
+		}(res)
 	}
 }
 
@@ -209,24 +213,28 @@ func (c *Client) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("stream err, %s", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), MODULE_RUN)
-		result, err := c.extension.Run(ctx1, c.app, res.GetData())
-		gr := &pb.ExtensionResult{
-			Request: res.GetRequest(),
-		}
-		if err != nil {
-			gr.Status = false
-			gr.Info = err.Error()
-		} else {
-			gr.Status = true
-		}
-		if result == nil {
-			result = map[string]interface{}{}
-		}
-		b, _ := json.Marshal(result)
-		gr.Result = b
-		if err := stream.Send(gr); err != nil {
-			logger.WithContext(ctx1).Errorf("执行(run)结果返回到流程扩展节点错误,%v", err)
-		}
+		go func(res *pb.ExtensionRunRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Extension.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_RUN)
+			result, err := c.extension.Run(ctx1, c.app, res.GetData())
+			gr := &pb.ExtensionResult{
+				Request: res.GetRequest(),
+			}
+			if err != nil {
+				gr.Status = false
+				gr.Info = err.Error()
+			} else {
+				gr.Status = true
+			}
+			if result == nil {
+				result = map[string]interface{}{}
+			}
+			b, _ := json.Marshal(result)
+			gr.Result = b
+			if err := stream.Send(gr); err != nil {
+				logger.WithContext(ctx1).Errorf("执行(run)结果返回到流程扩展节点错误,%v", err)
+			}
+		}(res)
 	}
 }

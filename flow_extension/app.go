@@ -36,6 +36,7 @@ func init() {
 	viper.SetDefault("log.output", "stdout")
 	viper.SetDefault("flowEngine.host", "flow-engine")
 	viper.SetDefault("flowEngine.port", 2333)
+	viper.SetDefault("extension.timeout", 600)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")

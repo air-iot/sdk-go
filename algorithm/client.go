@@ -186,23 +186,27 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("schema stream err, %w", err)
 		}
-		ctx1 := logger.NewModuleContext(context.Background(), MODULE_SCHEMA)
-		schema, err := c.algorithmService.Schema(ctx1, c.app)
-		schemaRes := new(grpcResult)
-		if err != nil {
-			schemaRes.Error = err.Error()
-			schemaRes.Code = 400
-		} else {
-			schemaRes.Result = schema
-			schemaRes.Code = 200
-		}
-		bts, _ := json.Marshal(schemaRes)
-		if err := stream.Send(&pb.SchemaResult{
-			Request: res.Request,
-			Message: bts,
-		}); err != nil {
-			logger.WithContext(ctx1).Errorf("配置(schema)返回到算法管理错误,%v", err)
-		}
+		go func(res *pb.SchemaRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Algorithm.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_SCHEMA)
+			schema, err := c.algorithmService.Schema(ctx1, c.app)
+			schemaRes := new(grpcResult)
+			if err != nil {
+				schemaRes.Error = err.Error()
+				schemaRes.Code = 400
+			} else {
+				schemaRes.Result = schema
+				schemaRes.Code = 200
+			}
+			bts, _ := json.Marshal(schemaRes)
+			if err := stream.Send(&pb.SchemaResult{
+				Request: res.Request,
+				Message: bts,
+			}); err != nil {
+				logger.WithContext(ctx1).Errorf("配置(schema)返回到算法管理错误,%v", err)
+			}
+		}(res)
 	}
 }
 
@@ -223,7 +227,9 @@ func (c *Client) RunStream(ctx context.Context) error {
 		}
 		go func(res *pb.RunRequest) {
 			gr := new(grpcResult)
-			ctx1 := logger.NewModuleContext(context.Background(), MODULE_RUN)
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Algorithm.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_RUN)
 			runRes, err := c.algorithmService.Run(ctx1, c.app, res.Data)
 			if err != nil {
 				gr.Error = err.Error()

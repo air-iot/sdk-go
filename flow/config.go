@@ -12,8 +12,9 @@ var Cfg = new(Config)
 
 type Config struct {
 	Flow struct {
-		Name string   `json:"name" yaml:"name"`
-		Mode TaskMode `json:"mode" yaml:"mode"`
+		Name    string   `json:"name" yaml:"name"`
+		Mode    TaskMode `json:"mode" yaml:"mode"`
+		Timeout uint     `json:"timeout" yaml:"timeout"`
 	} `json:"flow" yaml:"flow"`
 	FlowEngine Grpc          `json:"flowEngine" yaml:"flowEngine"`
 	Log        logger.Config `json:"log" yaml:"log"`

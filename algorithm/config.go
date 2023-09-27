@@ -13,8 +13,9 @@ type Config struct {
 	ServiceID string `json:"serviceId" yaml:"serviceId" mapstructure:"serviceId"`
 	//Project   string `json:"project" yaml:"project" mapstructure:"project"`
 	Algorithm struct {
-		ID   string `json:"id" yaml:"id"`
-		Name string `json:"name" yaml:"name"`
+		ID      string `json:"id" yaml:"id"`
+		Name    string `json:"name" yaml:"name"`
+		Timeout uint   `json:"timeout" yaml:"timeout"`
 	} `json:"algorithm" yaml:"algorithm"`
 	AlgorithmGrpc GrpcConfig    `json:"algorithmGrpc" yaml:"algorithmGrpc"`
 	Log           logger.Config `json:"log" yaml:"log"`
