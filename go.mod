@@ -6,7 +6,7 @@ require (
 	github.com/air-iot/api-client-go/v4 v4.3.0
 	github.com/air-iot/errors v0.0.4
 	github.com/air-iot/json v0.0.3
-	github.com/air-iot/logger v1.0.4
+	github.com/air-iot/logger v1.0.5
 	github.com/dop251/goja v0.0.0-20230828202809-3dbe69dd2b8e
 	github.com/dop251/goja_nodejs v0.0.0-20211022123610-8dd9abb0616d
 	github.com/eclipse/paho.mqtt.golang v1.2.0
