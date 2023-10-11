@@ -3,16 +3,16 @@ package rabbit
 import (
 	"fmt"
 
+	"github.com/rabbitmq/amqp091-go"
 	"github.com/sirupsen/logrus"
-	"github.com/streadway/amqp"
 )
 
 type Amqp struct {
-	*amqp.Connection
+	*amqp091.Connection
 }
 
 func NewAmqp(host string, port int, username, password, vhost string) (*Amqp, error) {
-	conn, err := amqp.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/%s", username, password, host, port, vhost))
+	conn, err := amqp091.Dial(fmt.Sprintf("amqp://%s:%s@%s:%d/%s", username, password, host, port, vhost))
 	if err != nil {
 		return nil, fmt.Errorf("创建Amqp连接错误,%s", err.Error())
 	}
@@ -39,8 +39,8 @@ func (p *Amqp) Send(exchange, routerKey string, data []byte) error {
 		routerKey, // routing key
 		false,     // mandatory
 		false,
-		amqp.Publishing{
-			DeliveryMode: amqp.Transient,
+		amqp091.Publishing{
+			DeliveryMode: amqp091.Transient,
 			ContentType:  "text/plain",
 			Body:         data,
 		})

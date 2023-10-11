@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streadway/amqp"
+	"github.com/rabbitmq/amqp091-go"
 
 	"github.com/air-iot/logger"
 )
@@ -14,7 +14,7 @@ import (
 type rabbit struct {
 	//queue    string
 	//exchange string
-	conn *amqp.Connection
+	conn *amqp091.Connection
 }
 
 // RabbitMQConfig rabbitmq配置参数
@@ -40,7 +40,7 @@ func (a RabbitMQConfig) DNS() string {
 const TOPICSEPWITHRABBIT = "."
 
 func NewRabbitClient(cfg RabbitMQConfig) (MQ, func(), error) {
-	conn, err := amqp.Dial(cfg.DNS())
+	conn, err := amqp091.Dial(cfg.DNS())
 	if err != nil {
 		return nil, nil, fmt.Errorf("创建AMQP客户端错误: %+v", err)
 	}
@@ -56,7 +56,7 @@ func NewRabbitClient(cfg RabbitMQConfig) (MQ, func(), error) {
 
 func (p *rabbit) Callback(Callback) {}
 
-func (p *rabbit) NewQueue(channel *amqp.Channel, queueName string) (*amqp.Queue, error) {
+func (p *rabbit) NewQueue(channel *amqp091.Channel, queueName string) (*amqp091.Queue, error) {
 	queue, err := channel.QueueDeclare(
 		queueName, // name
 		true,      // durable
@@ -71,7 +71,7 @@ func (p *rabbit) NewQueue(channel *amqp.Channel, queueName string) (*amqp.Queue,
 	return &queue, nil
 }
 
-func (p *rabbit) NewExchange(channel *amqp.Channel, exchange string) error {
+func (p *rabbit) NewExchange(channel *amqp091.Channel, exchange string) error {
 	return channel.ExchangeDeclare(
 		exchange, // name
 		"topic",  // type
@@ -98,8 +98,8 @@ func (p *rabbit) Publish(ctx context.Context, topicParams []string, payload []by
 		topic,    // routing key
 		false,    // mandatory
 		false,
-		amqp.Publishing{
-			DeliveryMode: amqp.Transient,
+		amqp091.Publishing{
+			DeliveryMode: amqp091.Transient,
 			ContentType:  "text/plain",
 			Body:         payload,
 		})
