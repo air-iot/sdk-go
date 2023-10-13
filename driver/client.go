@@ -394,6 +394,8 @@ func (c *Client) StartStream(ctx context.Context) error {
 				}
 				return
 			}
+			c.cacheConfigNum = sync.Map{}
+			c.cacheConfig = sync.Map{}
 			if cfg.Tables != nil {
 				for _, t := range cfg.Tables {
 					if t.Devices == nil {
