@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/air-iot/json"
+	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -375,46 +375,53 @@ func (c *Client) StartStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("start stream err, %w", err)
 		}
+		ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
+		defer cancel()
+		ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_START)
+		newLogger := logger.WithContext(ctx1)
+		startRes := new(entity.GrpcResult)
+		var cfg entity.Instance
+		if err := json.Unmarshal(res.Config, &cfg); err != nil {
+			startRes.Error = err.Error()
+			startRes.Code = 400
+			bts, _ := json.Marshal(startRes)
+			if err := stream.Send(&pb.StartResult{
+				Request: res.Request,
+				Message: bts,
+			}); err != nil {
+				newLogger.Errorf("启动驱动(start)时(解析配置的错误)返回到驱动管理错误,%v", err)
+			}
+			continue
+		}
+		if cfg.Debug != nil {
+			if *cfg.Debug {
+				logger.SetLevel(logger.DebugLevel)
+			} else {
+				logger.SetLevel(logger.InfoLevel)
+			}
+		}
+		c.cacheConfigNum = sync.Map{}
+		c.cacheConfig = sync.Map{}
+		if cfg.Tables != nil {
+			for _, t := range cfg.Tables {
+				if t.Devices == nil {
+					continue
+				}
+				for _, device := range t.Devices {
+					devM, ok := c.cacheConfigNum.Load(device.Id)
+					var devI map[string]interface{}
+					if ok {
+						devI, _ = devM.(map[string]interface{})
+					} else {
+						devI = map[string]interface{}{}
+					}
+					devI[t.Id] = struct{}{}
+					c.cacheConfigNum.Store(device.Id, devI)
+					c.cacheConfig.Store(device.Id, t.Id)
+				}
+			}
+		}
 		go func(res *pb.StartRequest) {
-			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
-			defer cancel()
-			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_START)
-			newLogger := logger.WithContext(ctx1)
-			startRes := new(entity.GrpcResult)
-			var cfg entity.Instance
-			if err := json.Unmarshal(res.Config, &cfg); err != nil {
-				startRes.Error = err.Error()
-				startRes.Code = 400
-				bts, _ := json.Marshal(startRes)
-				if err := stream.Send(&pb.StartResult{
-					Request: res.Request,
-					Message: bts,
-				}); err != nil {
-					newLogger.Errorf("启动驱动(start)时(解析配置的错误)返回到驱动管理错误,%v", err)
-				}
-				return
-			}
-			c.cacheConfigNum = sync.Map{}
-			c.cacheConfig = sync.Map{}
-			if cfg.Tables != nil {
-				for _, t := range cfg.Tables {
-					if t.Devices == nil {
-						continue
-					}
-					for _, device := range t.Devices {
-						devM, ok := c.cacheConfigNum.Load(device.Id)
-						var devI map[string]interface{}
-						if ok {
-							devI, _ = devM.(map[string]interface{})
-						} else {
-							devI = map[string]interface{}{}
-						}
-						devI[t.Id] = struct{}{}
-						c.cacheConfigNum.Store(device.Id, devI)
-						c.cacheConfig.Store(device.Id, t.Id)
-					}
-				}
-			}
 			if err := c.driver.Start(ctx1, c.app, res.Config); err != nil {
 				startRes.Error = err.Error()
 				startRes.Code = 400

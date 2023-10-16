@@ -4,7 +4,7 @@ mq:
     host: 121.89.244.23
     port: 1883
 
-serviceId: go-driver-mqtt-demo
+serviceId: 64f847d563d1482d33753c25
 project: 625f6dbf5433487131f09ff9
 
 driver:
@@ -12,7 +12,7 @@ driver:
   name: 测试驱动
 
 log:
-  level: 5
+  level: 4
   format: json
 
 

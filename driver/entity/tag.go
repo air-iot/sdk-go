@@ -77,6 +77,7 @@ type RangeCondition struct {
 
 type Instance struct {
 	ID     string  `json:"id"`
+	Debug  *bool   `json:"debug"`
 	Tables []table `json:"tables"`
 }
 
