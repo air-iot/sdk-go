@@ -90,7 +90,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 				return
 			default:
 				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), entity.MODULE_HEALTHCHECK))
-				newLogger.Infof("健康检查开始")
+				newLogger.Debugf("健康检查开始")
 				retry := C.DriverGrpc.Health.Retry
 				state := false
 				for retry >= 0 {
@@ -102,7 +102,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
-							newLogger.Infof("健康检查正常")
+							newLogger.Debugf("健康检查正常")
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
 									newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
