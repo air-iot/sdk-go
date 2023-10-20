@@ -122,6 +122,7 @@ func NewApp() App {
 	if C.DriverGrpc.WaitTime == 0 {
 		C.DriverGrpc.WaitTime = 5
 	}
+
 	C.Log.Syslog.ProjectId = C.Project
 	C.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", C.Project, C.ServiceID, C.Driver.ID)
 	logger.InitLogger(C.Log)

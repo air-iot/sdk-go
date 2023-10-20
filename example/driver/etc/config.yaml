@@ -17,7 +17,7 @@ log:
 
 
 driverGrpc:
-  host: 121.89.244.23
+  host: localhost
   port: 9224
   healthRequestTime: 10
   waitTime: 5
