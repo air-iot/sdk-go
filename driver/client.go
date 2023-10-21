@@ -26,6 +26,7 @@ type Client struct {
 	clean          func()
 	cacheConfig    sync.Map
 	cacheConfigNum sync.Map
+	groupId        string
 	//healthTime        time.Time
 }
 
@@ -375,9 +376,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("start stream err, %w", err)
 		}
-		ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
-		defer cancel()
-		ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_START)
+		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
 		newLogger := logger.WithContext(ctx1)
 		startRes := new(entity.GrpcResult)
 		var cfg entity.Instance
@@ -402,6 +401,10 @@ func (c *Client) StartStream(ctx context.Context) error {
 		}
 		c.cacheConfigNum = sync.Map{}
 		c.cacheConfig = sync.Map{}
+		c.groupId = cfg.GroupId
+		if c.groupId != "" {
+			ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+		}
 		if cfg.Tables != nil {
 			for _, t := range cfg.Tables {
 				if t.Devices == nil {
@@ -422,7 +425,9 @@ func (c *Client) StartStream(ctx context.Context) error {
 			}
 		}
 		go func(res *pb.StartRequest) {
-			if err := c.driver.Start(ctx1, c.app, res.Config); err != nil {
+			newCtx, cancel := context.WithTimeout(ctx1, time.Second*time.Duration(C.Driver.Timeout))
+			defer cancel()
+			if err := c.driver.Start(newCtx, c.app, res.Config); err != nil {
 				startRes.Error = err.Error()
 				startRes.Code = 400
 			} else {
@@ -458,6 +463,9 @@ func (c *Client) RunStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_RUN)
+			if c.groupId != "" {
+				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.Run(ctx1, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -502,6 +510,9 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_WRITETAG)
+			if c.groupId != "" {
+				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.WriteTag(ctx1, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -546,6 +557,9 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_BATCHRUN)
+			if c.groupId != "" {
+				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(ctx1, c.app, &entity.BatchCommand{
 				Table:    res.TableId,
@@ -591,6 +605,9 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_DEBUG)
+			if c.groupId != "" {
+				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			}
 			runRes, err := c.driver.Debug(ctx1, c.app, res.Data)
 			if err != nil {
 				gr.Error = err.Error()
@@ -631,6 +648,9 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_HTTPPROXY)
+			if c.groupId != "" {
+				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			}
 			if res.GetHeaders() != nil {
 				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
 					gr.Error = fmt.Sprintf("http proxy stream err, %v", err)
