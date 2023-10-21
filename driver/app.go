@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"os/signal"
 	"runtime"
@@ -61,7 +60,7 @@ type app struct {
 
 func init() {
 	// 设置随机数种子
-	rand.Seed(time.Now().Unix())
+	//rand.Seed(time.Now().Unix())
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	pflag.String("project", "default", "项目id")
 	pflag.String("serviceId", "", "服务id")
@@ -193,6 +192,7 @@ func (a *app) WritePoints(p entity.Point) error {
 	if p.Fields == nil || len(p.Fields) == 0 {
 		return fmt.Errorf("采集数据有空值")
 	}
+	ctx = logger.NewExtraKeyContext(ctx, tableId)
 	return a.writePoints(ctx, tableId, p)
 }
 
@@ -200,24 +200,25 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	fields := make(map[string]interface{})
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
-		if field.Tag == nil || field.Value == nil {
-			newLogger.Warnf("表 %s 资产 %s 数据点为空", tableId, p.ID)
+		if field.Value == nil {
+			newLogger.Warnf("资产数据点值为空,表:**%s**,资产:**%s**", tableId, p.ID)
 			continue
 		}
-		tagByte, err := json.Marshal(field.Tag)
-		if err != nil {
-			newLogger.Warnf("表 %s 资产 %s 数据点序列化错误: %v", tableId, p.ID, err)
-			continue
-		}
-
-		tag := new(entity.Tag)
-		err = json.Unmarshal(tagByte, tag)
-		if err != nil {
-			newLogger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
-			continue
-		}
+		//tagByte, err := json.Marshal(field.Tag)
+		//if err != nil {
+		//	newLogger.Warnf("表 %s 资产 %s 数据点序列化错误: %v", tableId, p.ID, err)
+		//	continue
+		//}
+		//
+		//tag := new(entity.Tag)
+		//err = json.Unmarshal(tagByte, tag)
+		//if err != nil {
+		//	newLogger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
+		//	continue
+		//}
+		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("表 %s 资产 %s 数据点标识为空", tableId, p.ID)
+			newLogger.Errorf("资产数据点标识为空,表:**%s**,资产:**%s**", tableId, p.ID)
 			continue
 		}
 		var value decimal.Decimal
@@ -252,13 +253,13 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		default:
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
-				newLogger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("资产数据点转类型失败,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 				continue
 			}
 			fields[tag.ID] = valTmp
 			continue
 		}
-		val := convert.Value(tag, value)
+		val := convert.Value(&tag, value)
 		cacheKey := fmt.Sprintf("%s__%s__%s", tableId, p.ID, tag.ID)
 		preValF, ok := a.cacheValue.Load(cacheKey)
 		var preVal *decimal.Decimal
@@ -273,7 +274,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
-				newLogger.Errorf("表 %s 资产 %s 数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("资产数据点转类型失败,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 			} else {
 				fields[tag.ID] = valTmp
 				if save {
@@ -284,7 +285,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if rawVal != nil {
 			valTmp, err := numberx.GetValueByType("", rawVal)
 			if err != nil {
-				newLogger.Errorf("表 %s 资产 %s 原始数据点转类型错误: %v", tableId, p.ID, err)
+				newLogger.Errorf("资产原始数据点转类型,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
@@ -303,7 +304,9 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	if err != nil {
 		return err
 	}
-	newLogger.Debugf("保存数据,%s", string(b))
+	if logger.IsLevelEnabled(logger.DebugLevel) {
+		newLogger.Debugf("保存数据,%s", string(b))
+	}
 	return a.mq.Publish(ctx, []string{"data", C.Project, tableId, p.ID}, b)
 	//return nil
 }

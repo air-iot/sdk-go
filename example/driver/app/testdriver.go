@@ -44,16 +44,11 @@ type (
 			ParseScript   string `json:"parseScript"`
 			CommandScript string `json:"commandScript"`
 		} `json:"settings"`
-		Tags     []tag `json:"tags"` // 驱动数据点
+		Tags     []entity.Tag `json:"tags"` // 驱动数据点
 		Commands []struct {
 			ID   string `json:"id"`   // 指令唯一标识
 			Name string `json:"name"` // 指令名称
 		} `json:"commands"` // 指令配置
-	}
-
-	tag struct {
-		ID   string `json:"id"`   // 数据点唯一标识
-		Name string `json:"name"` // 数据点名称
 	}
 )
 
@@ -64,7 +59,7 @@ type TestDriver struct {
 	parseHandler   goja.Callable
 	commandVm      *goja.Runtime
 	commandHandler goja.Callable
-	tables         map[string]map[string]map[string]tag
+	tables         map[string]map[string]map[string]entity.Tag
 }
 
 type parseResult struct {
@@ -199,7 +194,7 @@ func (p *TestDriver) Stop(ctx context.Context, _ driver.App) error {
 	if p.client != nil {
 		p.client.Disconnect(250)
 	}
-	p.tables = map[string]map[string]map[string]tag{}
+	p.tables = map[string]map[string]map[string]entity.Tag{}
 	return nil
 }
 
@@ -213,14 +208,14 @@ func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) er
 		if len(t.Devices) == 0 {
 			continue
 		}
-		tagMap := map[string]tag{}
+		tagMap := map[string]entity.Tag{}
 		for _, ta := range t.Device.Tags {
 			tagMap[ta.ID] = ta
 		}
-		dev1 := map[string]map[string]tag{}
+		dev1 := map[string]map[string]entity.Tag{}
 		p.tables[t.ID] = dev1
 		for _, device := range t.Devices {
-			devTagMap := map[string]tag{}
+			devTagMap := map[string]entity.Tag{}
 			for k, v := range tagMap {
 				devTagMap[k] = v
 			}

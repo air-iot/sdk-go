@@ -21,6 +21,6 @@ type WritePoint struct {
 
 // Field 字段
 type Field struct {
-	Tag   interface{} `json:"tag"`   // 数据点
+	Tag   Tag         `json:"tag"`   // 数据点
 	Value interface{} `json:"value"` // 数据采集值
 }
