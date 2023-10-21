@@ -64,6 +64,7 @@ func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	pflag.String("project", "default", "项目id")
 	pflag.String("serviceId", "", "服务id")
+	pflag.String("groupId", "", "组id")
 	cfgPath := pflag.String("config", "./etc/", "配置文件")
 	pflag.Parse()
 	viper.SetDefault("log.level", 4)

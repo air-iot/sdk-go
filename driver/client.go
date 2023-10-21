@@ -26,7 +26,6 @@ type Client struct {
 	clean          func()
 	cacheConfig    sync.Map
 	cacheConfigNum sync.Map
-	groupId        string
 	//healthTime        time.Time
 }
 
@@ -90,7 +89,11 @@ func (c *Client) healthCheck(ctx context.Context) {
 				logger.Infof("健康检查停止")
 				return
 			default:
-				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), entity.MODULE_HEALTHCHECK))
+				ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_HEALTHCHECK)
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
+				newLogger := logger.WithContext(ctx1)
 				newLogger.Debugf("健康检查开始")
 				retry := C.DriverGrpc.Health.Retry
 				state := false
@@ -208,6 +211,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_SCHEMA))
 				newLogger.Infof("启动驱动schema stream")
 				if err := c.SchemaStream(ctx1); err != nil {
@@ -225,6 +231,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_START))
 				newLogger.Infof("启动驱动start stream")
 				if err := c.StartStream(ctx1); err != nil {
@@ -242,6 +251,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_RUN))
 				newLogger.Infof("启动驱动run stream")
 				if err := c.RunStream(ctx1); err != nil {
@@ -259,6 +271,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_WRITETAG))
 				newLogger.Infof("启动驱动writeTag stream")
 				if err := c.WriteTagStream(ctx1); err != nil {
@@ -276,6 +291,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_BATCHRUN))
 				newLogger.Infof("启动驱动batchRun stream")
 				if err := c.BatchRunStream(ctx1); err != nil {
@@ -293,6 +311,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_DEBUG))
 				newLogger.Infof("启动驱动debug stream")
 				if err := c.DebugStream(ctx1); err != nil {
@@ -311,6 +332,9 @@ func (c *Client) startSteam(ctx context.Context) {
 				return
 			default:
 				ctx1 := context.Background()
+				if C.GroupID != "" {
+					ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+				}
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, entity.MODULE_HTTPPROXY))
 				newLogger.Infof("启动驱动http proxy stream")
 				if err := c.HttpProxyStream(ctx1); err != nil {
@@ -341,6 +365,9 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_SCHEMA)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
+			}
 			schema, err := c.driver.Schema(ctx1, c.app)
 			schemaRes := new(entity.GrpcResult)
 			if err != nil {
@@ -401,9 +428,11 @@ func (c *Client) StartStream(ctx context.Context) error {
 		}
 		c.cacheConfigNum = sync.Map{}
 		c.cacheConfig = sync.Map{}
-		c.groupId = cfg.GroupId
-		if c.groupId != "" {
-			ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+		if C.GroupID == "" {
+			C.GroupID = cfg.GroupId
+		}
+		if C.GroupID != "" {
+			ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 		}
 		if cfg.Tables != nil {
 			for _, t := range cfg.Tables {
@@ -463,8 +492,8 @@ func (c *Client) RunStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_RUN)
-			if c.groupId != "" {
-				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.Run(ctx1, c.app, &entity.Command{
@@ -510,8 +539,8 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_WRITETAG)
-			if c.groupId != "" {
-				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.WriteTag(ctx1, c.app, &entity.Command{
@@ -557,8 +586,8 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_BATCHRUN)
-			if c.groupId != "" {
-				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 			}
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(ctx1, c.app, &entity.BatchCommand{
@@ -605,8 +634,8 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_DEBUG)
-			if c.groupId != "" {
-				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 			}
 			runRes, err := c.driver.Debug(ctx1, c.app, res.Data)
 			if err != nil {
@@ -648,8 +677,8 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Driver.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, entity.MODULE_HTTPPROXY)
-			if c.groupId != "" {
-				ctx1 = logger.NewGroupContext(ctx1, c.groupId)
+			if C.GroupID != "" {
+				ctx1 = logger.NewGroupContext(ctx1, C.GroupID)
 			}
 			if res.GetHeaders() != nil {
 				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {

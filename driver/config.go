@@ -11,6 +11,7 @@ var C = new(Config)
 
 type Config struct {
 	ServiceID string `json:"serviceId" yaml:"serviceId" mapstructure:"serviceId"`
+	GroupID   string `json:"groupId" yaml:"groupId" mapstructure:"groupId"`
 	Project   string `json:"project" yaml:"project" mapstructure:"project"`
 	Driver    struct {
 		ID      string `json:"id" yaml:"id"`
