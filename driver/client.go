@@ -428,7 +428,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 		}
 		c.cacheConfigNum = sync.Map{}
 		c.cacheConfig = sync.Map{}
-		if C.GroupID == "" {
+		if cfg.GroupId != "" {
 			C.GroupID = cfg.GroupId
 		}
 		if C.GroupID != "" {
