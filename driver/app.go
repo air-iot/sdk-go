@@ -99,7 +99,7 @@ func init() {
 		log.Fatalln("读取配置错误,", err.Error())
 	}
 
-	if err := viper.Unmarshal(C); err != nil {
+	if err := viper.Unmarshal(Cfg); err != nil {
 		log.Fatalln("配置解析错误: ", err.Error())
 	}
 }
@@ -107,27 +107,27 @@ func init() {
 // NewApp 创建App
 func NewApp() App {
 	a := new(app)
-	if C.ServiceID == "" {
+	if Cfg.ServiceID == "" {
 		panic("服务id不能为空")
 	}
-	if C.Driver.ID == "" || C.Driver.Name == "" {
+	if Cfg.Driver.ID == "" || Cfg.Driver.Name == "" {
 		panic("驱动id或name不能为空")
 	}
-	if C.DriverGrpc.Health.RequestTime == 0 {
-		C.DriverGrpc.Health.RequestTime = 10
+	if Cfg.DriverGrpc.Health.RequestTime == 0 {
+		Cfg.DriverGrpc.Health.RequestTime = 10
 	}
-	if C.DriverGrpc.Health.Retry == 0 {
-		C.DriverGrpc.Health.Retry = 3
+	if Cfg.DriverGrpc.Health.Retry == 0 {
+		Cfg.DriverGrpc.Health.Retry = 3
 	}
-	if C.DriverGrpc.WaitTime == 0 {
-		C.DriverGrpc.WaitTime = 5
+	if Cfg.DriverGrpc.WaitTime == 0 {
+		Cfg.DriverGrpc.WaitTime = 5
 	}
 
-	C.Log.Syslog.ProjectId = C.Project
-	C.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", C.Project, C.ServiceID, C.Driver.ID)
-	logger.InitLogger(C.Log)
-	logger.Debugf("配置: %+v", *C)
-	mqConn, clean, err := mq.NewMQ(C.MQ)
+	Cfg.Log.Syslog.ProjectId = Cfg.Project
+	Cfg.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", Cfg.Project, Cfg.ServiceID, Cfg.Driver.ID)
+	logger.InitLogger(Cfg.Log)
+	logger.Debugf("配置: %+v", *Cfg)
+	mqConn, clean, err := mq.NewMQ(Cfg.MQ)
 	if err != nil {
 		panic(fmt.Errorf("初始化消息队列错误,%s", err))
 	}
@@ -166,7 +166,7 @@ func (a *app) stop() {
 }
 
 func (a *app) GetProjectId() string {
-	return C.Project
+	return Cfg.Project
 }
 
 // WritePoints 写数据点数据
@@ -308,7 +308,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	if logger.IsLevelEnabled(logger.DebugLevel) {
 		newLogger.Debugf("保存数据,%s", string(b))
 	}
-	return a.mq.Publish(ctx, []string{"data", C.Project, tableId, p.ID}, b)
+	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, p.ID}, b)
 	//return nil
 }
 
@@ -347,7 +347,7 @@ func (a *app) LogDebug(table, id string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", C.Project, "debug", table, id}, b); err != nil {
+	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "debug", table, id}, b); err != nil {
 		return
 	}
 }
@@ -359,7 +359,7 @@ func (a *app) LogInfo(table, id string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", C.Project, "info", table, id}, b); err != nil {
+	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "info", table, id}, b); err != nil {
 		return
 	}
 }
@@ -371,7 +371,7 @@ func (a *app) LogWarn(table, id string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", C.Project, "warn", table, id}, b); err != nil {
+	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "warn", table, id}, b); err != nil {
 		return
 	}
 	return
@@ -384,7 +384,7 @@ func (a *app) LogError(table, id string, msg interface{}) {
 	if err != nil {
 		return
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", C.Project, "error", table, id}, b); err != nil {
+	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "error", table, id}, b); err != nil {
 		return
 	}
 	return

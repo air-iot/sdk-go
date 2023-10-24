@@ -132,6 +132,24 @@ func (c *Client) startSteam(ctx context.Context) {
 			}
 		}
 	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Infof("debug stream break")
+				return
+			default:
+				ctx1 := context.Background()
+				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_DEBUG))
+				newLogger.Infof("启动debug stream")
+				if err := c.DebugStream(ctx1); err != nil {
+					newLogger.Errorf("debug stream错误,%v", err)
+				}
+				time.Sleep(time.Second * time.Duration(wait))
+			}
+		}
+	}()
 }
 
 func (c *Client) Stop() {
@@ -187,6 +205,52 @@ func (c *Client) Handler(ctx context.Context) error {
 			gr.Result = b
 			if err := stream.Send(gr); err != nil {
 				logger.WithContext(ctx1).Errorf("执行(handler)结果返回到流程引擎错误,%v", err)
+			}
+		}(res)
+	}
+}
+
+func (c *Client) DebugStream(ctx context.Context) error {
+	stream, err := c.cli.DebugStream(GetGrpcContext(ctx, Cfg.Flow.Name, Cfg.Flow.Mode))
+	if err != nil {
+		return fmt.Errorf("debug stream err,%w", err)
+	}
+	defer func() {
+		if err := stream.CloseSend(); err != nil {
+			logger.Infof("debug stream close err,vs", err)
+		}
+	}()
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			return fmt.Errorf("debug stream err, %s", err)
+		}
+		go func(res *pb.DebugRequest) {
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
+			defer cancel()
+			ctx1 = logger.NewModuleContext(ctx1, MODULE_DEBUG)
+			result, err := c.flow.Debug(ctx1, c.app, &DebugRequest{
+				ProjectId: res.ProjectId,
+				FlowId:    res.FlowId,
+				ElementId: res.ElementId,
+				Config:    res.Config,
+			})
+			gr := &pb.DebugResponse{
+				ElementJob: res.ElementJob,
+			}
+			if err != nil {
+				gr.Status = false
+				gr.Info = err.Error()
+			} else {
+				gr.Status = true
+			}
+			if result == nil {
+				result = &DebugResult{Value: map[string]interface{}{}, Logs: make([]Syslog, 0)}
+			}
+			b, _ := json.Marshal(result)
+			gr.Result = b
+			if err := stream.Send(gr); err != nil {
+				logger.WithContext(ctx1).Errorf("执行(debug)结果返回到流程引擎错误,%v", err)
 			}
 		}(res)
 	}

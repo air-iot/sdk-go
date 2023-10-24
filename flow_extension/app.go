@@ -1,6 +1,5 @@
 package flow_extionsion
 
-import "C"
 import (
 	"log"
 	"os"
@@ -61,8 +60,8 @@ func NewApp() App {
 	if Cfg.Extension.Id == "" || Cfg.Extension.Name == "" {
 		panic("流程扩展服务 id 和 name 不能为空")
 	}
-	C.Log.Syslog.ServiceName = Cfg.Extension.Id
-	logger.InitLogger(C.Log)
+	Cfg.Log.Syslog.ServiceName = Cfg.Extension.Id
+	logger.InitLogger(Cfg.Log)
 	logger.Debugf("配置: %+v", *Cfg)
 	a.clean = func() {}
 	return a

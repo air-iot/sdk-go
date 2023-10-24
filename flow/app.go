@@ -1,6 +1,5 @@
 package flow
 
-import "C"
 import (
 	"log"
 	"math/rand"
@@ -64,8 +63,8 @@ func NewApp() App {
 	if Cfg.Flow.Mode == "" || Cfg.Flow.Name == "" {
 		panic("流程节点name和模式不能为空")
 	}
-	C.Log.Syslog.ServiceName = Cfg.Flow.Name
-	logger.InitLogger(C.Log)
+	Cfg.Log.Syslog.ServiceName = Cfg.Flow.Name
+	logger.InitLogger(Cfg.Log)
 	logger.Debugf("配置: %+v", *Cfg)
 	a.clean = func() {}
 	return a

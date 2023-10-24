@@ -6,8 +6,8 @@ import (
 	"github.com/air-iot/sdk-go/v4/driver/grpc"
 )
 
-// C 全局配置(需要先执行MustLoad，否则拿不到配置)
-var C = new(Config)
+// Cfg 全局配置(需要先执行MustLoad，否则拿不到配置)
+var Cfg = new(Config)
 
 type Config struct {
 	ServiceID string `json:"serviceId" yaml:"serviceId" mapstructure:"serviceId"`

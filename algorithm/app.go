@@ -3,17 +3,18 @@ package algorithm
 import (
 	"context"
 	"fmt"
-	"github.com/air-iot/logger"
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"os/signal"
 	"runtime"
 	"sync"
 	"syscall"
+
+	"github.com/air-iot/logger"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 type App interface {
@@ -84,7 +85,7 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalln("读取配置错误,", err.Error())
 	}
-	if err := viper.Unmarshal(C); err != nil {
+	if err := viper.Unmarshal(Cfg); err != nil {
 		log.Fatalln("配置解析错误: ", err.Error())
 	}
 }
@@ -93,24 +94,24 @@ func init() {
 func NewApp() App {
 	a := new(app)
 
-	if C.Algorithm.ID == "" || C.Algorithm.Name == "" {
+	if Cfg.Algorithm.ID == "" || Cfg.Algorithm.Name == "" {
 		panic("算法id或name不能为空")
 	}
-	if C.ServiceID == "" {
-		C.ServiceID = fmt.Sprintf("%s_%s", C.Algorithm.ID, uuid.New().String())
+	if Cfg.ServiceID == "" {
+		Cfg.ServiceID = fmt.Sprintf("%s_%s", Cfg.Algorithm.ID, uuid.New().String())
 	}
-	if C.AlgorithmGrpc.Health.RequestTime == 0 {
-		C.AlgorithmGrpc.Health.RequestTime = 10
+	if Cfg.AlgorithmGrpc.Health.RequestTime == 0 {
+		Cfg.AlgorithmGrpc.Health.RequestTime = 10
 	}
-	if C.AlgorithmGrpc.Health.Retry == 0 {
-		C.AlgorithmGrpc.Health.Retry = 3
+	if Cfg.AlgorithmGrpc.Health.Retry == 0 {
+		Cfg.AlgorithmGrpc.Health.Retry = 3
 	}
-	if C.AlgorithmGrpc.WaitTime == 0 {
-		C.AlgorithmGrpc.WaitTime = 5
+	if Cfg.AlgorithmGrpc.WaitTime == 0 {
+		Cfg.AlgorithmGrpc.WaitTime = 5
 	}
-	C.Log.Syslog.ServiceName = C.ServiceID
-	logger.InitLogger(C.Log)
-	logger.Debugf("配置: %+v", *C)
+	Cfg.Log.Syslog.ServiceName = Cfg.ServiceID
+	logger.InitLogger(Cfg.Log)
+	logger.Debugf("配置: %+v", *Cfg)
 
 	a.cacheValue = sync.Map{}
 	return a

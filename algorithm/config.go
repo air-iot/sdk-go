@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var C = new(Config)
+var Cfg = new(Config)
 
 type Config struct {
 	ServiceID string `json:"serviceId" yaml:"serviceId" mapstructure:"serviceId"`

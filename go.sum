@@ -39,8 +39,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/air-iot/api-client-go/v4 v4.4.8 h1:VdmhQnGE+KExKsTemXjHf77aBcfX7OdlQ7dpext3hF4=
-github.com/air-iot/api-client-go/v4 v4.4.8/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
+github.com/air-iot/api-client-go/v4 v4.4.9 h1:Jx34wLrx5xiFZnrd8fmrTqcpg17/P/fuV4SO7gPP+BU=
+github.com/air-iot/api-client-go/v4 v4.4.9/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
 github.com/air-iot/errors v0.0.4 h1:8X3xpwGheacz7B8TLbDEHbwAUrOCgnVJStF0BUCWgTQ=
 github.com/air-iot/errors v0.0.4/go.mod h1:fe8Niz29xzePyWICcC4ED5hNIlbw4RN9w0c+GdmZ5pY=
 github.com/air-iot/json v0.0.3 h1:Tfwl197VrgBI1/mRvcp4YvSaIWmqR4uILXaqIwE9kGY=

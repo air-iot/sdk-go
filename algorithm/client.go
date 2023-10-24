@@ -67,10 +67,10 @@ func (c *Client) restart() {
 }
 
 func (c *Client) connAlgorithm() error {
-	logger.Infof("连接算法管理: %+v", C.AlgorithmGrpc)
+	logger.Infof("连接算法管理: %+v", Cfg.AlgorithmGrpc)
 	conn, err := grpc.DialContext(
 		context.Background(),
-		fmt.Sprintf("%s:%d", C.AlgorithmGrpc.Host, C.AlgorithmGrpc.Port),
+		fmt.Sprintf("%s:%d", Cfg.AlgorithmGrpc.Host, Cfg.AlgorithmGrpc.Port),
 		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("grpc.Dial error: %s", err)
@@ -93,14 +93,14 @@ func (c *Client) healthCheck(ctx context.Context) {
 			default:
 				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK))
 				newLogger.Infof("健康检查开始")
-				retry := C.AlgorithmGrpc.Health.Retry
+				retry := Cfg.AlgorithmGrpc.Health.Retry
 				state := false
 				for retry >= 0 {
 					healthRes, err := c.healthRequest(ctx)
 					if err != nil {
 						newLogger.Errorf("健康检查错误,%v", err)
 						state = true
-						time.Sleep(time.Second * time.Duration(C.AlgorithmGrpc.WaitTime))
+						time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
@@ -121,16 +121,16 @@ func (c *Client) healthCheck(ctx context.Context) {
 				if state {
 					c.restart()
 				}
-				time.Sleep(time.Second * time.Duration(C.AlgorithmGrpc.WaitTime))
+				time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 			}
 		}
 	}()
 }
 
 func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, error) {
-	reqCtx, reqCancel := context.WithTimeout(ctx, time.Second*time.Duration(C.AlgorithmGrpc.Health.RequestTime))
+	reqCtx, reqCancel := context.WithTimeout(ctx, time.Second*time.Duration(Cfg.AlgorithmGrpc.Health.RequestTime))
 	defer reqCancel()
-	healthRes, err := c.cli.HealthCheck(reqCtx, &pb.HealthCheckRequest{Service: C.ServiceID})
+	healthRes, err := c.cli.HealthCheck(reqCtx, &pb.HealthCheckRequest{Service: Cfg.ServiceID})
 	return healthRes, err
 }
 
@@ -148,7 +148,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.SchemaStream(ctx1); err != nil {
 					newLogger.Errorf("schema stream错误,%v", err)
 				}
-				time.Sleep(time.Second * time.Duration(C.AlgorithmGrpc.WaitTime))
+				time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 			}
 		}
 	}()
@@ -165,14 +165,14 @@ func (c *Client) startSteam(ctx context.Context) {
 				if err := c.RunStream(context.Background()); err != nil {
 					newLogger.Errorf("run stream错误,%v", err)
 				}
-				time.Sleep(time.Second * time.Duration(C.AlgorithmGrpc.WaitTime))
+				time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 			}
 		}
 	}()
 }
 
 func (c *Client) SchemaStream(ctx context.Context) error {
-	stream, err := c.cli.SchemaStream(GetGrpcContext(ctx, C.ServiceID, C.Algorithm.ID, C.Algorithm.Name))
+	stream, err := c.cli.SchemaStream(GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Algorithm.ID, Cfg.Algorithm.Name))
 	if err != nil {
 		return fmt.Errorf("schema stream err,%w", err)
 	}
@@ -187,7 +187,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			return fmt.Errorf("schema stream err, %w", err)
 		}
 		go func(res *pb.SchemaRequest) {
-			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Algorithm.Timeout))
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Algorithm.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_SCHEMA)
 			schema, err := c.algorithmService.Schema(ctx1, c.app)
@@ -211,7 +211,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 }
 
 func (c *Client) RunStream(ctx context.Context) error {
-	stream, err := c.cli.RunStream(GetGrpcContext(ctx, C.ServiceID, C.Algorithm.ID, C.Algorithm.Name))
+	stream, err := c.cli.RunStream(GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Algorithm.ID, Cfg.Algorithm.Name))
 	if err != nil {
 		return fmt.Errorf("run stream err,%w", err)
 	}
@@ -227,7 +227,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 		}
 		go func(res *pb.RunRequest) {
 			gr := new(grpcResult)
-			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(C.Algorithm.Timeout))
+			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Algorithm.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_RUN)
 			runRes, err := c.algorithmService.Run(ctx1, c.app, res.Data)
