@@ -8,23 +8,25 @@ import (
 const (
 	Mqtt   string = "MQTT"
 	Rabbit string = "RABBIT"
+	Kafka  string = "KAFKA"
 )
 
 type Config struct {
-	Type   string         `json:"type" yaml:"type"`
-	MQTT   MQTTConfig     `json:"mqtt" yaml:"mqtt"`
-	Rabbit RabbitMQConfig `json:"rabbit" yaml:"rabbit"`
+	MQType   string
+	MQTT     MQTTConfig
+	RabbitMQ RabbitMQConfig
+	Kafka    KafkaConfig
 }
-
-type Handler func(topic string, topicSplit []string, payload []byte)
 
 // NewMQ 创建消息队列
 func NewMQ(cfg Config) (MQ, func(), error) {
-	switch strings.ToUpper(cfg.Type) {
+	switch strings.ToUpper(cfg.MQType) {
 	case Rabbit:
-		return NewRabbitClient(cfg.Rabbit)
+		return NewRabbitClient(cfg.RabbitMQ)
 	case Mqtt:
 		return NewMQTTClient(cfg.MQTT)
+	case Kafka:
+		return NewKafkaClient(cfg.Kafka)
 	default:
 		return nil, nil, fmt.Errorf("未知mq类型")
 	}

@@ -82,6 +82,7 @@ func init() {
 	viper.SetDefault("mq.rabbit.port", 5672)
 	viper.SetDefault("mq.rabbit.username", "admin")
 	viper.SetDefault("mq.rabbit.password", "public")
+	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
 	viper.SetDefault("driverGrpc.host", "driver")
 	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetDefault("driverGrpc.health.requestTime", 10)

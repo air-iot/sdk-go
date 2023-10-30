@@ -2,6 +2,8 @@ package mq
 
 import "context"
 
+type Handler func(topic string, topicSplit []string, payload []byte)
+
 // MQ is a mq interface
 type MQ interface {
 	Publish(ctx context.Context, topicParams []string, payload []byte) error

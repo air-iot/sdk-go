@@ -1,8 +1,11 @@
 mq:
-  type: mqtt
+  mqType: kafka
   mqtt:
-    host: 121.89.244.23
+    host: localhost
     port: 1883
+  kafka:
+    brokers:
+      - localhost:9092
 
 serviceId: 64f847d563d1482d33753c25
 project: 625f6dbf5433487131f09ff9
