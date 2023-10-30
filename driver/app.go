@@ -194,6 +194,9 @@ func (a *app) WritePoints(p entity.Point) error {
 		return fmt.Errorf("采集数据有空值")
 	}
 	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	if Cfg.GroupID != "" {
+		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
+	}
 	return a.writePoints(ctx, tableId, p)
 }
 
