@@ -1,5 +1,5 @@
 mq:
-  mqType: kafka
+  type: kafka
   mqtt:
     host: localhost
     port: 1883
