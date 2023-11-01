@@ -31,6 +31,7 @@ type App interface {
 	Start(Driver)
 	WritePoints(entity.Point) error
 	WriteEvent(context.Context, entity.Event) error
+	FindDevice(ctx context.Context, table, id string, ret interface{}) error
 	RunLog(context.Context, entity.Log) error
 	UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error
 	LogDebug(table, id string, msg interface{})
@@ -206,24 +207,24 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
 		if field.Value == nil {
-			newLogger.Warnf("资产数据点值为空,表:**%s**,资产:**%s**", tableId, p.ID)
+			newLogger.Warnf("设备数据点值为空,表:**%s**,设备:**%s**", tableId, p.ID)
 			continue
 		}
 		//tagByte, err := json.Marshal(field.Tag)
 		//if err != nil {
-		//	newLogger.Warnf("表 %s 资产 %s 数据点序列化错误: %v", tableId, p.ID, err)
+		//	newLogger.Warnf("表 %s 设备 %s 数据点序列化错误: %v", tableId, p.ID, err)
 		//	continue
 		//}
 		//
 		//tag := new(entity.Tag)
 		//err = json.Unmarshal(tagByte, tag)
 		//if err != nil {
-		//	newLogger.Errorf("表 %s 资产 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
+		//	newLogger.Errorf("表 %s 设备 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
 		//	continue
 		//}
 		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("资产数据点标识为空,表:**%s**,资产:**%s**", tableId, p.ID)
+			newLogger.Errorf("设备数据点标识为空,表:**%s**,设备:**%s**", tableId, p.ID)
 			continue
 		}
 		var value decimal.Decimal
@@ -258,7 +259,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		default:
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
-				newLogger.Errorf("资产数据点转类型失败,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				newLogger.Errorf("设备数据点转类型失败,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -279,7 +280,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
-				newLogger.Errorf("资产数据点转类型失败,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				newLogger.Errorf("设备数据点转类型失败,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 			} else {
 				fields[tag.ID] = valTmp
 				if save {
@@ -290,7 +291,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if rawVal != nil {
 			valTmp, err := numberx.GetValueByType("", rawVal)
 			if err != nil {
-				newLogger.Errorf("资产原始数据点转类型,表:**%s**,资产:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				newLogger.Errorf("设备原始数据点转类型,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
@@ -318,6 +319,10 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 
 func (a *app) WriteEvent(ctx context.Context, event entity.Event) error {
 	return a.cli.WriteEvent(ctx, event)
+}
+
+func (a *app) FindDevice(ctx context.Context, table, id string, ret interface{}) error {
+	return a.cli.FindDevice(ctx, table, id, ret)
 }
 
 func (a *app) RunLog(ctx context.Context, l entity.Log) error {

@@ -138,7 +138,7 @@ func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, er
 
 func (c *Client) WriteEvent(ctx context.Context, event entity.Event) error {
 	if event.Table == "" || event.ID == "" || event.EventID == "" {
-		return errors.New("表、资产或事件ID为空")
+		return errors.New("表、设备或事件ID为空")
 	}
 	b, err := json.Marshal(event)
 	if err != nil {
@@ -153,6 +153,27 @@ func (c *Client) WriteEvent(ctx context.Context, event entity.Event) error {
 	}
 	if !res.GetStatus() {
 		return fmt.Errorf(res.GetInfo())
+	}
+	return nil
+}
+
+func (c *Client) FindDevice(ctx context.Context, table, id string, ret interface{}) error {
+	if id == "" {
+		return errors.New("设备ID为空")
+	}
+	res, err := c.cli.FindTableData(ctx, &pb.TableDataRequest{
+		Service:     Cfg.ServiceID,
+		TableId:     table,
+		TableDataId: id,
+	})
+	if err != nil {
+		return err
+	}
+	if !res.GetStatus() {
+		return fmt.Errorf(res.GetInfo())
+	}
+	if err := json.Unmarshal(res.GetResult(), ret); err != nil {
+		return fmt.Errorf("解析请求结果错误, %v", err)
 	}
 	return nil
 }

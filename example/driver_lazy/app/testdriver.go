@@ -25,12 +25,14 @@ type (
 	}
 
 	table struct {
-		ID      string `json:"id"`     // 模型id，模型唯一标识
-		Device  Device `json:"device"` // 模型驱动信息
-		Devices []struct {
-			ID     string `json:"id"`     // 设备id，设备唯一标识
-			Device Device `json:"device"` // 设备驱动信息
-		} `json:"devices"` // 所属模型的设备配置信息
+		ID      string   `json:"id"`      // 模型id，模型唯一标识
+		Device  Device   `json:"device"`  // 模型驱动信息
+		Devices []device `json:"devices"` // 所属模型的设备配置信息
+	}
+
+	device struct {
+		ID     string `json:"id"`     // 设备id，设备唯一标识
+		Device Device `json:"device"` // 设备驱动信息
 	}
 
 	Device struct {
@@ -59,6 +61,7 @@ type TestDriver struct {
 	parseHandler   goja.Callable
 	commandVm      *goja.Runtime
 	commandHandler goja.Callable
+	tableTags      map[string]map[string]entity.Tag
 	tables         map[string]map[string]map[string]entity.Tag
 }
 
@@ -195,6 +198,7 @@ func (p *TestDriver) Stop(ctx context.Context, _ driver.App) error {
 		p.client.Disconnect(250)
 	}
 	p.tables = map[string]map[string]map[string]entity.Tag{}
+	p.tableTags = map[string]map[string]entity.Tag{}
 	return nil
 }
 
@@ -205,25 +209,12 @@ func (p *TestDriver) HttpProxy(ctx context.Context, _ driver.App, t string, head
 
 func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) error {
 	for _, t := range driverConfig.Tables {
-		if len(t.Devices) == 0 {
-			continue
-		}
 		tagMap := map[string]entity.Tag{}
 		for _, ta := range t.Device.Tags {
 			tagMap[ta.ID] = ta
 		}
-		dev1 := map[string]map[string]entity.Tag{}
-		p.tables[t.ID] = dev1
-		for _, device := range t.Devices {
-			devTagMap := map[string]entity.Tag{}
-			for k, v := range tagMap {
-				devTagMap[k] = v
-			}
-			for _, tagE := range device.Device.Tags {
-				devTagMap[tagE.ID] = tagE
-			}
-			dev1[device.ID] = devTagMap
-		}
+		p.tableTags[t.ID] = tagMap
+		p.tables[t.ID] = map[string]map[string]entity.Tag{}
 	}
 	p.client.Subscribe(driverConfig.Device.Settings.Topic, 0, func(client MQTT.Client, message MQTT.Message) {
 		if p.parseHandler == nil || p.parseVm == nil {
@@ -244,17 +235,33 @@ func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) er
 
 		var arr []parseResult
 		if err := json.CopyByJson(&arr, result.Export()); err != nil {
-			logger.Errorf("实例执行脚本结果解序列化错误,%s", err)
+			logger.Errorf("实例执行脚本结果解序列化错误,%v", err)
 			return
 		}
 		for _, v := range arr {
+
 			dev, ok := p.tables[v.Table]
 			if !ok {
 				continue
 			}
 			tagM, ok := dev[v.Id]
 			if !ok {
-				continue
+				var ret device
+				err := a.FindDevice(context.Background(), v.Table, v.Id, &ret)
+				if err != nil {
+					logger.Errorf("查询设备错误,%v", err)
+					continue
+				}
+				tagMap := p.tableTags[v.Table]
+
+				tagM = map[string]entity.Tag{}
+				for k, v := range tagMap {
+					tagM[k] = v
+				}
+				for _, tagE := range ret.Device.Tags {
+					tagM[tagE.ID] = tagE
+				}
+				dev[ret.ID] = tagM
 			}
 			fields := make([]entity.Field, 0)
 			for k1, v1 := range v.Fields {

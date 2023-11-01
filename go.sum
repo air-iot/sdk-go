@@ -41,8 +41,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/IBM/sarama v1.41.3 h1:MWBEJ12vHC8coMjdEXFq/6ftO6DUZnQlFYcxtOJFa7c=
 github.com/IBM/sarama v1.41.3/go.mod h1:Xxho9HkHd4K/MDUo/T/sOqwtX/17D33++E9Wib6hUdQ=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/air-iot/api-client-go/v4 v4.4.9 h1:Jx34wLrx5xiFZnrd8fmrTqcpg17/P/fuV4SO7gPP+BU=
-github.com/air-iot/api-client-go/v4 v4.4.9/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
+github.com/air-iot/api-client-go/v4 v4.4.11 h1:vy+D8ePV+r3/Far8T/CJ8f/qSD0PoeAEsPS8NozGHvA=
+github.com/air-iot/api-client-go/v4 v4.4.11/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
 github.com/air-iot/errors v0.0.4 h1:8X3xpwGheacz7B8TLbDEHbwAUrOCgnVJStF0BUCWgTQ=
 github.com/air-iot/errors v0.0.4/go.mod h1:fe8Niz29xzePyWICcC4ED5hNIlbw4RN9w0c+GdmZ5pY=
 github.com/air-iot/json v0.0.3 h1:Tfwl197VrgBI1/mRvcp4YvSaIWmqR4uILXaqIwE9kGY=
@@ -262,8 +262,8 @@ github.com/google/pprof v0.0.0-20230207041349-798e818bf904/go.mod h1:uglQLonpP8q
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/google/uuid v1.3.1 h1:KjJaJ9iWZ3jOFZIf1Lqf4laDRCasjl0BCmnEGxkdLb4=
-github.com/google/uuid v1.3.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.4.0 h1:MtMxsa51/r9yyhkyLsVeVt0B+BGQZzpQiTQ4eHZ8bc4=
+github.com/google/uuid v1.4.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8/go.mod h1:dvDLG8qkwmyD9a/MJJN3XJcT3xFxOKAvTZGvuZmac9g=

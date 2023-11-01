@@ -23,7 +23,7 @@ topic: test/gosdk/gosdk1
 
 ```javascripta
 // 脚本返回值必须为对象数组
-// id: 资产编号
+// id: 设备编号
 // time: 时间戳(毫秒)
 // fields: 数据点数据. 该字段为 JSON 对象, key 为数据点标识, value 为数据点的值
 function handler(topic, message) {
