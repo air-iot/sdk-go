@@ -3,6 +3,7 @@ package mq
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -89,7 +90,7 @@ func (k *kafka) Consume(ctx context.Context, topicParams []string, splitN int, h
 	}
 	errChan := make(chan error)
 	newCtx, newCancel := context.WithCancel(ctx)
-	kh := &kafkaHandler{topicParams: topicParams, splitN: splitN, handler: handler, k: k, errChan: errChan, cancel: newCancel}
+	kh := &kafkaHandler{topicParams: topicParams, topicString: strings.Join(topicParams, TOPICSEPWITHMQTT), splitN: splitN, handler: handler, k: k, errChan: errChan, cancel: newCancel}
 	go func() {
 		select {
 		case <-newCtx.Done():
@@ -223,6 +224,7 @@ type kafkaHandler struct {
 	handler     Handler
 	k           *kafka
 	topicParams []string
+	topicString string
 	cancel      context.CancelFunc
 	errChan     chan error
 }
@@ -253,7 +255,18 @@ func (h *kafkaHandler) handlerMessage(sess sarama.ConsumerGroupSession, _ sarama
 		sess.MarkMessage(msg, "")
 	}()
 	topic := strings.Join([]string{msg.Topic, string(msg.Key)}, TOPICSEPWITHMQTT)
-	h.handler(topic, strings.SplitN(topic, TOPICSEPWITHMQTT, h.splitN), msg.Value)
+	if h.mqttMatch(h.topicString, topic) {
+		h.handler(topic, strings.SplitN(topic, TOPICSEPWITHMQTT, h.splitN), msg.Value)
+	}
+}
+
+func (h *kafkaHandler) mqttMatch(subscription, topic string) bool {
+	subscription = strings.ReplaceAll(subscription, "+", "[^/]+")
+	subscription = strings.ReplaceAll(subscription, "#", ".*")
+	subscription = "^" + subscription + "$"
+
+	match, _ := regexp.MatchString(subscription, topic)
+	return match
 }
 
 func (h *kafkaHandler) consume(ctx context.Context) error {
