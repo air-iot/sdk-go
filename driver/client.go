@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/air-iot/json"
@@ -26,12 +27,16 @@ type Client struct {
 	clean          func()
 	cacheConfig    sync.Map
 	cacheConfigNum sync.Map
+	streamCount    int32
 	//healthTime        time.Time
 }
+
+const totalStream = 7
 
 func (c *Client) Start(app App, driver Driver) *Client {
 	c.app = app
 	c.driver = driver
+	c.streamCount = 0
 	c.start()
 	return c
 }
@@ -83,13 +88,15 @@ func (c *Client) connDriver() error {
 func (c *Client) healthCheck(ctx context.Context) {
 	logger.Infof("健康检查启动")
 	go func() {
+		waitTime := time.Second * time.Duration(Cfg.DriverGrpc.WaitTime)
+		nextTime := time.Now().Local().Add(time.Duration(Cfg.DriverGrpc.Health.Retry) * waitTime)
 		for {
 			select {
 			case <-ctx.Done():
 				logger.Infof("健康检查停止")
 				return
 			default:
-				ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_HEALTHCHECK)
+				ctx1 := logger.NewModuleContext(ctx, entity.MODULE_HEALTHCHECK)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -97,12 +104,13 @@ func (c *Client) healthCheck(ctx context.Context) {
 				newLogger.Debugf("健康检查开始")
 				retry := Cfg.DriverGrpc.Health.Retry
 				state := false
+
 				for retry >= 0 {
 					healthRes, err := c.healthRequest(ctx)
 					if err != nil {
 						newLogger.Errorf("健康检查错误,%s", err.Error())
 						state = true
-						time.Sleep(time.Second * time.Duration(Cfg.DriverGrpc.WaitTime))
+						time.Sleep(waitTime)
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
@@ -120,10 +128,19 @@ func (c *Client) healthCheck(ctx context.Context) {
 					}
 					retry--
 				}
+
 				if state {
 					c.restart()
+				} else if time.Now().Local().After(nextTime) {
+					nextTime = time.Now().Local().Add(time.Duration(Cfg.DriverGrpc.Health.Retry) * waitTime)
+					getV := atomic.LoadInt32(&c.streamCount)
+					newLogger.Debugf("健康检查,找到流数量为:%d", getV)
+					if getV < totalStream {
+						newLogger.Errorf("健康检查异常,找到流数量不匹配,应为:%d,实际为:%d", totalStream, getV)
+						c.restart()
+					}
 				}
-				time.Sleep(time.Second * time.Duration(Cfg.DriverGrpc.WaitTime))
+				time.Sleep(waitTime)
 			}
 		}
 	}()
@@ -231,7 +248,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动schema stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -251,7 +268,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动start stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -271,7 +288,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动run stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -291,7 +308,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动writeTag stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -311,7 +328,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动batchRun stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -331,7 +348,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动debug stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -352,7 +369,7 @@ func (c *Client) startSteam(ctx context.Context) {
 				logger.Infof("关闭驱动http proxy stream")
 				return
 			default:
-				ctx1 := context.Background()
+				ctx1 := context.WithoutCancel(ctx)
 				if Cfg.GroupID != "" {
 					ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 				}
@@ -373,10 +390,13 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 		return fmt.Errorf("schema stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("schema stream close err,%v", err)
 		}
 	}()
+	logger.Infof("schema stream close err,%v", err)
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -415,10 +435,12 @@ func (c *Client) StartStream(ctx context.Context) error {
 		return fmt.Errorf("start stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("start stream close err,%v", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -500,10 +522,12 @@ func (c *Client) RunStream(ctx context.Context) error {
 		return fmt.Errorf("run stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("run stream close err,%v", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -547,10 +571,12 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 		return fmt.Errorf("writeTag stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("writeTag stream close err,%v", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -594,10 +620,12 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 		return fmt.Errorf("batchRun stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("batchRun stream close err,%v", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -641,10 +669,12 @@ func (c *Client) DebugStream(ctx context.Context) error {
 		return fmt.Errorf("debug stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("debug stream close err,vs", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -683,10 +713,12 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 		return fmt.Errorf("http proxy stream err,%w", err)
 	}
 	defer func() {
+		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			logger.Infof("http proxy stream close err,%v", err)
 		}
 	}()
+	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
