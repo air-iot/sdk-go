@@ -20,6 +20,7 @@ import (
 )
 
 type Client struct {
+	lock           sync.RWMutex
 	conn           *grpc.ClientConn
 	cli            pb.DriverServiceClient
 	app            App
@@ -37,7 +38,7 @@ func (c *Client) Start(app App, driver Driver) *Client {
 	c.app = app
 	c.driver = driver
 	c.streamCount = 0
-	c.start()
+	c.restart()
 	return c
 }
 
@@ -66,6 +67,8 @@ func (c *Client) Stop() {
 
 func (c *Client) restart() {
 	logger.Infof("重启驱动管理连接")
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.Stop()
 	c.start()
 }
@@ -392,10 +395,10 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("schema stream close err,%v", err)
+			logger.Errorf("schema stream close err,%v", err)
 		}
 	}()
-	logger.Infof("schema stream close err,%v", err)
+	logger.Infof("schema stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -440,6 +443,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 			logger.Infof("start stream close err,%v", err)
 		}
 	}()
+	logger.Infof("start stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -527,6 +531,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 			logger.Infof("run stream close err,%v", err)
 		}
 	}()
+	logger.Infof("run stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -576,6 +581,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			logger.Infof("writeTag stream close err,%v", err)
 		}
 	}()
+	logger.Infof("writeTag stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -625,6 +631,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			logger.Infof("batchRun stream close err,%v", err)
 		}
 	}()
+	logger.Infof("batchRun stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -674,6 +681,7 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			logger.Infof("debug stream close err,vs", err)
 		}
 	}()
+	logger.Infof("debug stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
@@ -718,6 +726,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			logger.Infof("http proxy stream close err,%v", err)
 		}
 	}()
+	logger.Infof("http proxy stream conn success")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
