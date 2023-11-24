@@ -3,6 +3,7 @@ package mq
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -12,10 +13,11 @@ const (
 )
 
 type Config struct {
-	Type   string         `json:"type" yaml:"type"`
-	MQTT   MQTTConfig     `json:"mqtt" yaml:"mqtt"`
-	Rabbit RabbitMQConfig `json:"rabbit" yaml:"rabbit"`
-	Kafka  KafkaConfig    `json:"kafka" yaml:"kafka"`
+	Type    string         `json:"type" yaml:"type"`
+	Timeout time.Duration  `json:"timeout" yaml:"timeout"`
+	MQTT    MQTTConfig     `json:"mqtt" yaml:"mqtt"`
+	Rabbit  RabbitMQConfig `json:"rabbit" yaml:"rabbit"`
+	Kafka   KafkaConfig    `json:"kafka" yaml:"kafka"`
 }
 
 // NewMQ 创建消息队列

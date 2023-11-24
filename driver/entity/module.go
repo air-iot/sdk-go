@@ -10,4 +10,5 @@ const (
 	MODULE_BATCHRUN           = "批量执行指令"
 	MODULE_DEBUG              = "调试"
 	MODULE_HTTPPROXY          = "Http代理"
+	MODULE_WARN               = "写报警"
 )

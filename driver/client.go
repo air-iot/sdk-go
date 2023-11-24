@@ -440,7 +440,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("start stream close err,%v", err)
+			logger.Errorf("start stream close err,%v", err)
 		}
 	}()
 	logger.Infof("start stream conn success")
@@ -528,7 +528,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("run stream close err,%v", err)
+			logger.Errorf("run stream close err,%v", err)
 		}
 	}()
 	logger.Infof("run stream conn success")
@@ -578,7 +578,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("writeTag stream close err,%v", err)
+			logger.Errorf("writeTag stream close err,%v", err)
 		}
 	}()
 	logger.Infof("writeTag stream conn success")
@@ -628,7 +628,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("batchRun stream close err,%v", err)
+			logger.Errorf("batchRun stream close err,%v", err)
 		}
 	}()
 	logger.Infof("batchRun stream conn success")
@@ -678,7 +678,7 @@ func (c *Client) DebugStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("debug stream close err,vs", err)
+			logger.Errorf("debug stream close err,%v", err)
 		}
 	}()
 	logger.Infof("debug stream conn success")
@@ -723,7 +723,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("http proxy stream close err,%v", err)
+			logger.Errorf("http proxy stream close err,%v", err)
 		}
 	}()
 	logger.Infof("http proxy stream conn success")

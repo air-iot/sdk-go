@@ -44,15 +44,15 @@ func TestApp_WritePoints(t *testing.T) {
 		},
 	}
 
-	app := NewApp()
-	err := app.WritePoints(point)
+	a := NewApp()
+	err := a.WritePoints(point)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func Test_wp(t *testing.T) {
-	app := new(app)
+	a := new(app)
 	var minValue float64 = 10
 	var MaxValue float64 = 100
 	//var MinRaw float64 = 200
@@ -84,7 +84,7 @@ func Test_wp(t *testing.T) {
 			},
 		},
 	}
-	err := app.writePoints(context.Background(), "test", point)
+	err := a.writePoints(context.Background(), "test", point)
 	if err != nil {
 		t.Fatal(err)
 	}

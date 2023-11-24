@@ -31,6 +31,8 @@ type App interface {
 	Start(Driver)
 	WritePoints(entity.Point) error
 	WriteEvent(context.Context, entity.Event) error
+	WriteWarning(entity.Warn) error
+	WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery) error
 	FindDevice(ctx context.Context, table, id string, ret interface{}) error
 	RunLog(context.Context, entity.Log) error
 	UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error
@@ -72,6 +74,7 @@ func init() {
 	viper.SetDefault("log.format", "json")
 	viper.SetDefault("log.output", "stdout")
 	viper.SetDefault("mq.type", "mqtt")
+	viper.SetDefault("mq.timeout", "60s")
 	viper.SetDefault("mq.mqtt.host", "mqtt")
 	viper.SetDefault("mq.mqtt.port", 1883)
 	viper.SetDefault("mq.mqtt.username", "admin")
@@ -173,7 +176,9 @@ func (a *app) GetProjectId() string {
 
 // WritePoints 写数据点数据
 func (a *app) WritePoints(p entity.Point) error {
-	ctx := logger.NewModuleContext(context.Background(), entity.MODULE_WRITEPOINT)
+	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancel()
+	ctx = logger.NewModuleContext(ctx, entity.MODULE_WRITEPOINT)
 	tableId := p.Table
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
@@ -190,7 +195,7 @@ func (a *app) WritePoints(p entity.Point) error {
 		tableId = tableIdI.(string)
 	}
 	if p.ID == "" {
-		return fmt.Errorf("记录id为空")
+		return fmt.Errorf("设备id为空")
 	}
 	if p.Fields == nil || len(p.Fields) == 0 {
 		return fmt.Errorf("采集数据有空值")
@@ -315,6 +320,99 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	}
 	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, p.ID}, b)
 	//return nil
+}
+
+func (a *app) WriteWarning(w entity.Warn) error {
+	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancel()
+	ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
+	tableId := w.TableId
+	if tableId == "" {
+		tableIdI, ok := a.cli.cacheConfig.Load(w.TableDataId)
+		if !ok {
+			return fmt.Errorf("传入表id为空且未在配置中找到")
+		}
+		devI, ok := a.cli.cacheConfigNum.Load(w.TableDataId)
+		if ok {
+			devM, _ := devI.(map[string]interface{})
+			if len(devM) >= 2 {
+				return fmt.Errorf("传入表id为空且在配置中找到多个表id")
+			}
+		}
+		tableId = tableIdI.(string)
+	}
+	w.TableId = tableId
+	if w.TableDataId == "" {
+		return fmt.Errorf("设备id为空")
+	}
+	if tableId == "" {
+		return fmt.Errorf("表id为空")
+	}
+	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	if Cfg.GroupID != "" {
+		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
+	}
+	if w.Time == nil {
+		n := time.Now().Local()
+		w.Time = &n
+	}
+
+	wt := entity.WarnSend{
+		ID:          w.ID,
+		Table:       entity.Table{ID: tableId},
+		TableData:   entity.TableData{ID: w.TableDataId},
+		Level:       w.Level,
+		Ruleid:      w.Ruleid,
+		Fields:      w.Fields,
+		WarningType: w.WarningType,
+		Processed:   w.Processed,
+		Time:        w.Time.Format(time.RFC3339),
+		Alert:       w.Alert,
+		Status:      w.Status,
+		Handle:      w.Handle,
+		Desc:        w.Desc,
+	}
+	b, err := json.Marshal(wt)
+	if err != nil {
+		return err
+	}
+	return a.mq.Publish(ctx, []string{"warningStorage", Cfg.Project, tableId, w.TableDataId}, b)
+}
+
+// WriteWarningRecovery 报警恢复
+func (a *app) WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery) error {
+	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancel()
+	ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
+	if tableId == "" {
+		return fmt.Errorf("表id为空")
+	}
+	if dataId == "" {
+		return fmt.Errorf("设备id为空")
+	}
+	if len(w.ID) == 0 {
+		return fmt.Errorf("报警id为空")
+	}
+	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	if Cfg.GroupID != "" {
+		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
+	}
+	if w.Data.Time == nil {
+		n := time.Now().Local()
+		w.Data.Time = &n
+	}
+	wt := entity.WarnRecoverySend{
+		ID: w.ID,
+		Data: entity.WarnRecoveryDataSend{
+			Time:   w.Data.Time.Format(time.RFC3339),
+			Fields: w.Data.Fields,
+		},
+	}
+	b, err := json.Marshal(wt)
+	if err != nil {
+		return err
+	}
+	return a.mq.Publish(ctx, []string{"warningUpdate", Cfg.Project, tableId, dataId}, b)
 }
 
 func (a *app) WriteEvent(ctx context.Context, event entity.Event) error {

@@ -80,6 +80,34 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 	if err := p.Stop(ctx, a); err != nil {
 		return err
 	}
+	//n := time.Now().Local()
+	//if err := a.WriteWarning(entity.Warn{
+	//	ID:          "test1",
+	//	TableId:     "modbusrtu",
+	//	TableDataId: "mr1",
+	//	Level:       "中",
+	//	Ruleid:      "0049e98e-cbdd-4a06-b0c7-0d1474f3789b",
+	//	Fields:      []entity.WarnTag{{Tag: entity.Tag{ID: "p1"}, Value: 1}},
+	//	WarningType: []string{"1z875xn8-2237-4544-7770-4kix918vb342"},
+	//	Processed:   entity.PROCESSED,
+	//	Time:        &n,
+	//	Alert:       false,
+	//	Status:      entity.UNCONFIRMED,
+	//	Handle:      false,
+	//	Desc:        "测试报警",
+	//}); err != nil {
+	//	return err
+	//}
+	//if err := a.WriteWarningRecovery("modbusrtu", "mr1", entity.WarnRecovery{
+	//	ID: []string{"test1"},
+	//	Data: entity.WarnRecoveryData{
+	//		Time:   &n,
+	//		Fields: []entity.WarnTag{{Tag: entity.Tag{ID: "p1"}, Value: 1}},
+	//	},
+	//}); err != nil {
+	//	return err
+	//}
+	//return nil
 	var config DriverInstanceConfig
 	err := json.Unmarshal(bts, &config)
 	if err != nil {
