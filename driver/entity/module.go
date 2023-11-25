@@ -1,7 +1,8 @@
 package entity
 
 const (
-	MODULE_WRITEPOINT  string = "写数据点值"
+	MODULE_STARTDRIVER string = "运行驱动"
+	MODULE_WRITEPOINT         = "写数据点值"
 	MODULE_HEALTHCHECK        = "健康检查"
 	MODULE_SCHEMA             = "Schema"
 	MODULE_START              = "启动驱动"

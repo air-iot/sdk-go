@@ -89,9 +89,10 @@ func init() {
 	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
 	viper.SetDefault("driverGrpc.host", "driver")
 	viper.SetDefault("driverGrpc.port", 9224)
-	viper.SetDefault("driverGrpc.health.requestTime", 10)
-	viper.SetDefault("driverGrpc.waitTime", 5)
-	viper.SetDefault("driver.timeout", 600)
+	viper.SetDefault("driverGrpc.health.requestTime", "10s")
+	viper.SetDefault("driverGrpc.health.retry", 3)
+	viper.SetDefault("driverGrpc.waitTime", "5s")
+	viper.SetDefault("driver.timeout", "600s")
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
@@ -118,16 +119,6 @@ func NewApp() App {
 	if Cfg.Driver.ID == "" || Cfg.Driver.Name == "" {
 		panic("驱动id或name不能为空")
 	}
-	if Cfg.DriverGrpc.Health.RequestTime == 0 {
-		Cfg.DriverGrpc.Health.RequestTime = 10
-	}
-	if Cfg.DriverGrpc.Health.Retry == 0 {
-		Cfg.DriverGrpc.Health.Retry = 3
-	}
-	if Cfg.DriverGrpc.WaitTime == 0 {
-		Cfg.DriverGrpc.WaitTime = 5
-	}
-
 	Cfg.Log.Syslog.ProjectId = Cfg.Project
 	Cfg.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", Cfg.Project, Cfg.ServiceID, Cfg.Driver.ID)
 	logger.InitLogger(Cfg.Log)

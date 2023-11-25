@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"encoding/hex"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 )
@@ -11,10 +12,10 @@ type Config struct {
 	Host   string `json:"host" yaml:"host"`
 	Port   int    `json:"port" yaml:"port"`
 	Health struct {
-		RequestTime int `json:"requestTime" yaml:"requestTime"`
-		Retry       int `json:"retry" yaml:"retry"`
+		RequestTime time.Duration `json:"requestTime" yaml:"requestTime"`
+		Retry       int           `json:"retry" yaml:"retry"`
 	} `json:"health" yaml:"health"`
-	WaitTime int `json:"waitTime" yaml:"waitTime"`
+	WaitTime time.Duration `json:"waitTime" yaml:"waitTime"`
 }
 
 func GetGrpcContext(ctx context.Context, serviceId, projectId, driverId, driverName string) context.Context {
