@@ -105,7 +105,7 @@ func (c *Client) close(ctx context.Context) {
 func (c *Client) connDriver(ctx context.Context) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	ctx, cancel := context.WithTimeout(ctx, Cfg.Driver.Timeout)
+	ctx, cancel := context.WithTimeout(ctx, Cfg.DriverGrpc.Timeout)
 	defer cancel()
 	logger.WithContext(ctx).Infof("连接driver: %+v", Cfg.DriverGrpc)
 	conn, err := grpc.DialContext(
@@ -148,7 +148,6 @@ func (c *Client) healthCheck(ctx context.Context) {
 					state = false
 					if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
 						newLogger.Debugf("健康检查正常")
-						fmt.Println("健康检查正常")
 						if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 							for _, e := range healthRes.Errors {
 								newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
@@ -169,7 +168,6 @@ func (c *Client) healthCheck(ctx context.Context) {
 				nextTime = time.Now().Local().Add(time.Duration(Cfg.DriverGrpc.Health.Retry) * waitTime)
 				getV := atomic.LoadInt32(&c.streamCount)
 				newLogger.Debugf("健康检查,找到流数量为:%d", getV)
-				fmt.Printf("健康检查,找到流数量为:%d \n", getV)
 				if getV < totalStream {
 					newLogger.Errorf("健康检查异常,找到流数量不匹配,应为:%d,实际为:%d", totalStream, getV)
 					return
@@ -445,7 +443,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			return fmt.Errorf("schema stream err, %w", err)
 		}
 		go func(res *pb.SchemaRequest) {
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_SCHEMA)
 			if Cfg.GroupID != "" {
@@ -540,7 +538,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 			}
 		}
 		go func(res *pb.StartRequest) {
-			newCtx, cancel := context.WithTimeout(ctx1, Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(ctx1, Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			if err := c.driver.Start(newCtx, c.app, res.Config); err != nil {
 				startRes.Error = err.Error()
@@ -578,7 +576,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 			return fmt.Errorf("run stream err, %w", err)
 		}
 		go func(res *pb.RunRequest) {
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_RUN)
 			if Cfg.GroupID != "" {
@@ -628,7 +626,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			return fmt.Errorf("writeTag stream err, %w", err)
 		}
 		go func(res *pb.RunRequest) {
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_WRITETAG)
 			if Cfg.GroupID != "" {
@@ -678,7 +676,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			return fmt.Errorf("batchRun stream err, %w", err)
 		}
 		go func(res *pb.BatchRunRequest) {
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_BATCHRUN)
 			if Cfg.GroupID != "" {
@@ -729,7 +727,7 @@ func (c *Client) DebugStream(ctx context.Context) error {
 		}
 		go func(res *pb.Debug) {
 			gr := new(entity.GrpcResult)
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_DEBUG)
 			if Cfg.GroupID != "" {
@@ -775,7 +773,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 		go func(res *pb.HttpProxyRequest) {
 			gr := new(entity.GrpcResult)
 			var header http.Header
-			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.Driver.Timeout)
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_HTTPPROXY)
 			if Cfg.GroupID != "" {

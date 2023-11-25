@@ -16,6 +16,7 @@ type Config struct {
 		Retry       int           `json:"retry" yaml:"retry"`
 	} `json:"health" yaml:"health"`
 	WaitTime time.Duration `json:"waitTime" yaml:"waitTime"`
+	Timeout  time.Duration `json:"timeout" yaml:"timeout"`
 }
 
 func GetGrpcContext(ctx context.Context, serviceId, projectId, driverId, driverName string) context.Context {
