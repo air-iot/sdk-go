@@ -41,8 +41,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/IBM/sarama v1.41.3 h1:MWBEJ12vHC8coMjdEXFq/6ftO6DUZnQlFYcxtOJFa7c=
 github.com/IBM/sarama v1.41.3/go.mod h1:Xxho9HkHd4K/MDUo/T/sOqwtX/17D33++E9Wib6hUdQ=
 github.com/StackExchange/wmi v1.2.1/go.mod h1:rcmrprowKIVzvc+NUiLncP2uuArMWLCbu9SBzvHz7e8=
-github.com/air-iot/api-client-go/v4 v4.4.11 h1:vy+D8ePV+r3/Far8T/CJ8f/qSD0PoeAEsPS8NozGHvA=
-github.com/air-iot/api-client-go/v4 v4.4.11/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
+github.com/air-iot/api-client-go/v4 v4.5.0 h1:uPOmXfM/9pIaaMOhnQIc+8xDOq88W6tB2Ty9JgNngW4=
+github.com/air-iot/api-client-go/v4 v4.5.0/go.mod h1:6RsudUBfvsyE26jObpG6Zt2fQeeSP0WO6aitiuAbrz4=
 github.com/air-iot/errors v0.0.4 h1:8X3xpwGheacz7B8TLbDEHbwAUrOCgnVJStF0BUCWgTQ=
 github.com/air-iot/errors v0.0.4/go.mod h1:fe8Niz29xzePyWICcC4ED5hNIlbw4RN9w0c+GdmZ5pY=
 github.com/air-iot/json v0.0.3 h1:Tfwl197VrgBI1/mRvcp4YvSaIWmqR4uILXaqIwE9kGY=

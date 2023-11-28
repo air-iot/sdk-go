@@ -182,7 +182,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, error) {
 	reqCtx, reqCancel := context.WithTimeout(ctx, Cfg.DriverGrpc.Health.RequestTime)
 	defer reqCancel()
-	healthRes, err := c.cli.HealthCheck(reqCtx, &pb.HealthCheckRequest{Service: Cfg.ServiceID})
+	healthRes, err := c.cli.HealthCheck(reqCtx, &pb.HealthCheckRequest{Service: Cfg.ServiceID, ProjectId: Cfg.Project, DriverId: Cfg.Driver.ID})
 	return healthRes, err
 }
 
@@ -212,6 +212,8 @@ func (c *Client) FindDevice(ctx context.Context, table, id string, ret interface
 		return errors.New("设备ID为空")
 	}
 	res, err := c.cli.FindTableData(ctx, &pb.TableDataRequest{
+		ProjectId:   Cfg.Project,
+		DriverId:    Cfg.Driver.ID,
 		Service:     Cfg.ServiceID,
 		TableId:     table,
 		TableDataId: id,
