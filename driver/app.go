@@ -229,13 +229,15 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		switch valueTmp := field.Value.(type) {
 		case float32:
 			if math.IsNaN(float64(valueTmp)) || math.IsInf(float64(valueTmp), 0) {
-				fields[tag.ID] = valueTmp
+				//fields[tag.ID] = valueTmp
+				newLogger.Errorf("设备数据点值不合法,表:**%s**,设备:**%s**,数据点:%s,值:%f", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat32(valueTmp)
 		case float64:
 			if math.IsNaN(valueTmp) || math.IsInf(valueTmp, 0) {
-				fields[tag.ID] = valueTmp
+				//fields[tag.ID] = valueTmp
+				newLogger.Errorf("设备数据点值不合法,表:**%s**,设备:**%s**,数据点:%s,值:%f", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat(valueTmp)
