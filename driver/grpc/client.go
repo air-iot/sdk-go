@@ -17,6 +17,7 @@ type Config struct {
 	} `json:"health" yaml:"health"`
 	WaitTime time.Duration `json:"waitTime" yaml:"waitTime"`
 	Timeout  time.Duration `json:"timeout" yaml:"timeout"`
+	Limit    int           `json:"limit" yaml:"limit"`
 }
 
 func GetGrpcContext(ctx context.Context, serviceId, projectId, driverId, driverName string) context.Context {

@@ -111,7 +111,9 @@ func (c *Client) connDriver(ctx context.Context) error {
 	conn, err := grpc.DialContext(
 		ctx,
 		fmt.Sprintf("%s:%d", Cfg.DriverGrpc.Host, Cfg.DriverGrpc.Port),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(Cfg.DriverGrpc.Limit*1024*1024), grpc.MaxCallSendMsgSize(Cfg.DriverGrpc.Limit*1024*1024)),
+	)
 	if err != nil {
 		return fmt.Errorf("grpc.Dial error: %s", err)
 	}

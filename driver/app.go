@@ -94,6 +94,7 @@ func init() {
 	viper.SetDefault("driverGrpc.health.retry", 3)
 	viper.SetDefault("driverGrpc.waitTime", "5s")
 	viper.SetDefault("driverGrpc.timeout", "600s")
+	viper.SetDefault("driverGrpc.limit", 100)
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
