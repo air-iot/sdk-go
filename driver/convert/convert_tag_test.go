@@ -82,3 +82,22 @@ func Test_ConvertRange4(t *testing.T) {
 		t.Log(*gotRawValue)
 	}
 }
+
+func Test_ConvertRange5(t *testing.T) {
+	rangeStr := `{"active":"boundary","maxValue":9999,"minValue":0}`
+	var tagRange entity.Range
+
+	if err := json.Unmarshal([]byte(rangeStr), &tagRange); err != nil {
+		t.Fatal(err)
+	}
+	preVal := decimal.NewFromInt(8)
+	raw := decimal.NewFromFloat(12000)
+	gotNewValue, gotRawValue, _, gotIsSave := ConvertRange(&tagRange, &preVal, &raw)
+	t.Logf("new %+v , old %+v ,%t", gotNewValue, gotRawValue, gotIsSave)
+	if gotNewValue != nil {
+		t.Log(*gotNewValue)
+	}
+	if gotRawValue != nil {
+		t.Log(*gotRawValue)
+	}
+}
