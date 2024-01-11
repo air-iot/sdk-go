@@ -106,7 +106,6 @@ func init() {
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalln("读取配置错误,", err.Error())
 	}
-
 	if err := viper.Unmarshal(Cfg); err != nil {
 		log.Fatalln("配置解析错误: ", err.Error())
 	}

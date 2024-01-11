@@ -582,7 +582,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 		go func(res *pb.RunRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
-			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_RUN)
+			newCtx = logger.NewTDMContext(newCtx, res.TableId, res.Id, entity.MODULE_RUN)
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
@@ -632,7 +632,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 		go func(res *pb.RunRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
-			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_WRITETAG)
+			newCtx = logger.NewTDMContext(newCtx, res.TableId, res.Id, entity.MODULE_WRITETAG)
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
@@ -686,6 +686,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			newCtx = logger.NewExtraKeyContext(newCtx, res.TableId)
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(newCtx, c.app, &entity.BatchCommand{
 				Table:    res.TableId,
