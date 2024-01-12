@@ -9,13 +9,12 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type App interface {
 	Start(service Service)
-	GetLogger() *logrus.Logger
+	//GetLogger() *logrus.Logger
 	GetHttpServer() *gin.Engine
 }
 
@@ -41,7 +40,6 @@ func init() {
 
 // 任务服务
 type app struct {
-	*logrus.Logger
 	*gin.Engine
 	srv *http.Server
 }
@@ -73,26 +71,21 @@ func (p *app) Start(service Service) {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
-	p.Logger.Infoln("启动服务")
+	log.Println("启动服务")
 	sig := <-ch
 	close(ch)
 	if err := service.Stop(p); err != nil {
-		p.Logger.Errorln("任务停止,", err.Error())
+		log.Println("任务停止,", err.Error())
 	}
 	p.stop()
-	p.Logger.Infoln("关闭服务,", sig)
+	log.Println("关闭服务,", sig)
 	os.Exit(0)
 }
 
 func (p *app) stop() {
 	if err := p.srv.Close(); err != nil {
-		p.Logger.Errorln("关闭http服务,", err)
+		log.Println("关闭http服务,", err)
 	}
-}
-
-// GetLogger 获取日志
-func (p *app) GetLogger() *logrus.Logger {
-	return p.Logger
 }
 
 func (p *app) GetHttpServer() *gin.Engine {

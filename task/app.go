@@ -14,13 +14,11 @@ import (
 	"syscall"
 
 	"github.com/robfig/cron/v3"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 type App interface {
 	Start(task Task)
-	GetLogger() *logrus.Logger
 	GetCron() *cron.Cron
 }
 
@@ -44,7 +42,7 @@ func init() {
 
 // 任务服务
 type app struct {
-	*logrus.Logger
+	//*logrus.Logger
 	*cron.Cron
 }
 
@@ -65,21 +63,21 @@ func (p *app) Start(task Task) {
 		panic(err)
 	}
 	p.Cron.Start()
-	p.Logger.Infoln("启动服务")
+	//p.Logger.Infoln("启动服务")
 	sig := <-ch
 	close(ch)
 	if err := task.Stop(p); err != nil {
-		p.Logger.Errorln("任务停止,", err.Error())
+		log.Println("任务停止,", err.Error())
 	}
 	p.Cron.Stop()
-	p.Logger.Infoln("关闭服务,", sig)
+	log.Println("关闭服务,", sig)
 	os.Exit(0)
 }
 
 // GetLogger 获取日志
-func (p *app) GetLogger() *logrus.Logger {
-	return p.Logger
-}
+//func (p *app) GetLogger() *logrus.Logger {
+//	return p.Logger
+//}
 
 func (p *app) GetCron() *cron.Cron {
 	return p.Cron
