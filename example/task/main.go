@@ -9,6 +9,7 @@
 package main
 
 import (
+	"log"
 	"math/rand"
 	"time"
 
@@ -24,9 +25,8 @@ type TestTask struct {
 // Start 驱动执行，实现Task的Start函数
 func (p *TestTask) Start(a task.App) error {
 	p.taskIds = make(map[cron.EntryID]int)
-	a.GetLogger().Debugln("start")
 	id, _ := a.GetCron().AddFunc("* * * * * *", func() {
-		a.GetLogger().Debugln(rand.Int())
+		log.Println(rand.Int())
 	})
 	p.taskIds[id] = 0
 	go func() {
@@ -35,7 +35,7 @@ func (p *TestTask) Start(a task.App) error {
 			a.GetCron().Remove(id)
 		}
 		id, _ := a.GetCron().AddFunc("* * * * * *", func() {
-			a.GetLogger().Debugln(rand.Float64())
+			log.Println(rand.Float64())
 		})
 		p.taskIds[id] = 0
 	}()
@@ -43,7 +43,7 @@ func (p *TestTask) Start(a task.App) error {
 }
 
 func (p *TestTask) Stop(a task.App) error {
-	a.GetLogger().Debugln("stop")
+	log.Println("stop")
 	return nil
 }
 

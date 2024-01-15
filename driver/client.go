@@ -2,7 +2,6 @@ package driver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -59,7 +58,7 @@ func (c *Client) start() {
 			default:
 				waitTime := Cfg.DriverGrpc.WaitTime
 				if err := c.run(ctx); err != nil {
-					logger.WithContext(ctx).Errorf("连接:%v", err)
+					logger.WithContext(ctx).Errorln(err)
 				}
 				time.Sleep(waitTime)
 			}
@@ -97,7 +96,7 @@ func (c *Client) close(ctx context.Context) {
 	defer c.lock.Unlock()
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
-			logger.WithContext(ctx).Errorf("关闭grpc错误:%v", err)
+			logger.WithContext(ctx).Errorf("关闭grpc连接. %v", err)
 		}
 	}
 }
@@ -107,7 +106,7 @@ func (c *Client) connDriver(ctx context.Context) error {
 	defer c.lock.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, Cfg.DriverGrpc.Timeout)
 	defer cancel()
-	logger.WithContext(ctx).Infof("连接driver: %+v", Cfg.DriverGrpc)
+	logger.WithContext(ctx).Infof("连接driver: 配置=%+v", Cfg.DriverGrpc)
 	conn, err := grpc.DialContext(
 		ctx,
 		fmt.Sprintf("%s:%d", Cfg.DriverGrpc.Host, Cfg.DriverGrpc.Port),
@@ -115,7 +114,7 @@ func (c *Client) connDriver(ctx context.Context) error {
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(Cfg.DriverGrpc.Limit*1024*1024), grpc.MaxCallSendMsgSize(Cfg.DriverGrpc.Limit*1024*1024)),
 	)
 	if err != nil {
-		return fmt.Errorf("grpc.Dial error: %s", err)
+		return fmt.Errorf("grpc.Dial error: %w", err)
 	}
 	c.conn = conn
 	c.cli = pb.NewDriverServiceClient(conn)
@@ -123,12 +122,12 @@ func (c *Client) connDriver(ctx context.Context) error {
 }
 
 func (c *Client) healthCheck(ctx context.Context) {
-	logger.WithContext(ctx).Infof("健康检查启动")
+	logger.WithContext(ctx).Infof("健康检查: 启动")
 	nextTime := time.Now().Local().Add(Cfg.DriverGrpc.WaitTime * time.Duration(Cfg.DriverGrpc.Health.Retry))
 	for {
 		select {
 		case <-ctx.Done():
-			logger.WithContext(ctx).Infof("健康检查停止")
+			logger.WithContext(ctx).Infof("健康检查: 停止")
 			return
 		default:
 			waitTime := Cfg.DriverGrpc.WaitTime
@@ -137,26 +136,27 @@ func (c *Client) healthCheck(ctx context.Context) {
 				ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 			}
 			newLogger := logger.WithContext(ctx1)
-			newLogger.Debugf("健康检查开始")
+			newLogger.Debugf("健康检查: 开始")
 			retry := Cfg.DriverGrpc.Health.Retry
 			state := false
 			for retry >= 0 {
 				healthRes, err := c.healthRequest(ctx)
 				if err != nil {
-					newLogger.Errorf("健康检查第 %d 次错误,%v", Cfg.DriverGrpc.Health.Retry-retry+1, err)
+					errCtx := logger.NewErrorContext(ctx1, err)
+					logger.WithContext(errCtx).Errorf("健康检查: 健康检查第 %d 次错误", Cfg.DriverGrpc.Health.Retry-retry+1)
 					state = true
 					time.Sleep(waitTime)
 				} else {
 					state = false
 					if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
-						newLogger.Debugf("健康检查正常")
+						newLogger.Debugf("健康检查: 正常")
 						if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 							for _, e := range healthRes.Errors {
-								newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+								newLogger.Errorf("健康检查: code=%s,错误=%s", e.Code.String(), e.Message)
 							}
 						}
 					} else if healthRes.GetStatus() == pb.HealthCheckResponse_SERVICE_UNKNOWN {
-						newLogger.Errorf("健康检查异常,服务端未找到本驱动服务")
+						newLogger.Errorf("健康检查: 服务端未找到本驱动服务")
 						state = true
 					}
 					break
@@ -169,9 +169,9 @@ func (c *Client) healthCheck(ctx context.Context) {
 			} else if time.Now().Local().After(nextTime) {
 				nextTime = time.Now().Local().Add(time.Duration(Cfg.DriverGrpc.Health.Retry) * waitTime)
 				getV := atomic.LoadInt32(&c.streamCount)
-				newLogger.Debugf("健康检查,找到流数量为:%d", getV)
+				newLogger.Debugf("健康检查: 找到流数量为:%d", getV)
 				if getV < totalStream {
-					newLogger.Errorf("健康检查异常,找到流数量不匹配,应为:%d,实际为:%d", totalStream, getV)
+					newLogger.Errorf("健康检查: 找到流数量不匹配,应为=%d,实际为=%d", totalStream, getV)
 					return
 				}
 			}
@@ -190,7 +190,7 @@ func (c *Client) healthRequest(ctx context.Context) (*pb.HealthCheckResponse, er
 
 func (c *Client) WriteEvent(ctx context.Context, event entity.Event) error {
 	if event.Table == "" || event.ID == "" || event.EventID == "" {
-		return errors.New("表、设备或事件ID为空")
+		return fmt.Errorf("表、设备或事件ID为空")
 	}
 	b, err := json.Marshal(event)
 	if err != nil {
@@ -211,7 +211,7 @@ func (c *Client) WriteEvent(ctx context.Context, event entity.Event) error {
 
 func (c *Client) FindDevice(ctx context.Context, table, id string, ret interface{}) error {
 	if id == "" {
-		return errors.New("设备ID为空")
+		return fmt.Errorf("设备ID为空")
 	}
 	res, err := c.cli.FindTableData(ctx, &pb.TableDataRequest{
 		ProjectId:   Cfg.Project,
@@ -227,14 +227,14 @@ func (c *Client) FindDevice(ctx context.Context, table, id string, ret interface
 		return fmt.Errorf(res.GetInfo())
 	}
 	if err := json.Unmarshal(res.GetResult(), ret); err != nil {
-		return fmt.Errorf("解析请求结果错误, %v", err)
+		return fmt.Errorf("解析请求结果错误: %v", err)
 	}
 	return nil
 }
 
 func (c *Client) RunLog(ctx context.Context, l entity.Log) error {
 	if l.SerialNo == "" {
-		return errors.New("流水号为空")
+		return fmt.Errorf("流水号为空")
 	}
 	b, err := json.Marshal(l)
 	if err != nil {
@@ -255,7 +255,7 @@ func (c *Client) RunLog(ctx context.Context, l entity.Log) error {
 
 func (c *Client) UpdateTableData(ctx context.Context, l entity.TableData, result interface{}) error {
 	if l.TableID == "" || l.ID == "" {
-		return errors.New("表或记录id为空")
+		return fmt.Errorf("表或记录id为空")
 	}
 	b, err := json.Marshal(l)
 	if err != nil {
@@ -282,7 +282,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动schema stream上下文")
+				logger.WithContext(ctx).Infof("schema: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -291,9 +291,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_SCHEMA)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动schema stream")
+				newLogger.Infof("schema: 启动stream")
 				if err := c.SchemaStream(newCtx); err != nil {
-					newLogger.Errorf("驱动schema stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("schema: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -303,7 +304,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动start stream上下文")
+				logger.WithContext(ctx).Infof("start: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -312,9 +313,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_START)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动start stream")
+				newLogger.Infof("start: 启动stream")
 				if err := c.StartStream(newCtx); err != nil {
-					newLogger.Errorf("驱动start stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("start: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -324,7 +326,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动run stream上下文")
+				logger.WithContext(ctx).Infof("执行指令: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -333,9 +335,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_RUN)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动run stream")
+				newLogger.Infof("执行指令: 启动stream")
 				if err := c.RunStream(newCtx); err != nil {
-					newLogger.Errorf("驱动run stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("执行指令: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -345,7 +348,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动writeTag stream上下文")
+				logger.WithContext(ctx).Infof("写数据点: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -354,9 +357,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_WRITETAG)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动writeTag stream")
+				newLogger.Infof("写数据点: 启动stream")
 				if err := c.WriteTagStream(newCtx); err != nil {
-					newLogger.Errorf("驱动writeTag stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("写数据点: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -366,7 +370,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动batchRun stream上下文")
+				logger.WithContext(ctx).Infof("批量执行指令: stream创建错误")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -375,9 +379,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_BATCHRUN)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动batchRun stream")
+				newLogger.Infof("批量执行指令: 启动stream")
 				if err := c.BatchRunStream(newCtx); err != nil {
-					newLogger.Errorf("驱动batchRun stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("批量执行指令: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -387,7 +392,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动debug stream上下文")
+				logger.WithContext(ctx).Infof("调试: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -396,9 +401,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_DEBUG)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动debug stream")
+				newLogger.Infof("调试: 启动stream")
 				if err := c.DebugStream(newCtx); err != nil {
-					newLogger.Errorf("驱动debug stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("调试: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -409,7 +415,7 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.WithContext(ctx).Infof("关闭驱动http proxy stream上下文")
+				logger.WithContext(ctx).Infof("httpProxy: 通过上下文关闭stream检查")
 				return
 			default:
 				newCtx := context.WithoutCancel(ctx)
@@ -418,9 +424,10 @@ func (c *Client) startSteam(ctx context.Context) {
 				}
 				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_HTTPPROXY)
 				newLogger := logger.WithContext(newCtx)
-				newLogger.Infof("启动驱动http proxy stream")
+				newLogger.Infof("httpProxy: 启动stream")
 				if err := c.HttpProxyStream(newCtx); err != nil {
-					newLogger.Errorf("驱动http proxy stream错误,%v", err)
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("httpProxy: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -431,20 +438,21 @@ func (c *Client) startSteam(ctx context.Context) {
 func (c *Client) SchemaStream(ctx context.Context) error {
 	stream, err := c.cli.SchemaStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("schema stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("schema stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("schema: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("schema stream conn success")
+	logger.WithContext(ctx).Infof("schema: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("schema stream err, %w", err)
+			return err
 		}
 		go func(res *pb.SchemaRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
@@ -467,7 +475,8 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("驱动配置(schema)返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("schema: 配置返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -476,23 +485,23 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 func (c *Client) StartStream(ctx context.Context) error {
 	stream, err := c.cli.StartStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("start stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("start stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("start: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("start stream conn success")
+	logger.WithContext(ctx).Infof("start: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("start stream err, %w", err)
+			return err
 		}
 		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
-		newLogger := logger.WithContext(ctx1)
 		startRes := new(entity.GrpcResult)
 		var cfg entity.Instance
 		if err := json.Unmarshal(res.Config, &cfg); err != nil {
@@ -503,7 +512,8 @@ func (c *Client) StartStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				newLogger.Errorf("启动驱动(start)时(解析配置的错误)返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(ctx1, err)
+				logger.WithContext(errCtx).Errorf("start: 解析配置的错误返回到驱动管理错误")
 			}
 			continue
 		}
@@ -555,7 +565,8 @@ func (c *Client) StartStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				newLogger.Errorf("启动驱动(start)结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("start: 启动驱动结果返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -564,20 +575,21 @@ func (c *Client) StartStream(ctx context.Context) error {
 func (c *Client) RunStream(ctx context.Context) error {
 	stream, err := c.cli.RunStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("run stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("run stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("执行指令: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("run stream conn success")
+	logger.WithContext(ctx).Infof("执行指令: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("run stream err, %w", err)
+			return err
 		}
 		go func(res *pb.RunRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
@@ -605,7 +617,8 @@ func (c *Client) RunStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("执行指令(run)结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("执行指令: 执行指令结果返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -614,20 +627,21 @@ func (c *Client) RunStream(ctx context.Context) error {
 func (c *Client) WriteTagStream(ctx context.Context) error {
 	stream, err := c.cli.WriteTagStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("writeTag stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("writeTag stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("写数据点: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("writeTag stream conn success")
+	logger.WithContext(ctx).Infof("写数据点: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("writeTag stream err, %w", err)
+			return err
 		}
 		go func(res *pb.RunRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
@@ -655,7 +669,8 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("写数据点(writeTag)结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("写数据点: 写数据点执行结果返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -664,20 +679,21 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 func (c *Client) BatchRunStream(ctx context.Context) error {
 	stream, err := c.cli.BatchRunStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("batchRun stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("batchRun stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("批量执行指令: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("batchRun stream conn success")
+	logger.WithContext(ctx).Infof("批量执行指令: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("batchRun stream err, %w", err)
+			return err
 		}
 		go func(res *pb.BatchRunRequest) {
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
@@ -686,7 +702,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
-			newCtx = logger.NewExtraKeyContext(newCtx, res.TableId)
+			newCtx = logger.NewTableContext(newCtx, res.TableId)
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(newCtx, c.app, &entity.BatchCommand{
 				Table:    res.TableId,
@@ -706,7 +722,8 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("批量执行指令(batchRun)结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("批量执行指令: 批量执行指令结果返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -715,20 +732,21 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 func (c *Client) DebugStream(ctx context.Context) error {
 	stream, err := c.cli.DebugStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("debug stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("debug stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("调试: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("debug stream conn success")
+	logger.WithContext(ctx).Infof("调试: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("debug stream err, %s", err)
+			return err
 		}
 		go func(res *pb.Debug) {
 			gr := new(entity.GrpcResult)
@@ -751,7 +769,8 @@ func (c *Client) DebugStream(ctx context.Context) error {
 				Request: res.Request,
 				Data:    bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("调试(debug)结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("调试: 调试结果返回到驱动管理错误")
 			}
 		}(res)
 	}
@@ -760,20 +779,21 @@ func (c *Client) DebugStream(ctx context.Context) error {
 func (c *Client) HttpProxyStream(ctx context.Context) error {
 	stream, err := c.cli.HttpProxyStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name))
 	if err != nil {
-		return fmt.Errorf("http proxy stream err,%w", err)
+		return err
 	}
 	defer func() {
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
-			logger.WithContext(ctx).Errorf("http proxy stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("httpProxy: stream关闭错误")
 		}
 	}()
-	logger.WithContext(ctx).Infof("http proxy stream conn success")
+	logger.WithContext(ctx).Infof("httpProxy: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("http proxy stream err, %s", err)
+			return err
 		}
 		go func(res *pb.HttpProxyRequest) {
 			gr := new(entity.GrpcResult)
@@ -786,7 +806,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			}
 			if res.GetHeaders() != nil {
 				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
-					gr.Error = fmt.Sprintf("http proxy stream err, %v", err)
+					gr.Error = fmt.Sprintf("httpProxy流错误:%v", err)
 					gr.Code = 400
 				} else {
 					runRes, err := c.driver.HttpProxy(newCtx, c.app, res.GetType(), header, res.GetData())
@@ -813,7 +833,8 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 				Request: res.Request,
 				Data:    bts,
 			}); err != nil {
-				logger.WithContext(newCtx).Errorf("http代理(httpProxy)请求结果返回到驱动管理错误,%v", err)
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("httpProxy: 请求结果返回到驱动管理错误")
 			}
 		}(res)
 	}

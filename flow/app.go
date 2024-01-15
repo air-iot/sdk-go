@@ -80,6 +80,6 @@ func (a *app) Start(flow Flow) {
 	sig := <-ch
 	close(ch)
 	cli.Stop()
-	logger.Debugln("关闭服务,", sig)
+	logger.Debugf("关闭服务: 信号=%v", sig)
 	os.Exit(0)
 }

@@ -146,11 +146,11 @@ func (a *app) Start(driver Driver) {
 	sig := <-ch
 	close(ch)
 	if err := driver.Stop(context.Background(), a); err != nil {
-		logger.Warnln("驱动停止,", err.Error())
+		logger.Warnf("驱动停止: %v", err.Error())
 	}
 	cli.Stop()
 	a.stop()
-	logger.Debugln("关闭服务,", sig)
+	logger.Debugf("关闭服务: 信号=%v", sig)
 	os.Exit(0)
 }
 
@@ -192,7 +192,7 @@ func (a *app) WritePoints(p entity.Point) error {
 	if p.Fields == nil || len(p.Fields) == 0 {
 		return fmt.Errorf("采集数据有空值")
 	}
-	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
 		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
 	}
@@ -204,7 +204,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
 		if field.Value == nil {
-			newLogger.Warnf("设备数据点值为空,表:**%s**,设备:**%s**", tableId, p.ID)
+			newLogger.Warnf("存数据点: 表=**%s**,设备=**%s**. 设备数据点值为空", tableId, p.ID)
 			continue
 		}
 		//tagByte, err := json.Marshal(field.Tag)
@@ -221,7 +221,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		//}
 		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("设备数据点标识为空,表:**%s**,设备:**%s**", tableId, p.ID)
+			newLogger.Errorf("存数据点: 表=**%s**,设备=**%s**. 设备数据点标识为空,", tableId, p.ID)
 			continue
 		}
 
@@ -230,14 +230,14 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		case float32:
 			if math.IsNaN(float64(valueTmp)) || math.IsInf(float64(valueTmp), 0) {
 				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("设备数据点值不合法,表:**%s**,设备:**%s**,数据点:%s,值:%f", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("存数据点: 表=**%s**,设备=**%s**,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat32(valueTmp)
 		case float64:
 			if math.IsNaN(valueTmp) || math.IsInf(valueTmp, 0) {
 				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("设备数据点值不合法,表:**%s**,设备:**%s**,数据点:%s,值:%f", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("存数据点: 表=**%s**,设备=**%s**,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat(valueTmp)
@@ -267,7 +267,8 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		default:
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
-				newLogger.Errorf("设备数据点转类型失败,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				errCtx := logger.NewErrorContext(ctx, err)
+				logger.WithContext(errCtx).Errorf("存数据点: 表=**%s**,设备=**%s**,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -288,7 +289,8 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if newVal != nil {
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
-				newLogger.Errorf("设备数据点转类型失败,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				errCtx := logger.NewErrorContext(ctx, err)
+				logger.WithContext(errCtx).Errorf("存数据点: 表=**%s**,设备=**%s**,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
 			} else {
 				fields[tag.ID] = valTmp
 				if save {
@@ -299,7 +301,8 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		if rawVal != nil {
 			valTmp, err := numberx.GetValueByType("", rawVal)
 			if err != nil {
-				newLogger.Errorf("设备原始数据点转类型,表:**%s**,设备:**%s**,数据点:**%s**,错误: %v", tableId, p.ID, tag.ID, err)
+				errCtx := logger.NewErrorContext(ctx, err)
+				logger.WithContext(errCtx).Errorf("存数据点: 表=**%s**,设备=**%s**,数据点=%s. 设备原始数据点转类型失败", tableId, p.ID, tag.ID)
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
@@ -319,7 +322,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		return err
 	}
 	if logger.IsLevelEnabled(logger.DebugLevel) {
-		newLogger.Debugf("保存数据,%s", string(b))
+		newLogger.Debugf("存数据点: 表=**%s**,设备=**%s**,数据=%s. 保存数据成功", tableId, p.ID, string(b))
 	}
 	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, p.ID}, b)
 	//return nil
@@ -351,7 +354,7 @@ func (a *app) WriteWarning(w entity.Warn) error {
 	if tableId == "" {
 		return fmt.Errorf("表id为空")
 	}
-	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
 		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
 	}
@@ -396,7 +399,7 @@ func (a *app) WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery
 	if len(w.ID) == 0 {
 		return fmt.Errorf("报警id为空")
 	}
-	ctx = logger.NewExtraKeyContext(ctx, tableId)
+	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
 		ctx = logger.NewGroupContext(ctx, Cfg.GroupID)
 	}

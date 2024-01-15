@@ -62,7 +62,7 @@ func NewApp() App {
 	}
 	Cfg.Log.Syslog.ServiceName = Cfg.Extension.Id
 	logger.InitLogger(Cfg.Log)
-	logger.Debugf("配置: %+v", *Cfg)
+	logger.Debugf("配置=%+v", *Cfg)
 	a.clean = func() {}
 	return a
 }
@@ -77,6 +77,6 @@ func (a *app) Start(ext Extension) {
 	sig := <-ch
 	close(ch)
 	cli.Stop()
-	logger.Debugln("关闭服务,", sig)
+	logger.Debugf("关闭服务: 信号=%v", sig)
 	os.Exit(0)
 }

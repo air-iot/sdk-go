@@ -67,7 +67,7 @@ func (c *Client) restart() {
 }
 
 func (c *Client) connAlgorithm() error {
-	logger.Infof("连接算法管理: %+v", Cfg.AlgorithmGrpc)
+	logger.Infof("连接算法管理: 配置=%+v", Cfg.AlgorithmGrpc)
 	conn, err := grpc.DialContext(
 		context.Background(),
 		fmt.Sprintf("%s:%d", Cfg.AlgorithmGrpc.Host, Cfg.AlgorithmGrpc.Port),
@@ -82,36 +82,35 @@ func (c *Client) connAlgorithm() error {
 }
 
 func (c *Client) healthCheck(ctx context.Context) {
-	//time.Sleep(3 * time.Second)
-	logger.Debugf("健康检查启动")
+	logger.Infof("健康检查: 启动")
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("健康检查停止")
+				logger.Infof("健康检查: 结束")
 				return
 			default:
-				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK))
-				newLogger.Infof("健康检查开始")
+				ctxHealth := logger.NewModuleContext(ctx, MODULE_HEALTHCHECK)
+				logger.WithContext(ctxHealth).Infof("健康检查: 开始")
 				retry := Cfg.AlgorithmGrpc.Health.Retry
 				state := false
 				for retry >= 0 {
 					healthRes, err := c.healthRequest(ctx)
 					if err != nil {
-						newLogger.Errorf("健康检查错误,%v", err)
+						logger.WithContext(logger.NewErrorContext(ctxHealth, err)).Errorf("健康检查: 健康检查请求错误")
 						state = true
 						time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 					} else {
 						state = false
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
-							newLogger.Infof("健康检查正常")
+							logger.WithContext(ctxHealth).Infof("健康检查: 正常")
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
-									newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+									logger.WithContext(ctxHealth).Errorf("健康检查: code=%s,错误=%s", e.Code.String(), e.Message)
 								}
 							}
 						} else if healthRes.GetStatus() == pb.HealthCheckResponse_SERVICE_UNKNOWN {
-							newLogger.Errorf("健康检查异常,服务端未找到本算法服务")
+							logger.WithContext(ctxHealth).Errorf("健康检查: 服务端未找到本算法服务")
 							state = true
 						}
 						break
@@ -139,14 +138,15 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("schema stream break")
+				logger.WithContext(ctx).Infof("schema: 通过上下文关闭stream检查")
 				return
 			default:
 				ctx1 := context.Background()
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_SCHEMA))
-				newLogger.Infof("启动schema stream")
+				newLogger.Infof("schema流: 启动stream")
 				if err := c.SchemaStream(ctx1); err != nil {
-					newLogger.Errorf("schema stream错误,%v", err)
+					errCtx := logger.NewErrorContext(ctx1, err)
+					logger.WithContext(errCtx).Errorf("schema: stream创建错误")
 				}
 				time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 			}
@@ -156,14 +156,15 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("run stream break")
+				logger.WithContext(ctx).Infof("run: 通过上下文关闭stream检查")
 				return
 			default:
 				ctx1 := context.Background()
 				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_RUN))
-				newLogger.Infof("启动run stream")
+				newLogger.Infof("run: 启动stream")
 				if err := c.RunStream(context.Background()); err != nil {
-					newLogger.Errorf("run stream错误,%v", err)
+					errCtx := logger.NewErrorContext(ctx1, err)
+					logger.WithContext(errCtx).Errorf("run: stream创建错误")
 				}
 				time.Sleep(time.Second * time.Duration(Cfg.AlgorithmGrpc.WaitTime))
 			}
@@ -174,17 +175,19 @@ func (c *Client) startSteam(ctx context.Context) {
 func (c *Client) SchemaStream(ctx context.Context) error {
 	stream, err := c.cli.SchemaStream(GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Algorithm.ID, Cfg.Algorithm.Name))
 	if err != nil {
-		return fmt.Errorf("schema stream err,%w", err)
+		return err
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("schema stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("schema: stream关闭错误")
 		}
 	}()
+	logger.WithContext(ctx).Infof("schema: stream连接成功")
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("schema stream err, %w", err)
+			return err
 		}
 		go func(res *pb.SchemaRequest) {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Algorithm.Timeout))
@@ -204,7 +207,8 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(ctx1).Errorf("配置(schema)返回到算法管理错误,%v", err)
+				errCtx := logger.NewErrorContext(ctx1, err)
+				logger.WithContext(errCtx).Errorf("schema: 执行结果返回到流程扩展节点错误")
 			}
 		}(res)
 	}
@@ -213,17 +217,19 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 func (c *Client) RunStream(ctx context.Context) error {
 	stream, err := c.cli.RunStream(GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Algorithm.ID, Cfg.Algorithm.Name))
 	if err != nil {
-		return fmt.Errorf("run stream err,%w", err)
+		return err
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("run stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("run: stream关闭错误")
 		}
 	}()
+	logger.WithContext(ctx).Infof("run: stream连接成功")
 	for {
 		res0, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("run stream err, %s", err)
+			return err
 		}
 		go func(res *pb.RunRequest) {
 			gr := new(grpcResult)
@@ -243,7 +249,8 @@ func (c *Client) RunStream(ctx context.Context) error {
 				Request: res.Request,
 				Message: bts,
 			}); err != nil {
-				logger.WithContext(ctx1).Errorf("执行(run)结果返回到算法管理错误,%v", err)
+				errCtx := logger.NewErrorContext(ctx1, err)
+				logger.WithContext(errCtx).Errorf("run: 执行结果返回到流程扩展节点错误")
 			}
 		}(res0)
 	}

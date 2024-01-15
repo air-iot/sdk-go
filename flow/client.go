@@ -46,7 +46,7 @@ func (c *Client) Start(app App, flow Flow) *Client {
 }
 
 func (c *Client) connFlow() error {
-	logger.Infof("连接flow: %+v", Cfg.FlowEngine)
+	logger.Infof("连接流程引擎: 配置=%+v", Cfg.FlowEngine)
 	conn, err := grpc.DialContext(
 		context.Background(),
 		fmt.Sprintf("%s:%d", Cfg.FlowEngine.Host, Cfg.FlowEngine.Port),
@@ -61,22 +61,24 @@ func (c *Client) connFlow() error {
 }
 
 func (c *Client) healthCheck(ctx context.Context) {
-	logger.Infof("健康检查开始")
+	logger.Infof("健康检查: 启动")
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("健康检查结束")
+				logger.Infof("健康检查: 结束")
 				return
 			default:
-				newLogger := logger.WithContext(logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK))
-				newLogger.Infof("健康检查开始")
+				newCtx := logger.NewModuleContext(context.Background(), MODULE_HEALTHCHECK)
+				newLogger := logger.WithContext(newCtx)
+				newLogger.Infof("健康检查: 开始")
 				retry := 3
 				state := false
 				for retry >= 0 {
 					healthRes, err := c.cli.HealthCheck(ctx, &pb.HealthCheckRequest{Name: Cfg.Flow.Name})
 					if err != nil {
-						newLogger.Errorf("健康检查重试错误,%v", err)
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("健康检查: 健康检查重试错误")
 						state = true
 						time.Sleep(time.Second * time.Duration(wait))
 					} else {
@@ -84,7 +86,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 						if healthRes.GetStatus() == pb.HealthCheckResponse_SERVING {
 							if healthRes.Errors != nil && len(healthRes.Errors) > 0 {
 								for _, e := range healthRes.Errors {
-									newLogger.Errorf("执行 %s, 错误为%s", e.Code.String(), e.Message)
+									newLogger.Errorf("健康检查: code=%s,错误=%s", e.Code.String(), e.Message)
 								}
 							}
 						}
@@ -96,7 +98,8 @@ func (c *Client) healthCheck(ctx context.Context) {
 					c.cleanStream()
 					if c.conn != nil {
 						if err := c.conn.Close(); err != nil {
-							newLogger.Errorf("grpc close error: %s", err.Error())
+							errCtx := logger.NewErrorContext(newCtx, err)
+							logger.WithContext(errCtx).Errorf("健康检查: 关闭连接")
 						}
 					}
 					if err := c.connFlow(); err != nil {
@@ -119,14 +122,16 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("stream break")
+				logger.Infof("handler: 通过上下文关闭stream检查")
 				return
 			default:
 				ctx1 := context.Background()
-				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_HANDLER))
-				newLogger.Infof("启动start stream")
+				ctx1 = logger.NewModuleContext(ctx1, MODULE_HANDLER)
+				newLogger := logger.WithContext(ctx1)
+				newLogger.Infof("handler: 启动stream")
 				if err := c.Handler(ctx1); err != nil {
-					newLogger.Errorf("start stream错误,%v", err)
+					errCtx := logger.NewErrorContext(ctx1, err)
+					logger.WithContext(errCtx).Errorf("handler: stream创建错误")
 				}
 				time.Sleep(time.Second * time.Duration(wait))
 			}
@@ -137,14 +142,16 @@ func (c *Client) startSteam(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Infof("debug stream break")
+				logger.Infof("调试: 通过上下文关闭stream检查")
 				return
 			default:
 				ctx1 := context.Background()
-				newLogger := logger.WithContext(logger.NewModuleContext(ctx1, MODULE_DEBUG))
-				newLogger.Infof("启动debug stream")
+				ctx1 = logger.NewModuleContext(ctx1, MODULE_DEBUG)
+				newLogger := logger.WithContext(ctx1)
+				newLogger.Infof("调试: 启动stream")
 				if err := c.DebugStream(ctx1); err != nil {
-					newLogger.Errorf("debug stream错误,%v", err)
+					errCtx := logger.NewErrorContext(ctx1, err)
+					logger.WithContext(errCtx).Errorf("调试流: stream创建错误")
 				}
 				time.Sleep(time.Second * time.Duration(wait))
 			}
@@ -165,17 +172,19 @@ func (c *Client) Stop() {
 func (c *Client) Handler(ctx context.Context) error {
 	stream, err := c.cli.Register(GetGrpcContext(ctx, Cfg.Flow.Name, Cfg.Flow.Mode))
 	if err != nil {
-		return fmt.Errorf("stream err,%w", err)
+		return err
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("stream close err,%v", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("handler: stream关闭错误")
 		}
 	}()
+	logger.WithContext(ctx).Infof("handler: stream连接成功")
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("stream err, %s", err)
+			return err
 		}
 		go func(res *pb.FlowRequest) {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
@@ -204,7 +213,8 @@ func (c *Client) Handler(ctx context.Context) error {
 			b, _ := json.Marshal(result)
 			gr.Result = b
 			if err := stream.Send(gr); err != nil {
-				logger.WithContext(ctx1).Errorf("执行(handler)结果返回到流程引擎错误,%v", err)
+				errCtx := logger.NewErrorContext(ctx1, err)
+				logger.WithContext(errCtx).Errorf("handler: 执行结果返回到流程引擎错误")
 			}
 		}(res)
 	}
@@ -213,17 +223,19 @@ func (c *Client) Handler(ctx context.Context) error {
 func (c *Client) DebugStream(ctx context.Context) error {
 	stream, err := c.cli.DebugStream(GetGrpcContext(ctx, Cfg.Flow.Name, Cfg.Flow.Mode))
 	if err != nil {
-		return fmt.Errorf("debug stream err,%w", err)
+		return err
 	}
 	defer func() {
 		if err := stream.CloseSend(); err != nil {
-			logger.Infof("debug stream close err,vs", err)
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("调试: stream关闭错误")
 		}
 	}()
+	logger.WithContext(ctx).Infof("调试: stream连接成功")
 	for {
 		res, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("debug stream err, %s", err)
+			return err
 		}
 		go func(res *pb.DebugRequest) {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
@@ -250,7 +262,8 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			b, _ := json.Marshal(result)
 			gr.Result = b
 			if err := stream.Send(gr); err != nil {
-				logger.WithContext(ctx1).Errorf("执行(debug)结果返回到流程引擎错误,%v", err)
+				errCtx := logger.NewErrorContext(ctx1, err)
+				logger.WithContext(errCtx).Errorf("调试: 执行结果返回到流程引擎错误")
 			}
 		}(res)
 	}

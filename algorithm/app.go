@@ -12,14 +12,12 @@ import (
 
 	"github.com/air-iot/logger"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
 type App interface {
 	Start(Service)
-	GetLogger() *logrus.Logger
 }
 
 type Service interface {
@@ -52,7 +50,6 @@ type Service interface {
 
 // app 数据采集类
 type app struct {
-	*logrus.Logger
 	//mq      mq.MQ
 	stopped    bool
 	cli        *Client
@@ -111,7 +108,7 @@ func NewApp() App {
 	}
 	Cfg.Log.Syslog.ServiceName = Cfg.ServiceID
 	logger.InitLogger(Cfg.Log)
-	logger.Debugf("配置: %+v", *Cfg)
+	logger.Debugf("配置=%+v", *Cfg)
 
 	a.cacheValue = sync.Map{}
 	return a
@@ -128,17 +125,12 @@ func (a *app) Start(service Service) {
 	sig := <-ch
 	close(ch)
 	if err := service.Stop(context.Background(), a); err != nil {
-		logger.Warnln("算法停止,", err.Error())
+		logger.Warnf("算法停止: %v", err)
 	}
 	cli.Stop()
 	a.stop()
-	logger.Debugln("关闭算法,", sig)
+	logger.Debugf("关闭服务: 信号=%v", sig)
 	os.Exit(0)
-}
-
-// GetLogger 获取日志
-func (a *app) GetLogger() *logrus.Logger {
-	return a.Logger
 }
 
 // Stop 服务停止

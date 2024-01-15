@@ -10,6 +10,7 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 
 	"github.com/air-iot/sdk-go/v4/service"
@@ -21,7 +22,7 @@ type TestService struct {
 
 // Start 驱动执行，实现Service的Start函数
 func (p *TestService) Start(a service.App) error {
-	a.GetLogger().Debugln("start")
+	log.Println("start")
 	a.GetHttpServer().GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "hello world")
 	})
@@ -30,7 +31,7 @@ func (p *TestService) Start(a service.App) error {
 
 // Stop 接口停止，实现Service的Stop函数
 func (p *TestService) Stop(a service.App) error {
-	a.GetLogger().Debugln("stop")
+	log.Println("stop")
 	return nil
 }
 

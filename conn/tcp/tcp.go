@@ -2,8 +2,8 @@ package tcp
 
 import (
 	"fmt"
+	"github.com/air-iot/logger"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"net"
 )
 
@@ -69,7 +69,7 @@ func (c *Conn) reConnect() error {
 
 func (c *Conn) Close() {
 	if err := c.Conn.Close(); err != nil {
-		logrus.Errorf("socket连接关闭失败:%s", err.Error())
+		logger.Errorf("socket连接关闭失败:%s", err.Error())
 	}
 	c.isClose = true
 

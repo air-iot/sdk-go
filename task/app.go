@@ -1,10 +1,3 @@
-/**
- * @Author: ZhangQiang
- * @Description:
- * @File:  app
- * @Version: 1.0.0
- * @Date: 2020/8/6 10:50
- */
 package task
 
 import (
