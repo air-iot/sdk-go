@@ -35,7 +35,6 @@ func init() {
 
 // 任务服务
 type app struct {
-	//*logrus.Logger
 	*cron.Cron
 }
 
@@ -66,11 +65,6 @@ func (p *app) Start(task Task) {
 	log.Println("关闭服务,", sig)
 	os.Exit(0)
 }
-
-// GetLogger 获取日志
-//func (p *app) GetLogger() *logrus.Logger {
-//	return p.Logger
-//}
 
 func (p *app) GetCron() *cron.Cron {
 	return p.Cron

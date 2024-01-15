@@ -3,8 +3,8 @@ package rabbit
 import (
 	"fmt"
 
+	"github.com/air-iot/logger"
 	"github.com/rabbitmq/amqp091-go"
-	"github.com/sirupsen/logrus"
 )
 
 type Amqp struct {
@@ -23,7 +23,7 @@ func NewAmqp(host string, port int, username, password, vhost string) (*Amqp, er
 func (p *Amqp) Close() {
 	if !p.Connection.IsClosed() {
 		if err := p.Connection.Close(); err != nil {
-			logrus.Errorln("关闭Amqp连接错误", err.Error())
+			logger.Errorln("关闭Amqp连接错误", err.Error())
 		}
 	}
 }

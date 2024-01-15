@@ -14,7 +14,6 @@ import (
 
 type App interface {
 	Start(service Service)
-	//GetLogger() *logrus.Logger
 	GetHttpServer() *gin.Engine
 }
 

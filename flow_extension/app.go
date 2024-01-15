@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/air-iot/logger"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -19,7 +18,6 @@ type App interface {
 
 // app 数据采集类
 type app struct {
-	*logrus.Logger
 	stopped bool
 	cli     *Client
 	clean   func()

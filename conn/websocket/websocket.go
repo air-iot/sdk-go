@@ -3,8 +3,8 @@ package websocket
 import (
 	"errors"
 
+	"github.com/air-iot/logger"
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
 )
 
 type Conn struct {
@@ -93,7 +93,7 @@ func (c *Conn) reConnect() error {
 
 func (c *Conn) Close() {
 	if err := c.Conn.Close(); err != nil {
-		logrus.Errorln("关闭websocket错误", err.Error())
+		logger.Errorln("关闭websocket错误", err.Error())
 	}
 	c.isClose = true
 }

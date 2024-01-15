@@ -18,7 +18,6 @@ import (
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
 	"github.com/shopspring/decimal"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
@@ -53,7 +52,6 @@ const (
 
 // app 数据采集类
 type app struct {
-	*logrus.Logger
 	mq      mq.MQ
 	stopped bool
 	cli     *Client

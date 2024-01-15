@@ -2,9 +2,10 @@ package tcp
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/air-iot/logger"
 	"github.com/pkg/errors"
-	"net"
 )
 
 type Conn struct {
@@ -15,7 +16,6 @@ type Conn struct {
 }
 
 func DialTCP(network, host string, port int) (*Conn, error) {
-
 	address := fmt.Sprintf("%s:%d", host, port)
 	c, err := net.Dial(network, address)
 	if err != nil {

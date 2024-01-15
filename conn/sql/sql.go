@@ -3,8 +3,8 @@ package sql
 import (
 	"fmt"
 
+	"github.com/air-iot/logger"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 )
 
 type DBConn struct {
@@ -23,6 +23,6 @@ func NewDB(driverName, url string, maxIdleConn, maxOpenConn int) (*DBConn, error
 
 func (p *DBConn) Close() {
 	if err := p.DB.Close(); err != nil {
-		logrus.Errorln("cli????", err.Error())
+		logger.Errorln("cli错误:", err.Error())
 	}
 }

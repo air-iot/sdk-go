@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/air-iot/logger"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"github.com/sirupsen/logrus"
 )
 
 type Mqtt struct {
@@ -24,7 +24,7 @@ func NewMqtt(host string, port int, username, password string) (*Mqtt, error) {
 	opts.SetProtocolVersion(4)
 	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
 		if e != nil {
-			logrus.Fatalf("消息队列连接错误,%s", e.Error())
+			logger.Fatalf("消息队列连接错误,%s", e.Error())
 		}
 	})
 	opts.SetOrderMatters(false)
