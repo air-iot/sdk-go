@@ -169,7 +169,7 @@ func (c *Client) healthCheck(ctx context.Context) {
 			} else if time.Now().Local().After(nextTime) {
 				nextTime = time.Now().Local().Add(time.Duration(Cfg.DriverGrpc.Health.Retry) * waitTime)
 				getV := atomic.LoadInt32(&c.streamCount)
-				newLogger.Debugf("健康检查: 找到流数量为:%d", getV)
+				newLogger.Debugf("健康检查: 找到流数量=%d", getV)
 				if getV < totalStream {
 					newLogger.Errorf("健康检查: 找到流数量不匹配,应为=%d,实际为=%d", totalStream, getV)
 					return
