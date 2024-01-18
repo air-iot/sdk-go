@@ -19,6 +19,11 @@ type Config struct {
 		Name    string `json:"name" yaml:"name"`
 		Timeout uint   `json:"timeout" yaml:"timeout"`
 	} `json:"extension" yaml:"extension"`
+	Pprof struct {
+		Enable bool   `json:"enable" yaml:"enable"`
+		Host   string `json:"host" yaml:"host"`
+		Port   string `json:"port" yaml:"port"`
+	} `json:"pprof" yaml:"pprof"`
 }
 
 type Grpc struct {

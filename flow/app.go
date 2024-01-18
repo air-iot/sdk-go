@@ -3,6 +3,8 @@ package flow
 import (
 	"log"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -65,6 +67,17 @@ func NewApp() App {
 	logger.InitLogger(Cfg.Log)
 	logger.Debugf("配置: %+v", *Cfg)
 	a.clean = func() {}
+	if Cfg.Pprof.Enable {
+		go func() {
+			//  路径/debug/pprof/
+			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+			logger.Infof("pprof启动: 地址=%s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				logger.Errorf("pprof启动: 地址=%s. %v", addr, err)
+				return
+			}
+		}()
+	}
 	return a
 }
 

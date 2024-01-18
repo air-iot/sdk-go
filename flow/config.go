@@ -18,6 +18,11 @@ type Config struct {
 	} `json:"flow" yaml:"flow"`
 	FlowEngine Grpc          `json:"flowEngine" yaml:"flowEngine"`
 	Log        logger.Config `json:"log" yaml:"log"`
+	Pprof      struct {
+		Enable bool   `json:"enable" yaml:"enable"`
+		Host   string `json:"host" yaml:"host"`
+		Port   string `json:"port" yaml:"port"`
+	} `json:"pprof" yaml:"pprof"`
 }
 
 type Grpc struct {

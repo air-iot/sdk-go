@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -131,6 +133,17 @@ func NewApp() App {
 		clean()
 	}
 	a.cacheValue = sync.Map{}
+	if Cfg.Pprof.Enable {
+		go func() {
+			//  路径/debug/pprof/
+			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+			logger.Infof("pprof启动: 地址=%s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				logger.Errorf("pprof启动: 地址=%s. %v", addr, err)
+				return
+			}
+		}()
+	}
 	return a
 }
 

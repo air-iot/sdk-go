@@ -20,4 +20,9 @@ type Config struct {
 	DriverGrpc grpc.Config   `json:"driverGrpc" yaml:"driverGrpc"`
 	Log        logger.Config `json:"log" yaml:"log"`
 	MQ         mq.Config     `json:"mq" yaml:"mq"`
+	Pprof      struct {
+		Enable bool   `json:"enable" yaml:"enable"`
+		Host   string `json:"host" yaml:"host"`
+		Port   string `json:"port" yaml:"port"`
+	} `json:"pprof" yaml:"pprof"`
 }

@@ -20,6 +20,11 @@ type Config struct {
 	AlgorithmGrpc GrpcConfig    `json:"algorithmGrpc" yaml:"algorithmGrpc"`
 	Log           logger.Config `json:"log" yaml:"log"`
 	//MQ         mq.Config   `json:"mq" yaml:"mq"`
+	Pprof struct {
+		Enable bool   `json:"enable" yaml:"enable"`
+		Host   string `json:"host" yaml:"host"`
+		Port   string `json:"port" yaml:"port"`
+	} `json:"pprof" yaml:"pprof"`
 }
 
 type GrpcConfig struct {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -109,7 +111,17 @@ func NewApp() App {
 	Cfg.Log.Syslog.ServiceName = Cfg.ServiceID
 	logger.InitLogger(Cfg.Log)
 	logger.Debugf("配置=%+v", *Cfg)
-
+	if Cfg.Pprof.Enable {
+		go func() {
+			//  路径/debug/pprof/
+			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+			logger.Infof("pprof启动: 地址=%s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				logger.Errorf("pprof启动: 地址=%s. %v", addr, err)
+				return
+			}
+		}()
+	}
 	a.cacheValue = sync.Map{}
 	return a
 }
