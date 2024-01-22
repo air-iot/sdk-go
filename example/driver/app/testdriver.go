@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/driver"
@@ -11,7 +13,6 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"net/http"
 )
 
 // 驱动配置信息，不同的驱动生成不同的配置信息
@@ -165,7 +166,7 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 		return token.Error()
 	}
 	p.client = client
-	if err := p.handler(a, config); err != nil {
+	if err := p.handler(a, ctx, config); err != nil {
 		return err
 	}
 	return nil
@@ -231,7 +232,7 @@ func (p *TestDriver) HttpProxy(ctx context.Context, _ driver.App, t string, head
 	return Schema, nil
 }
 
-func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) error {
+func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig DriverInstanceConfig) error {
 	for _, t := range driverConfig.Tables {
 		if len(t.Devices) == 0 {
 			continue
@@ -295,7 +296,7 @@ func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) er
 					Value: v1,
 				})
 			}
-			err := a.WritePoints(entity.Point{
+			err := a.WritePoints(ctx, entity.Point{
 				Table:    v.Table,
 				ID:       v.Id,
 				Fields:   fields,

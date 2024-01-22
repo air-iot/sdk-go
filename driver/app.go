@@ -32,10 +32,10 @@ import (
 
 type App interface {
 	Start(Driver)
-	WritePoints(entity.Point) error
+	WritePoints(context.Context, entity.Point) error
 	WriteEvent(context.Context, entity.Event) error
-	WriteWarning(entity.Warn) error
-	WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery) error
+	WriteWarning(context.Context, entity.Warn) error
+	WriteWarningRecovery(ctx context.Context, tableId, dataId string, w entity.WarnRecovery) error
 	FindDevice(ctx context.Context, table, id string, ret interface{}) error
 	RunLog(context.Context, entity.Log) error
 	UpdateTableData(ctx context.Context, table, id string, custom map[string]interface{}) error
@@ -179,10 +179,8 @@ func (a *app) GetProjectId() string {
 }
 
 // WritePoints 写数据点数据
-func (a *app) WritePoints(p entity.Point) error {
-	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
-	defer cancel()
-	ctx = logger.NewModuleContext(ctx, entity.MODULE_WRITEPOINT)
+func (a *app) WritePoints(ctx context.Context, p entity.Point) error {
+	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WRITEPOINT)
 	tableId := p.Table
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
@@ -212,6 +210,8 @@ func (a *app) WritePoints(p entity.Point) error {
 }
 
 func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) error {
+	ctxTimeout, cancelTimeout := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancelTimeout()
 	fields := make(map[string]interface{})
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
@@ -336,14 +336,12 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	if logger.IsLevelEnabled(logger.DebugLevel) {
 		newLogger.Debugf("存数据点: 表=%s,设备=%s,数据=%s. 保存数据成功", tableId, p.ID, string(b))
 	}
-	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, p.ID}, b)
+	return a.mq.Publish(ctxTimeout, []string{"data", Cfg.Project, tableId, p.ID}, b)
 	//return nil
 }
 
-func (a *app) WriteWarning(w entity.Warn) error {
-	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
-	defer cancel()
-	ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
+func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
+	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
 	tableId := w.TableId
 	if tableId == "" {
 		tableIdI, ok := a.cli.cacheConfig.Load(w.TableDataId)
@@ -394,14 +392,14 @@ func (a *app) WriteWarning(w entity.Warn) error {
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancel()
 	return a.mq.Publish(ctx, []string{"warningStorage", Cfg.Project, tableId, w.TableDataId}, b)
 }
 
 // WriteWarningRecovery 报警恢复
-func (a *app) WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery) error {
-	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
-	defer cancel()
-	ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
+func (a *app) WriteWarningRecovery(ctx context.Context, tableId, dataId string, w entity.WarnRecovery) error {
+	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
 	if tableId == "" {
 		return fmt.Errorf("表id为空")
 	}
@@ -430,6 +428,8 @@ func (a *app) WriteWarningRecovery(tableId, dataId string, w entity.WarnRecovery
 	if err != nil {
 		return err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
+	defer cancel()
 	return a.mq.Publish(ctx, []string{"warningUpdate", Cfg.Project, tableId, dataId}, b)
 }
 

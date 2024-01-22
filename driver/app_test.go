@@ -45,7 +45,7 @@ func TestApp_WritePoints(t *testing.T) {
 	}
 
 	a := NewApp()
-	err := a.WritePoints(point)
+	err := a.WritePoints(context.Background(), point)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -140,7 +140,7 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 		return token.Error()
 	}
 	p.client = client
-	if err := p.handler(a, config); err != nil {
+	if err := p.handler(a, ctx, config); err != nil {
 		return err
 	}
 	return nil
@@ -207,7 +207,7 @@ func (p *TestDriver) HttpProxy(ctx context.Context, _ driver.App, t string, head
 	return Schema, nil
 }
 
-func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) error {
+func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig DriverInstanceConfig) error {
 	for _, t := range driverConfig.Tables {
 		tagMap := map[string]entity.Tag{}
 		for _, ta := range t.Device.Tags {
@@ -274,7 +274,7 @@ func (p *TestDriver) handler(a driver.App, driverConfig DriverInstanceConfig) er
 					Value: v1,
 				})
 			}
-			err := a.WritePoints(entity.Point{
+			err := a.WritePoints(ctx, entity.Point{
 				Table:    v.Table,
 				ID:       v.Id,
 				Fields:   fields,
