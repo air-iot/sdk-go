@@ -8,7 +8,7 @@ mq:
       - localhost:9092
 
 serviceId: 64f847d563d1482d33753c25
-project: 625f6dbf5433487131f09ff9
+project: zq
 
 driver:
   id: go-driver-mqtt-demo

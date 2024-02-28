@@ -3,6 +3,7 @@ package flow_extionsion
 import (
 	"context"
 	"fmt"
+	"github.com/air-iot/errors"
 	"time"
 
 	"github.com/air-iot/json"
@@ -189,6 +190,28 @@ func (c *Client) Schema(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Extension.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_SCHEMA)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := &pb.ExtensionResult{
+						Request: res.GetRequest(),
+						Status:  false,
+						Info:    errStr,
+					}
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("schema: 执行结果返回到流程扩展节点错误")
+					}
+				}
+			}()
 			result, err := c.extension.Schema(ctx1, c.app)
 			gr := &pb.ExtensionResult{
 				Request: res.GetRequest(),
@@ -229,6 +252,30 @@ func (c *Client) Run(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Extension.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_RUN)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := &pb.ExtensionResult{
+						Request: res.GetRequest(),
+						Status:  false,
+						Info:    errStr,
+					}
+					b, _ := json.Marshal(map[string]interface{}{})
+					gr.Result = b
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("run: 执行结果返回到流程扩展节点错误")
+					}
+				}
+			}()
 			result, err := c.extension.Run(ctx1, c.app, res.GetData())
 			gr := &pb.ExtensionResult{
 				Request: res.GetRequest(),

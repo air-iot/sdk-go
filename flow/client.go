@@ -3,14 +3,14 @@ package flow
 import (
 	"context"
 	"fmt"
-	"github.com/air-iot/json"
 	"time"
 
+	pb "github.com/air-iot/api-client-go/v4/engine"
+	"github.com/air-iot/errors"
+	"github.com/air-iot/json"
+	"github.com/air-iot/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-
-	pb "github.com/air-iot/api-client-go/v4/engine"
-	"github.com/air-iot/logger"
 )
 
 const (
@@ -190,6 +190,30 @@ func (c *Client) Handler(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_HANDLER)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := &pb.FlowResponse{
+						ElementJob: res.ElementJob,
+						Status:     false,
+						Info:       errStr,
+					}
+					b, _ := json.Marshal(map[string]interface{}{})
+					gr.Result = b
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("handler: 执行结果返回到流程引擎错误")
+					}
+				}
+			}()
 			result, err := c.flow.Handler(ctx1, c.app, &Request{
 				ProjectId:  res.ProjectId,
 				FlowId:     res.FlowId,
@@ -241,6 +265,30 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Flow.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_DEBUG)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := &pb.DebugResponse{
+						ElementJob: res.ElementJob,
+						Status:     false,
+						Info:       errStr,
+					}
+					b, _ := json.Marshal(&DebugResult{Value: map[string]interface{}{}, Logs: make([]Syslog, 0)})
+					gr.Result = b
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("调试: 执行结果返回到流程引擎错误")
+					}
+				}
+			}()
 			result, err := c.flow.Debug(ctx1, c.app, &DebugRequest{
 				ProjectId: res.ProjectId,
 				FlowId:    res.FlowId,

@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/air-iot/errors"
 	"github.com/air-iot/json"
 	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"google.golang.org/grpc"
@@ -502,9 +503,9 @@ func (c *Client) StartStream(ctx context.Context) error {
 			return err
 		}
 		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
-		startRes := new(entity.GrpcResult)
 		var cfg entity.Instance
 		if err := json.Unmarshal(res.Config, &cfg); err != nil {
+			startRes := new(entity.GrpcResult)
 			startRes.Error = err.Error()
 			startRes.Code = 400
 			bts, _ := json.Marshal(startRes)
@@ -554,6 +555,31 @@ func (c *Client) StartStream(ctx context.Context) error {
 		go func(res *pb.StartRequest) {
 			newCtx, cancel := context.WithTimeout(ctx1, Cfg.DriverGrpc.Timeout)
 			defer cancel()
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					startRes := new(entity.GrpcResult)
+					startRes.Error = errStr
+					startRes.Code = 400
+					bts, _ := json.Marshal(startRes)
+					if err := stream.Send(&pb.StartResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("start: 启动驱动结果返回到驱动管理错误")
+					}
+				}
+			}()
+			startRes := new(entity.GrpcResult)
 			if err := c.driver.Start(newCtx, c.app, res.Config); err != nil {
 				startRes.Error = err.Error()
 				startRes.Code = 400
@@ -598,6 +624,30 @@ func (c *Client) RunStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(entity.GrpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.RunResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("执行指令: 执行指令结果返回到驱动管理错误")
+					}
+				}
+			}()
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.Run(newCtx, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -650,6 +700,30 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(entity.GrpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.RunResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("写数据点: 写数据点执行结果返回到驱动管理错误")
+					}
+				}
+			}()
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.WriteTag(newCtx, c.app, &entity.Command{
 				Table:    res.TableId,
@@ -703,6 +777,30 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
 			newCtx = logger.NewTableContext(newCtx, res.TableId)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(entity.GrpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.BatchRunResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("批量执行指令: 批量执行指令结果返回到驱动管理错误")
+					}
+				}
+			}()
 			gr := new(entity.GrpcResult)
 			runRes, err := c.driver.BatchRun(newCtx, c.app, &entity.BatchCommand{
 				Table:    res.TableId,
@@ -749,14 +847,39 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			return err
 		}
 		go func(res *pb.Debug) {
-			gr := new(entity.GrpcResult)
+
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
 			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_DEBUG)
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(entity.GrpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.Debug{
+						Request: res.Request,
+						Data:    bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("调试: 调试结果返回到驱动管理错误")
+					}
+				}
+			}()
 			runRes, err := c.driver.Debug(newCtx, c.app, res.Data)
+			gr := new(entity.GrpcResult)
 			if err != nil {
 				gr.Error = err.Error()
 				gr.Code = 400
@@ -796,7 +919,6 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			return err
 		}
 		go func(res *pb.HttpProxyRequest) {
-			gr := new(entity.GrpcResult)
 			var header http.Header
 			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
 			defer cancel()
@@ -804,6 +926,31 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(entity.GrpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.HttpProxyResult{
+						Request: res.Request,
+						Data:    bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("httpProxy: 请求结果返回到驱动管理错误")
+					}
+				}
+			}()
+			gr := new(entity.GrpcResult)
 			if res.GetHeaders() != nil {
 				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
 					gr.Error = fmt.Sprintf("httpProxy流错误:%v", err)

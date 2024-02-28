@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/air-iot/errors"
 	"github.com/air-iot/json"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -193,6 +194,30 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Algorithm.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_SCHEMA)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					schemaRes := new(grpcResult)
+					schemaRes.Error = errStr
+					schemaRes.Code = 400
+					bts, _ := json.Marshal(schemaRes)
+					if err := stream.Send(&pb.SchemaResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("schema: 执行结果返回到算法服务错误")
+					}
+				}
+			}()
 			schema, err := c.algorithmService.Schema(ctx1, c.app)
 			schemaRes := new(grpcResult)
 			if err != nil {
@@ -208,7 +233,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 				Message: bts,
 			}); err != nil {
 				errCtx := logger.NewErrorContext(ctx1, err)
-				logger.WithContext(errCtx).Errorf("schema: 执行结果返回到流程扩展节点错误")
+				logger.WithContext(errCtx).Errorf("schema: 执行结果返回到算法服务错误")
 			}
 		}(res)
 	}
@@ -232,11 +257,36 @@ func (c *Client) RunStream(ctx context.Context) error {
 			return err
 		}
 		go func(res *pb.RunRequest) {
-			gr := new(grpcResult)
+
 			ctx1, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(Cfg.Algorithm.Timeout))
 			defer cancel()
 			ctx1 = logger.NewModuleContext(ctx1, MODULE_RUN)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(grpcResult)
+					gr.Error = errStr
+					gr.Code = 400
+					bts, _ := json.Marshal(gr)
+					if err := stream.Send(&pb.RunResult{
+						Request: res.Request,
+						Message: bts,
+					}); err != nil {
+						errCtx := logger.NewErrorContext(ctx1, err)
+						logger.WithContext(errCtx).Errorf("run: 执行结果返回到算法服务错误")
+					}
+				}
+			}()
 			runRes, err := c.algorithmService.Run(ctx1, c.app, res.Data)
+			gr := new(grpcResult)
 			if err != nil {
 				gr.Error = err.Error()
 				gr.Code = 400
@@ -250,7 +300,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 				Message: bts,
 			}); err != nil {
 				errCtx := logger.NewErrorContext(ctx1, err)
-				logger.WithContext(errCtx).Errorf("run: 执行结果返回到流程扩展节点错误")
+				logger.WithContext(errCtx).Errorf("run: 执行结果返回到算法服务错误")
 			}
 		}(res0)
 	}
