@@ -216,7 +216,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
 		if field.Value == nil {
-			newLogger.Warnf("存数据点: 表=%s,设备=%s. 设备数据点值为空", tableId, p.ID)
+			newLogger.Warnf("存数据点: 设备表=%s,设备=%s. 设备数据点值为空", tableId, p.ID)
 			continue
 		}
 		//tagByte, err := json.Marshal(field.Tag)
@@ -233,7 +233,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		//}
 		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("存数据点: 表=%s,设备=%s. 设备数据点标识为空", tableId, p.ID)
+			newLogger.Errorf("存数据点: 设备表=%s,设备=%s. 设备数据点标识为空", tableId, p.ID)
 			continue
 		}
 
@@ -242,14 +242,14 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		case float32:
 			if math.IsNaN(float64(valueTmp)) || math.IsInf(float64(valueTmp), 0) {
 				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("存数据点: 表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat32(valueTmp)
 		case float64:
 			if math.IsNaN(valueTmp) || math.IsInf(valueTmp, 0) {
 				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("存数据点: 表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat(valueTmp)
@@ -280,7 +280,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
 				errCtx := logger.NewErrorContext(ctx, err)
-				logger.WithContext(errCtx).Errorf("存数据点: 表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
+				logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -302,7 +302,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			valTmp, err := numberx.GetValueByType("", newVal)
 			if err != nil {
 				errCtx := logger.NewErrorContext(ctx, err)
-				logger.WithContext(errCtx).Errorf("存数据点: 表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
+				logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
 			} else {
 				fields[tag.ID] = valTmp
 				if save {
@@ -314,7 +314,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			valTmp, err := numberx.GetValueByType("", rawVal)
 			if err != nil {
 				errCtx := logger.NewErrorContext(ctx, err)
-				logger.WithContext(errCtx).Errorf("存数据点: 表=%s,设备=%s,数据点=%s. 设备原始数据点转类型失败", tableId, p.ID, tag.ID)
+				logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备原始数据点转类型失败", tableId, p.ID, tag.ID)
 			} else {
 				fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 			}
@@ -334,7 +334,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		return err
 	}
 	if logger.IsLevelEnabled(logger.DebugLevel) {
-		newLogger.Debugf("存数据点: 表=%s,设备=%s,数据=%s. 保存数据成功", tableId, p.ID, string(b))
+		newLogger.Debugf("存数据点: 设备表=%s,设备=%s,数据=%s. 保存数据成功", tableId, p.ID, string(b))
 	}
 	return a.mq.Publish(ctxTimeout, []string{"data", Cfg.Project, tableId, p.ID}, b)
 	//return nil
