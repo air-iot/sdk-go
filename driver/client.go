@@ -462,6 +462,7 @@ func (c *Client) SchemaStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			logger.WithContext(newCtx).Debugf("schema: 接收到查询请求")
 			schema, err := c.driver.Schema(newCtx, c.app)
 			schemaRes := new(entity.GrpcResult)
 			if err != nil {
@@ -503,6 +504,7 @@ func (c *Client) StartStream(ctx context.Context) error {
 			return err
 		}
 		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
+		logger.WithContext(ctx1).Debugf("start: 接收到开始请求")
 		var cfg entity.Instance
 		if err := json.Unmarshal(res.Config, &cfg); err != nil {
 			startRes := new(entity.GrpcResult)
@@ -624,6 +626,7 @@ func (c *Client) RunStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			logger.WithContext(newCtx).Debugf("执行指令: 设备表=%s,设备=%s,指令=%s", res.TableId, res.Id, res.Command)
 			defer func() {
 				if errR := recover(); errR != nil {
 					var errStr string
@@ -700,6 +703,7 @@ func (c *Client) WriteTagStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			logger.WithContext(newCtx).Debugf("写数据点: 设备表=%s,设备=%s,指令=%s", res.TableId, res.Id, res.Command)
 			defer func() {
 				if errR := recover(); errR != nil {
 					var errStr string
@@ -777,6 +781,7 @@ func (c *Client) BatchRunStream(ctx context.Context) error {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
 			newCtx = logger.NewTableContext(newCtx, res.TableId)
+			logger.WithContext(newCtx).Debugf("批量执行指令: 设备表=%s,设备=%+v,指令=%s", res.TableId, res.Id, res.Command)
 			defer func() {
 				if errR := recover(); errR != nil {
 					var errStr string
@@ -854,6 +859,7 @@ func (c *Client) DebugStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			logger.WithContext(newCtx).Debugf("调试: 请求数据=%s", res.Data)
 			defer func() {
 				if errR := recover(); errR != nil {
 					var errStr string
@@ -926,6 +932,7 @@ func (c *Client) HttpProxyStream(ctx context.Context) error {
 			if Cfg.GroupID != "" {
 				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
 			}
+			logger.WithContext(newCtx).Debugf("httpProxy: type=%s,header=%s,请求数据=%s", res.Type, res.Headers, res.Data)
 			defer func() {
 				if errR := recover(); errR != nil {
 					var errStr string
