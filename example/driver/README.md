@@ -4,13 +4,13 @@
 
 ## 测试数据
 
-topic: test/gosdk/gosdk1
+topic: test1/gosdk/gosdk1
 
 ```json
 [
   {
     "key": "p1",
-    "value": 1
+    "value": 1.234
   },
   {
     "key": "p2",
@@ -37,7 +37,7 @@ function handler(topic, message) {
       field[ele.key] = ele.value
     })
     return [
-      {"table": topics[1], "id": topics[2], "time": new Date().getTime(), "fields": field}
+      {"table": topics[1], "id": topics[2], "time": new Date().ge"fields": fieldtTime(), }
     ]
   } catch (e) {
     console.error("handler error", e)

@@ -4,10 +4,11 @@ type Tag struct {
 	ID   string `json:"id" description:"ID"`
 	Name string `json:"name" description:"自定义名称"`
 	//以下为通用值计算相关属性
-	TagValue *TagValue `json:"tagValue"`
-	Fixed    *int32    `json:"fixed"`
-	Mod      *float64  `json:"mod"`
-	Range    *Range    `json:"range"`
+	TagValue      *TagValue `json:"tagValue"`
+	Fixed         *int32    `json:"fixed"`
+	Mod           *float64  `json:"mod"`
+	Range         *Range    `json:"range"`
+	BaseValFormat string    `json:"baseValFormat"`
 }
 
 type TagValue struct {
@@ -38,6 +39,8 @@ type InvalidAction string
 const (
 	InvalidAction_Save InvalidAction = "save"
 )
+
+type Fmt string
 
 type Range struct {
 	Enable        *bool            `json:"enable"`

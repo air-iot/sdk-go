@@ -1,6 +1,11 @@
 package convert
 
 import (
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/air-iot/sdk-go/v4/driver/entity"
 	"github.com/shopspring/decimal"
 )
@@ -33,14 +38,13 @@ func Value(tagTemp *entity.Tag, raw decimal.Decimal) (val decimal.Decimal) {
 			}
 		}
 	}
-
-	if tagTemp.Fixed != nil {
-		value = value.Round(*tagTemp.Fixed)
-	}
-
 	if tagTemp.Mod != nil {
 		value = value.Mul(decimal.NewFromFloat(*tagTemp.Mod))
 	}
+
+	//if tagTemp.Fixed != nil {
+	//	value = value.Round(*tagTemp.Fixed)
+	//}
 
 	return value
 }
@@ -513,4 +517,70 @@ loop:
 	}
 
 	return
+}
+
+func ValueFormat(tag *entity.Tag, value interface{}) interface{} {
+	if tag == nil {
+		return value
+	}
+	switch val := value.(type) {
+	case float64:
+		return ValueFloat(tag, val)
+	case float32:
+		return ValueFloat(tag, float64(val))
+	}
+	return value
+}
+
+func ValueFloat(tag *entity.Tag, value float64) float64 {
+	var fixed int32 = 3
+	if tag.Fixed != nil {
+		fixed = *tag.Fixed
+	}
+	switch tag.BaseValFormat {
+	case "round": // 四舍五入
+		factor := math.Pow(10, float64(fixed))
+		return math.Round(value*factor) / factor
+	case "carryUp": // 向上进位
+		factor := math.Pow(10, float64(fixed))
+		return math.Ceil(value*factor) / factor
+	case "slice": // 按位展示
+		return sliceNum(value, int(fixed))
+	default:
+		if tag.Fixed != nil {
+			factor := math.Pow(10, float64(*tag.Fixed))
+			return math.Round(value*factor) / factor
+		}
+	}
+	return value
+}
+
+// sliceNum 截取浮点数的小数位数
+func sliceNum(number float64, fixed int) float64 {
+	// 将浮点数转换为字符串
+	numberStr := strconv.FormatFloat(number, 'f', -1, 64)
+
+	// 查找小数点的位置
+	indexOfDecimal := strings.Index(numberStr, ".")
+	var slicedNumberStr string
+
+	if indexOfDecimal != -1 {
+		// 计算截取的结束位置
+		sliceEnd := indexOfDecimal + fixed + 1
+		if sliceEnd > len(numberStr) {
+			sliceEnd = len(numberStr)
+		}
+		slicedNumberStr = numberStr[:sliceEnd]
+	} else {
+		slicedNumberStr = numberStr
+	}
+
+	// 将截取后的字符串转换回浮点数
+	result, err := strconv.ParseFloat(slicedNumberStr, 64)
+	if err != nil {
+		fmt.Println("转换错误:", err)
+		return 0
+	}
+
+	return result
 }

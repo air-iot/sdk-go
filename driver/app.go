@@ -327,6 +327,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 					errCtx := logger.NewErrorContext(ctx, err)
 					logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
 				} else {
+					valTmp = convert.ValueFormat(&tag, valTmp)
 					fields[tag.ID] = valTmp
 					if save {
 						a.cacheValue.Store(cacheKey, newVal)
@@ -347,7 +348,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			}
 		} else {
 			vTmp, _ := val.Float64()
-			fields[tag.ID] = vTmp
+			fields[tag.ID] = convert.ValueFormat(&tag, vTmp)
 		}
 	}
 	if len(fields) == 0 {

@@ -78,3 +78,12 @@ func Test_ConvertRange_3(t *testing.T) {
 		t.Log(*gotRawValue)
 	}
 }
+
+func TestValueFormat(t *testing.T) {
+	var fixed int32 = 2
+	t.Log(ValueFormat(&entity.Tag{BaseValFormat: "round", Fixed: &fixed}, 1.2355))
+	t.Log(ValueFormat(&entity.Tag{BaseValFormat: "carryUp", Fixed: &fixed}, 1.2345))
+	t.Log(ValueFormat(&entity.Tag{BaseValFormat: "slice", Fixed: &fixed}, 1.2355))
+	t.Log(ValueFormat(&entity.Tag{BaseValFormat: "", Fixed: &fixed}, 1.2355))
+	t.Log(ValueFormat(&entity.Tag{BaseValFormat: "", Fixed: nil}, 1.2355))
+}
