@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	pb "github.com/air-iot/api-client-go/v4/driver"
 	"net/http"
 
 	"github.com/air-iot/sdk-go/v4/driver/entity"
@@ -50,6 +51,11 @@ type Driver interface {
 	// @param data 请求数据
 	// @return result "响应结果,自定义返回的格式"
 	HttpProxy(ctx context.Context, app App, t string, header http.Header, data []byte) (result interface{}, err error)
+
+	// ConfigUpdate
+	// @description 配置更新
+	// @param data 请求数据
+	ConfigUpdate(ctx context.Context, app App, data *pb.ConfigUpdateRequest) (err error)
 
 	// Stop
 	// @description 驱动停止处理

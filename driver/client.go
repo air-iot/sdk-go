@@ -37,7 +37,7 @@ type Client struct {
 	streamCount    int32
 }
 
-const totalStream = 7
+const totalStream = 8
 const STREAM_HEARTBEAT = "heartbeat"
 
 func (c *Client) Start(app App, driver Driver) *Client {
@@ -469,7 +469,6 @@ func (c *Client) startSteam(ctx context.Context, sessionId string) {
 			}
 		}
 	}()
-
 	go func() {
 		for {
 			select {
@@ -487,6 +486,28 @@ func (c *Client) startSteam(ctx context.Context, sessionId string) {
 				if err := c.HttpProxyStream(newCtx, sessionId); err != nil {
 					errCtx := logger.NewErrorContext(newCtx, err)
 					logger.WithContext(errCtx).Errorf("httpProxy: stream创建错误")
+				}
+				time.Sleep(Cfg.DriverGrpc.WaitTime)
+			}
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.WithContext(ctx).Infof("配置更新: 通过上下文关闭stream检查")
+				return
+			default:
+				newCtx := context.WithoutCancel(ctx)
+				if Cfg.GroupID != "" {
+					newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
+				}
+				newCtx = logger.NewModuleContext(newCtx, entity.MODULE_CONFIGUPDATE)
+				newLogger := logger.WithContext(newCtx)
+				newLogger.Infof("配置更新: 启动stream")
+				if err := c.ConfigUpdateStream(newCtx, sessionId); err != nil {
+					errCtx := logger.NewErrorContext(newCtx, err)
+					logger.WithContext(errCtx).Errorf("配置更新: stream创建错误")
 				}
 				time.Sleep(Cfg.DriverGrpc.WaitTime)
 			}
@@ -1356,6 +1377,76 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 			}); err != nil {
 				errCtx := logger.NewErrorContext(newCtx, err)
 				logger.WithContext(errCtx).Errorf("httpProxy: 请求结果返回到驱动管理错误")
+			}
+		}(res)
+	}
+}
+
+func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error {
+	stream, err := c.cli.ConfigUpdateStream(dGrpc.GetGrpcContext(ctx, Cfg.ServiceID, Cfg.Project, Cfg.Driver.ID, Cfg.Driver.Name, sessionId))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		//hCancel()
+		atomic.AddInt32(&c.streamCount, -1)
+		if err := stream.CloseSend(); err != nil {
+			errCtx := logger.NewErrorContext(ctx, err)
+			logger.WithContext(errCtx).Errorf("httpProxy: stream关闭错误")
+		}
+	}()
+	logger.WithContext(ctx).Infof("配置更新: stream连接成功")
+	atomic.AddInt32(&c.streamCount, 1)
+	for {
+		res, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		go func(res *pb.ConfigUpdateRequest) {
+			if res.GetRequest() == STREAM_HEARTBEAT {
+				//logger.WithContext(hCtx).Debugf("httpProxy stream收到心跳响应包输入到管道")
+				//ch <- struct{}{}
+				return
+			}
+			newCtx, cancel := context.WithTimeout(context.Background(), Cfg.DriverGrpc.Timeout)
+			defer cancel()
+			newCtx = logger.NewModuleContext(newCtx, entity.MODULE_CONFIGUPDATE)
+			if Cfg.GroupID != "" {
+				newCtx = logger.NewGroupContext(newCtx, Cfg.GroupID)
+			}
+			logger.WithContext(newCtx).Debugf("配置更新: type=%s,请求数据=%s", res.OpsType, res.Data)
+			defer func() {
+				if errR := recover(); errR != nil {
+					var errStr string
+					switch v := errR.(type) {
+					case error:
+						errStr = v.Error()
+						logger.Errorf("%+v", errors.WithStack(v))
+					default:
+						errStr = fmt.Sprintf("%v", v)
+						logger.Errorln(v)
+					}
+					gr := new(pb.ConfigUpdateResponse)
+					gr.Request = res.Request
+					gr.Status = false
+					gr.Detail = errStr
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("配置更新: 请求结果返回到驱动管理错误")
+					}
+				}
+			}()
+			gr := new(pb.ConfigUpdateResponse)
+			gr.Request = res.Request
+			gr.Status = true
+			err := c.driver.ConfigUpdate(newCtx, c.app, res)
+			if err != nil {
+				gr.Detail = err.Error()
+				gr.Status = false
+			}
+			if err := stream.Send(gr); err != nil {
+				errCtx := logger.NewErrorContext(newCtx, err)
+				logger.WithContext(errCtx).Errorf("配置更新: 请求结果返回到驱动管理错误")
 			}
 		}(res)
 	}

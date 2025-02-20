@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	pb "github.com/air-iot/api-client-go/v4/driver"
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
 	"github.com/air-iot/sdk-go/v4/driver"
@@ -249,6 +250,11 @@ func (p *TestDriver) HttpProxy(ctx context.Context, a driver.App, t string, head
 		}
 	}
 	return Schema, nil
+}
+
+func (p *TestDriver) ConfigUpdate(ctx context.Context, _ driver.App, data *pb.ConfigUpdateRequest) (err error) {
+
+	return nil
 }
 
 func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig DriverInstanceConfig) error {

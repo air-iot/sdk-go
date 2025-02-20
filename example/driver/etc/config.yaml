@@ -1,7 +1,7 @@
 mq:
   type: mqtt
   mqtt:
-    host: localhost
+    host: v4.airiot.tech
     port: 1883
   kafka:
     brokers:
@@ -9,15 +9,17 @@ mq:
 
 serviceId: 64f847d563d1482d33753c25
 project: zq
+#serviceId: 649e73e5f21caca0dceb708d
+#project: 647d3f6db395ea47865d4b9e
 
 driver:
   id: go-driver-mqtt-demo
+#  id: opcua
   name: 测试驱动
 
 log:
   level: 5
   format: json
-
 
 driverGrpc:
   host: localhost
