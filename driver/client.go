@@ -1439,6 +1439,32 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 			gr := new(pb.ConfigUpdateResponse)
 			gr.Request = res.Request
 			gr.Status = true
+			switch res.OpsType {
+			case pb.ConfigUpdateRequest_ADD_DEVICE:
+				var dev entity.Device
+				if err := json.Unmarshal(res.GetAddDeviceData().GetTableData(), &dev); err != nil {
+					gr.Detail = err.Error()
+					gr.Status = false
+					if err := stream.Send(gr); err != nil {
+						errCtx := logger.NewErrorContext(newCtx, err)
+						logger.WithContext(errCtx).Errorf("配置更新: 请求结果返回到驱动管理错误")
+					}
+					return
+				}
+				devM, ok := c.cacheConfigNum.Load(dev.Id)
+				var devI map[string]interface{}
+				if ok {
+					devI, _ = devM.(map[string]interface{})
+				} else {
+					devI = map[string]interface{}{}
+				}
+				devI[res.GetAddDeviceData().GetTableId()] = struct{}{}
+				c.cacheConfigNum.Store(dev.Id, devI)
+				c.cacheConfig.Store(dev.Id, res.GetAddDeviceData().GetTableId())
+			case pb.ConfigUpdateRequest_DEL_DEVICE:
+				c.cacheConfigNum.Delete(res.GetDelDeviceData().GetTableDataId())
+				c.cacheConfig.Delete(res.GetDelDeviceData().GetTableDataId())
+			}
 			err := c.driver.ConfigUpdate(newCtx, c.app, res)
 			if err != nil {
 				gr.Detail = err.Error()
