@@ -22,6 +22,7 @@ type mqtt struct {
 
 // MQTTConfig mqtt配置参数
 type MQTTConfig struct {
+	Schema          string      `json:"schema"`
 	Host            string      `json:"host" yaml:"host"`
 	Port            int         `json:"port" yaml:"port"`
 	Username        string      `json:"username" yaml:"username"`
@@ -35,7 +36,11 @@ type MQTTConfig struct {
 }
 
 func (a MQTTConfig) DNS() string {
-	return fmt.Sprintf("tcp://%s:%d", a.Host, a.Port)
+	schema := "tcp"
+	if a.Schema != "" {
+		schema = a.Schema
+	}
+	return fmt.Sprintf("%s://%s:%d", schema, a.Host, a.Port)
 }
 
 const TOPICSEPWITHMQTT = "/"
