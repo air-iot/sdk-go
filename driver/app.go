@@ -443,6 +443,7 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 		Status:      w.Status,
 		Handle:      w.Handle,
 		Desc:        w.Desc,
+		I18nProp:    w.I18nProp,
 	}
 	b, err := json.Marshal(wt)
 	if err != nil {

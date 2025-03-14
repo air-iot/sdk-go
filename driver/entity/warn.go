@@ -17,35 +17,37 @@ const (
 )
 
 type Warn struct {
-	ID          string        `json:"id"`
-	TableId     string        `json:"tableId"`
-	TableDataId string        `json:"tableDataId"`
-	Level       string        `json:"level"`
-	Ruleid      string        `json:"ruleid"`
-	Fields      []WarnTag     `json:"fields"`
-	WarningType []string      `json:"type"`
-	Processed   WarnProcessed `json:"processed"`
-	Time        *time.Time    `json:"time"`
-	Alert       bool          `json:"alert"`
-	Status      WarnStatus    `json:"status"`
-	Handle      bool          `json:"handle"`
-	Desc        string        `json:"desc"`
+	ID          string            `json:"id"`
+	TableId     string            `json:"tableId"`
+	TableDataId string            `json:"tableDataId"`
+	Level       string            `json:"level"`
+	Ruleid      string            `json:"ruleid"`
+	Fields      []WarnTag         `json:"fields"`
+	WarningType []string          `json:"type"`
+	Processed   WarnProcessed     `json:"processed"`
+	Time        *time.Time        `json:"time"`
+	Alert       bool              `json:"alert"`
+	Status      WarnStatus        `json:"status"`
+	Handle      bool              `json:"handle"`
+	Desc        string            `json:"desc"`
+	I18nProp    map[string]string `json:"i18nProp"`
 }
 
 type WarnSend struct {
-	ID          string        `json:"id"`
-	Table       Table         `json:"table"`
-	TableData   TableData     `json:"tableData"`
-	Level       string        `json:"level"`
-	Ruleid      string        `json:"ruleid"`
-	Fields      []WarnTag     `json:"fields"`
-	WarningType []string      `json:"type"`
-	Processed   WarnProcessed `json:"processed"`
-	Time        string        `json:"time"` //time.RFC3339
-	Alert       bool          `json:"alert"`
-	Status      WarnStatus    `json:"status"`
-	Handle      bool          `json:"handle"`
-	Desc        string        `json:"desc"`
+	ID          string            `json:"id"`
+	Table       Table             `json:"table"`
+	TableData   TableData         `json:"tableData"`
+	Level       string            `json:"level"`
+	Ruleid      string            `json:"ruleid"`
+	Fields      []WarnTag         `json:"fields"`
+	WarningType []string          `json:"type"`
+	Processed   WarnProcessed     `json:"processed"`
+	Time        string            `json:"time"` //time.RFC3339
+	Alert       bool              `json:"alert"`
+	Status      WarnStatus        `json:"status"`
+	Handle      bool              `json:"handle"`
+	Desc        string            `json:"desc"`
+	I18nProp    map[string]string `json:"i18nProp"`
 }
 
 type WarnTag struct {
