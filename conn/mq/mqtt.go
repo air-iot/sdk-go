@@ -22,17 +22,21 @@ type mqtt struct {
 
 // MQTTConfig mqtt配置参数
 type MQTTConfig struct {
-	Schema          string      `json:"schema"`
-	Host            string      `json:"host" yaml:"host"`
-	Port            int         `json:"port" yaml:"port"`
-	Username        string      `json:"username" yaml:"username"`
-	Password        string      `json:"password" yaml:"password"`
-	KeepAlive       uint        `json:"keepAlive" yaml:"keepAlive" default:"60"`
-	ConnectTimeout  uint        `json:"connectTimeout" yaml:"connectTimeout" default:"20"`
-	ProtocolVersion uint        `json:"protocolVersion" yaml:"protocolVersion" default:"4"`
-	Order           bool        `json:"order" yaml:"order" default:"false"`
-	ClientIdPrefix  string      `json:"clientIdPrefix" yaml:"clientIdPrefix"`
-	TLSConfig       *tls.Config `json:"tlsConfig" yaml:"tlsConfig"`
+	Schema          string     `json:"schema"`
+	Host            string     `json:"host" yaml:"host"`
+	Port            int        `json:"port" yaml:"port"`
+	Username        string     `json:"username" yaml:"username"`
+	Password        string     `json:"password" yaml:"password"`
+	KeepAlive       uint       `json:"keepAlive" yaml:"keepAlive" default:"60"`
+	ConnectTimeout  uint       `json:"connectTimeout" yaml:"connectTimeout" default:"20"`
+	ProtocolVersion uint       `json:"protocolVersion" yaml:"protocolVersion" default:"4"`
+	Order           bool       `json:"order" yaml:"order" default:"false"`
+	ClientIdPrefix  string     `json:"clientIdPrefix" yaml:"clientIdPrefix"`
+	TLSConfig       *TlsConfig `json:"tlsConfig" yaml:"tlsConfig"`
+}
+
+type TlsConfig struct {
+	InsecureSkipVerify bool `json:"insecureSkipVerify" yaml:"insecureSkipVerify"`
 }
 
 func (a MQTTConfig) DNS() string {
@@ -74,8 +78,9 @@ func NewMQTTClient(cfg MQTTConfig) (MQ, func(), error) {
 	if cfg.ClientIdPrefix != "" {
 		opts.SetClientID(fmt.Sprintf("%s_%s", cfg.ClientIdPrefix, primitive.NewObjectID().Hex()))
 	}
-	if cfg.TLSConfig != nil {
-		opts.SetTLSConfig(cfg.TLSConfig)
+	if cfg.TLSConfig != nil && cfg.TLSConfig.InsecureSkipVerify {
+		opts.SetTLSConfig(&tls.Config{InsecureSkipVerify: cfg.TLSConfig.InsecureSkipVerify})
+		//opts.SetTLSConfig(cfg.TLSConfig)
 	}
 	opts.SetOnConnectHandler(func(client MQTT.Client) {
 		logger.Infof("MQTT 已连接")
