@@ -79,6 +79,8 @@ func Init() {
 	viper.SetDefault("log.level", 4)
 	viper.SetDefault("log.format", "json")
 	viper.SetDefault("log.output", "stdout")
+
+	// mq
 	viper.SetDefault("mq.type", "mqtt")
 	viper.SetDefault("mq.timeout", "60s")
 	viper.SetDefault("mq.mqtt.schema", "tcp")
@@ -95,6 +97,8 @@ func Init() {
 	viper.SetDefault("mq.rabbit.username", "admin")
 	viper.SetDefault("mq.rabbit.password", "public")
 	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
+
+	// driver
 	viper.SetDefault("driverGrpc.host", "driver")
 	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetDefault("driverGrpc.health.requestTime", "10s")
@@ -103,6 +107,24 @@ func Init() {
 	viper.SetDefault("driverGrpc.waitTime", "5s")
 	viper.SetDefault("driverGrpc.timeout", "600s")
 	viper.SetDefault("driverGrpc.limit", 100)
+
+	// etcd
+	viper.SetDefault("etcd.endpoints", []string{"etcd:2379"})
+	viper.SetDefault("etcd.dialTimeout", 60)
+	viper.SetDefault("etcd.username", "root")
+
+	// etcd config
+	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
+
+	// api client
+	viper.SetDefault("api.liteMode", false)
+	viper.SetDefault("api.gateway", "http://localhost:3030/rest")
+	viper.SetDefault("api.gatewayGrpc", "localhost:9224")
+	viper.SetDefault("api.etcdConfig", "/airiot/config/pro.json")
+	viper.SetDefault("api.metadata", map[string]string{"env": "local"})
+	viper.SetDefault("api.type", "project")
+	viper.SetDefault("api.projectId", "default")
+
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
