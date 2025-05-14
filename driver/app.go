@@ -112,6 +112,7 @@ func Init() {
 	viper.SetDefault("etcd.endpoints", []string{"etcd:2379"})
 	viper.SetDefault("etcd.dialTimeout", 60)
 	viper.SetDefault("etcd.username", "root")
+	viper.SetDefault("etcd.password", "")
 
 	// etcd config
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
@@ -124,6 +125,8 @@ func Init() {
 	viper.SetDefault("api.metadata", map[string]string{"env": "local"})
 	viper.SetDefault("api.type", "project")
 	viper.SetDefault("api.projectId", "default")
+	viper.SetDefault("api.ak", "")
+	viper.SetDefault("api.sk", "")
 
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
