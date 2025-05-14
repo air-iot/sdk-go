@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 
+	apiConfig "github.com/air-iot/api-client-go/v4/config"
+	"github.com/air-iot/sdk-go/v4/etcd"
+
 	"github.com/air-iot/logger"
 	"google.golang.org/grpc/metadata"
 )
@@ -24,6 +27,9 @@ type Config struct {
 		Host   string `json:"host" yaml:"host"`
 		Port   string `json:"port" yaml:"port"`
 	} `json:"pprof" yaml:"pprof"`
+	EtcdConfig string           `json:"etcdConfig" yaml:"etcdConfig"`
+	Etcd       etcd.Config      `json:"etcd" yaml:"etcd"`
+	API        apiConfig.Config `json:"api" yaml:"api"`
 }
 
 type Grpc struct {

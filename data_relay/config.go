@@ -30,5 +30,6 @@ type Config struct {
 	App        struct {
 		API grpcConfig.Config `json:"api" yaml:"API"`
 	} `json:"app" yaml:"app"`
-	MQ mq.Config `json:"mq" yaml:"mq"`
+	MQ  mq.Config         `json:"mq" yaml:"mq"`
+	API grpcConfig.Config `json:"api" yaml:"api"`
 }

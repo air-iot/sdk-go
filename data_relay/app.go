@@ -74,6 +74,27 @@ func Init() {
 	viper.SetDefault("mq.rabbit.username", "admin")
 	viper.SetDefault("mq.rabbit.password", "public")
 	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
+
+	// etcd
+	viper.SetDefault("etcd.endpoints", []string{"etcd:2379"})
+	viper.SetDefault("etcd.dialTimeout", 60)
+	viper.SetDefault("etcd.username", "root")
+	viper.SetDefault("etcd.password", "")
+
+	// etcd config
+	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
+
+	// api client
+	viper.SetDefault("api.liteMode", false)
+	viper.SetDefault("api.gateway", "http://localhost:3030/rest")
+	viper.SetDefault("api.gatewayGrpc", "localhost:9224")
+	viper.SetDefault("api.etcdConfig", "/airiot/config/pro.json")
+	viper.SetDefault("api.metadata", map[string]string{"env": "local"})
+	viper.SetDefault("api.type", "project")
+	viper.SetDefault("api.projectId", "default")
+	viper.SetDefault("api.ak", "")
+	viper.SetDefault("api.sk", "")
+
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 	viper.SetConfigType("yaml")
@@ -138,30 +159,46 @@ func NewApp() App {
 			}
 		}()
 	}
-	conn, err := etcd.NewConn(Cfg.Etcd)
-	if err != nil {
-		panic(err)
-	}
-	a.etcdConn = conn
-	apiCli, clean, err := api_client_go.NewClient(conn, Cfg.App.API)
-	if err != nil {
-		panic(err)
-	}
-	a.apiClient = apiCli
-	mqConn, cleanMQ, err := mq.NewMQ(Cfg.MQ)
-	if err != nil {
-		panic(fmt.Errorf("初始化消息队列错误: %w", err))
-	}
-	a.mq = mqConn
-	a.clean = func() {
-		clean()
-		cleanMQ()
-		err := conn.Close()
+	if !Cfg.API.LiteMode {
+		conn, err := etcd.NewConn(Cfg.Etcd)
 		if err != nil {
-			logger.Errorf("关闭etcd: %v", err)
+			panic(err)
+		}
+		a.etcdConn = conn
+		apiCli, clean, err := api_client_go.NewClient(conn, Cfg.App.API)
+		if err != nil {
+			panic(err)
+		}
+		a.apiClient = apiCli
+		mqConn, cleanMQ, err := mq.NewMQ(Cfg.MQ)
+		if err != nil {
+			panic(fmt.Errorf("初始化消息队列错误: %w", err))
+		}
+		a.mq = mqConn
+		a.clean = func() {
+			clean()
+			cleanMQ()
+			err := conn.Close()
+			if err != nil {
+				logger.Errorf("关闭etcd: %v", err)
+			}
+		}
+	} else {
+		apiCli, clean, err := api_client_go.NewClient(nil, Cfg.API)
+		if err != nil {
+			panic(err)
+		}
+		a.apiClient = apiCli
+		mqConn, cleanMQ, err := mq.NewMQ(Cfg.MQ)
+		if err != nil {
+			panic(fmt.Errorf("初始化消息队列错误: %w", err))
+		}
+		a.mq = mqConn
+		a.clean = func() {
+			clean()
+			cleanMQ()
 		}
 	}
-
 	return a
 }
 
