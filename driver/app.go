@@ -52,10 +52,11 @@ type App interface {
 }
 
 const (
-	String  = "string"
-	Float   = "float"
-	Integer = "integer"
-	Boolean = "boolean"
+	String     = "string"
+	Float      = "float"
+	Integer    = "integer"
+	Boolean    = "boolean"
+	BooleanRaw = "boolean_raw"
 )
 
 // app 数据采集类
