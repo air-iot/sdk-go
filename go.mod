@@ -4,7 +4,7 @@ go 1.23.0
 
 require (
 	github.com/IBM/sarama v1.42.1
-	github.com/air-iot/api-client-go/v4 v4.8.11
+	github.com/air-iot/api-client-go/v4 v4.8.13
 	github.com/air-iot/errors v0.0.7
 	github.com/air-iot/json v0.0.3
 	github.com/air-iot/logger v1.0.14
@@ -115,4 +115,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-//replace github.com/air-iot/api-client-go/v4 => /Users/zhangqiang/work/code/airiot/api-client-go
+//replace github.com/air-iot/api-client-go/v4 => ../../api-client-go
