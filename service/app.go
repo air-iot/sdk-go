@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/air-iot/sdk-go/v4/utils/decrypt"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 )
@@ -32,9 +34,9 @@ func init() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./etc/")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Println("读取配置,", err.Error())
-		os.Exit(1)
+		panic(fmt.Errorf("读取配置: %w", err))
 	}
+	decrypt.Decode()
 }
 
 // 任务服务

@@ -14,15 +14,14 @@ project: zq
 
 driver:
   id: go-driver-mqtt-demo
-#  id: opcua
-  name: 测试驱动
+  name: ENC(ZGVsbDEyMw==)
 
 log:
   level: 5
   format: json
 
 driverGrpc:
-  host: localhost
+  host: v4.airiot.tech
   port: 9224
   healthRequestTime: 10s
   waitTime: 5s

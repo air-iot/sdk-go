@@ -14,6 +14,8 @@ import (
 	"github.com/air-iot/logger"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
+	"github.com/air-iot/sdk-go/v4/utils/decrypt"
 )
 
 type App interface {
@@ -72,6 +74,7 @@ func Init() {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(fmt.Errorf("读取配置错误: %w", err))
 	}
+	decrypt.Decode()
 	if err := viper.Unmarshal(Cfg); err != nil {
 		panic(fmt.Errorf("配置解析错误: %w", err))
 	}

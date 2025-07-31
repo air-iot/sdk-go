@@ -118,7 +118,7 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 		return fmt.Errorf("服务器地址为空")
 	}
 	if config.Device.Settings.Topic == "" {
-		return fmt.Errorf("Topic为空")
+		return fmt.Errorf("topic为空")
 	}
 	registry := require.NewRegistry()
 	if config.Device.Settings.ParseScript != "" {

@@ -26,6 +26,7 @@ import (
 	"github.com/air-iot/sdk-go/v4/conn/mq"
 	"github.com/air-iot/sdk-go/v4/driver/convert"
 	"github.com/air-iot/sdk-go/v4/driver/entity"
+	"github.com/air-iot/sdk-go/v4/utils/decrypt"
 	"github.com/air-iot/sdk-go/v4/utils/numberx"
 )
 
@@ -141,6 +142,7 @@ func Init() {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(fmt.Errorf("读取配置错误: %w", err))
 	}
+	decrypt.Decode()
 	if err := viper.Unmarshal(Cfg); err != nil {
 		panic(fmt.Errorf("配置解析错误: %w", err))
 	}

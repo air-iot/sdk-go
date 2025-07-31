@@ -1,11 +1,13 @@
 package task
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/air-iot/sdk-go/v4/utils/decrypt"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 )
@@ -28,9 +30,9 @@ func init() {
 	viper.SetConfigName("config")
 	viper.AddConfigPath("./etc/")
 	if err := viper.ReadInConfig(); err != nil {
-		log.Println("读取配置,", err.Error())
-		os.Exit(1)
+		panic(fmt.Errorf("读取配置: %w", err))
 	}
+	decrypt.Decode()
 }
 
 // 任务服务
