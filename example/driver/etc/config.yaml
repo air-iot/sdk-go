@@ -1,7 +1,7 @@
 mq:
   type: mqtt
   mqtt:
-    host: v4.airiot.tech
+    host: localhost
     port: 1883
   kafka:
     brokers:
@@ -14,14 +14,14 @@ project: zq
 
 driver:
   id: go-driver-mqtt-demo
-  name: ENC(ZGVsbDEyMw==)
+  name: 测试驱动
 
 log:
   level: 5
   format: json
 
 driverGrpc:
-  host: v4.airiot.tech
+  host: localhost
   port: 9224
   healthRequestTime: 10s
   waitTime: 5s
