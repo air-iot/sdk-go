@@ -191,7 +191,7 @@ func NewApp() App {
 // Start 开始服务
 func (a *app) Start(driver Driver) {
 	a.stopped = false
-	cli := Client{cacheConfig: sync.Map{}, cacheConfigNum: sync.Map{}}
+	cli := Client{cacheConfig: NewCacheConfig()}
 	a.cli = cli.Start(a, driver)
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
@@ -235,18 +235,11 @@ func (a *app) WritePoints(ctx context.Context, p entity.Point) error {
 	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WRITEPOINT)
 	tableId := p.Table
 	if tableId == "" {
-		tableIdI, ok := a.cli.cacheConfig.Load(p.ID)
-		if !ok {
-			return fmt.Errorf("传入表id为空且未在配置中找到")
+		tableIdI, err := a.cli.cacheConfig.get(p.ID)
+		if err != nil {
+			return err
 		}
-		devI, ok := a.cli.cacheConfigNum.Load(p.ID)
-		if ok {
-			devM, _ := devI.(map[string]interface{})
-			if len(devM) >= 2 {
-				return fmt.Errorf("传入表id为空且在配置中找到多个表id")
-			}
-		}
-		tableId = tableIdI.(string)
+		tableId = tableIdI
 	}
 	if p.ID == "" {
 		return fmt.Errorf("设备id为空")
@@ -430,18 +423,11 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
 	tableId := w.TableId
 	if tableId == "" {
-		tableIdI, ok := a.cli.cacheConfig.Load(w.TableDataId)
-		if !ok {
-			return fmt.Errorf("传入表id为空且未在配置中找到")
+		tableIdI, err := a.cli.cacheConfig.get(w.TableDataId)
+		if err != nil {
+			return err
 		}
-		devI, ok := a.cli.cacheConfigNum.Load(w.TableDataId)
-		if ok {
-			devM, _ := devI.(map[string]interface{})
-			if len(devM) >= 2 {
-				return fmt.Errorf("传入表id为空且在配置中找到多个表id")
-			}
-		}
-		tableId = tableIdI.(string)
+		tableId = tableIdI
 	}
 	w.TableId = tableId
 	if w.TableDataId == "" {

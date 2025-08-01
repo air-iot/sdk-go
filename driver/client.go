@@ -26,15 +26,14 @@ import (
 type Client struct {
 	lock sync.RWMutex
 
-	conn           *grpc.ClientConn
-	cli            pb.DriverServiceClient
-	instructCli    pb.DriverInstructServiceClient
-	app            App
-	driver         Driver
-	clean          func()
-	cacheConfig    sync.Map
-	cacheConfigNum sync.Map
-	streamCount    int32
+	conn        *grpc.ClientConn
+	cli         pb.DriverServiceClient
+	instructCli pb.DriverInstructServiceClient
+	app         App
+	driver      Driver
+	clean       func()
+	cacheConfig *cacheConfig
+	streamCount int32
 }
 
 const totalStream = 8
@@ -46,6 +45,65 @@ func (c *Client) Start(app App, driver Driver) *Client {
 	c.streamCount = 0
 	c.start()
 	return c
+}
+
+type cacheConfig struct {
+	lock sync.RWMutex
+	data map[string]map[string]struct{}
+}
+
+func NewCacheConfig() *cacheConfig {
+	return &cacheConfig{
+		data: make(map[string]map[string]struct{}),
+	}
+}
+
+func (c *cacheConfig) clear() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	clear(c.data)
+}
+
+func (c *cacheConfig) set(table, id string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	m, ok := c.data[id]
+	if !ok {
+		m = make(map[string]struct{})
+	}
+	m[table] = struct{}{}
+	c.data[id] = m
+}
+
+func (c *cacheConfig) del(table string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for id, m := range c.data {
+		for k := range m {
+			if k == table {
+				delete(m, table)
+			}
+		}
+		if len(m) == 0 {
+			delete(c.data, id)
+		}
+	}
+}
+
+func (c *cacheConfig) get(id string) (string, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	m, ok := c.data[id]
+	if !ok {
+		return "", errors.New("未找到设备所在的表")
+	}
+	if len(m) > 1 {
+		return "", errors.New("设备所在的表不唯一")
+	}
+	for k := range m {
+		return k, nil
+	}
+	return "", errors.New("未找到设备所在的表")
 }
 
 func (c *Client) start() {
@@ -1191,19 +1249,10 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 				}
 				c.updateTableCache(t)
 			case pb.ConfigUpdateRequest_ADD_DEVICE:
-				devM, ok := c.cacheConfigNum.Load(res.GetAddDeviceData().GetTableDataId())
-				var devI map[string]interface{}
-				if ok {
-					devI, _ = devM.(map[string]interface{})
-				} else {
-					devI = map[string]interface{}{}
-				}
-				devI[res.GetAddDeviceData().GetTableId()] = struct{}{}
-				c.cacheConfigNum.Store(res.GetAddDeviceData().GetTableDataId(), devI)
-				c.cacheConfig.Store(res.GetAddDeviceData().GetTableDataId(), res.GetAddDeviceData().GetTableId())
+				c.cacheConfig.set(res.GetAddDeviceData().GetTableId(), res.GetAddDeviceData().GetTableDataId())
 			case pb.ConfigUpdateRequest_DEL_DEVICE:
-				c.cacheConfigNum.Delete(res.GetDelDeviceData().GetTableDataId())
-				c.cacheConfig.Delete(res.GetDelDeviceData().GetTableDataId())
+				//c.cacheConfigNum.Delete(res.GetDelDeviceData().GetTableDataId())
+				c.cacheConfig.del(res.GetDelDeviceData().GetTableId())
 			}
 			err := c.driver.ConfigUpdate(newCtx, c.app, res)
 			if err != nil {
@@ -1218,66 +1267,22 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 }
 
 func (c *Client) updateDriverCache(cfg entity.Instance) {
-	c.cacheConfigNum.Clear()
-	c.cacheConfig.Clear()
+	c.cacheConfig.clear()
 	if cfg.Tables != nil {
 		for _, t := range cfg.Tables {
 			if t.Devices == nil {
 				continue
 			}
 			for _, device := range t.Devices {
-				devM, ok := c.cacheConfigNum.Load(device.Id)
-				var devI map[string]interface{}
-				if ok {
-					devI, _ = devM.(map[string]interface{})
-				} else {
-					devI = map[string]interface{}{}
-				}
-				devI[t.Id] = struct{}{}
-				c.cacheConfigNum.Store(device.Id, devI)
-				c.cacheConfig.Store(device.Id, t.Id)
+				c.cacheConfig.set(t.Id, device.Id)
 			}
 		}
 	}
 }
 
 func (c *Client) updateTableCache(t entity.TableCfg) {
-	c.cacheConfigNum.Range(func(key, value interface{}) bool {
-		if value == nil {
-			c.cacheConfigNum.Delete(key)
-			return true
-		}
-		devI, _ := value.(map[string]interface{})
-		delete(devI, t.Id)
-		if len(devI) == 0 {
-			c.cacheConfigNum.Delete(key)
-			return true
-		}
-		return true
-	})
-	c.cacheConfig.Range(func(key, value interface{}) bool {
-		if value == nil {
-			c.cacheConfig.Delete(key)
-			return true
-		}
-		vOk, ok := value.(string)
-		if ok && vOk == t.Id {
-			c.cacheConfig.Delete(key)
-			return true
-		}
-
-		return true
-	})
+	c.cacheConfig.del(t.Id)
 	for _, device := range t.Devices {
-		devM, ok := c.cacheConfigNum.Load(device.Id)
-		var devI map[string]interface{}
-		if ok {
-			devI, _ = devM.(map[string]interface{})
-		} else {
-			devI = map[string]interface{}{}
-		}
-		devI[t.Id] = struct{}{}
-		c.cacheConfigNum.Store(device.Id, devI)
-		c.cacheConfig.Store(device.Id, t.Id)
+		c.cacheConfig.set(t.Id, device.Id)
 	}
 }
