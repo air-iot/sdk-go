@@ -80,14 +80,14 @@ type RangeCondition struct {
 }
 
 type Instance struct {
-	ID      string  `json:"id"`
-	Debug   *bool   `json:"debug"`
-	GroupId string  `json:"groupId"`
-	Tables  []table `json:"tables"`
+	ID      string     `json:"id"`
+	Debug   *bool      `json:"debug"`
+	GroupId string     `json:"groupId"`
+	Tables  []TableCfg `json:"tables"`
 }
 
-// table 设置
-type table struct {
+// TableCfg 设置
+type TableCfg struct {
 	Id      string   `json:"id"`
 	Devices []Device `json:"devices"`
 }

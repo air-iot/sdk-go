@@ -520,10 +520,7 @@ func (c *Client) SchemaStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
-		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			errCtx := logger.NewErrorContext(ctx, err)
@@ -532,42 +529,6 @@ func (c *Client) SchemaStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("schema: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("schema stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("schema stream心跳开始")
-	//			if err := stream.Send(&pb.SchemaResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("schema stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("schema stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("schema stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("schema stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("schema stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("schema stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -612,8 +573,6 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
 		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
@@ -624,50 +583,12 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("start: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("start stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("start stream心跳开始")
-	//			if err := stream.Send(&pb.StartResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("start stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("start stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("start stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("start stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("start stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("start stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
 			return err
 		}
 		if res.GetRequest() == STREAM_HEARTBEAT {
-			//logger.WithContext(hCtx).Debugf("start stream收到心跳响应包输入到管道")
-			//ch <- struct{}{}
 			continue
 		}
 		ctx1 := logger.NewModuleContext(context.Background(), entity.MODULE_START)
@@ -694,33 +615,13 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 				logger.SetLevel(logger.InfoLevel)
 			}
 		}
-		c.cacheConfigNum = sync.Map{}
-		c.cacheConfig = sync.Map{}
 		if cfg.GroupId != "" {
 			Cfg.GroupID = cfg.GroupId
 		}
 		if Cfg.GroupID != "" {
 			ctx1 = logger.NewGroupContext(ctx1, Cfg.GroupID)
 		}
-		if cfg.Tables != nil {
-			for _, t := range cfg.Tables {
-				if t.Devices == nil {
-					continue
-				}
-				for _, device := range t.Devices {
-					devM, ok := c.cacheConfigNum.Load(device.Id)
-					var devI map[string]interface{}
-					if ok {
-						devI, _ = devM.(map[string]interface{})
-					} else {
-						devI = map[string]interface{}{}
-					}
-					devI[t.Id] = struct{}{}
-					c.cacheConfigNum.Store(device.Id, devI)
-					c.cacheConfig.Store(device.Id, t.Id)
-				}
-			}
-		}
+		c.updateDriverCache(cfg)
 		run := func(res *pb.StartRequest) {
 			newCtx, cancel := context.WithTimeout(ctx1, Cfg.DriverGrpc.Timeout)
 			defer cancel()
@@ -773,10 +674,7 @@ func (c *Client) RunStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
-		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			errCtx := logger.NewErrorContext(ctx, err)
@@ -785,42 +683,6 @@ func (c *Client) RunStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("执行指令: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("执行指令stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("执行指令stream心跳开始")
-	//			if err := stream.Send(&pb.RunResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("执行指令stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("执行指令stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("执行指令stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("执行指令stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("执行指令stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("执行指令stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -894,10 +756,7 @@ func (c *Client) WriteTagStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
-		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			errCtx := logger.NewErrorContext(ctx, err)
@@ -906,42 +765,6 @@ func (c *Client) WriteTagStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("写数据点: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("写数据点stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("写数据点stream心跳开始")
-	//			if err := stream.Send(&pb.RunResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("写数据点stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("写数据点stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("写数据点stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("写数据点stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("写数据点stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("写数据点stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -1015,10 +838,7 @@ func (c *Client) BatchRunStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
-		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
 		if err := stream.CloseSend(); err != nil {
 			errCtx := logger.NewErrorContext(ctx, err)
@@ -1027,42 +847,6 @@ func (c *Client) BatchRunStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("批量执行指令: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("批量执行指令stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("批量执行指令stream心跳开始")
-	//			if err := stream.Send(&pb.BatchRunResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("批量执行指令stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("批量执行指令stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("批量执行指令stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("批量执行指令stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("批量执行指令stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("批量执行指令stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -1137,8 +921,6 @@ func (c *Client) DebugStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
 		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
@@ -1149,43 +931,6 @@ func (c *Client) DebugStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("调试: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("调试stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("调试stream心跳开始")
-	//			if err := stream.Send(&pb.Debug{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("调试stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("调试stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("调试stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("调试stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("调试stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("调试stream收到心跳响应")
-	//			}
-	//
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -1254,8 +999,6 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 	if err != nil {
 		return err
 	}
-	//hCtx, hCancel := context.WithCancel(ctx)
-	//ch := make(chan struct{}, 1)
 	defer func() {
 		//hCancel()
 		atomic.AddInt32(&c.streamCount, -1)
@@ -1266,42 +1009,6 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 	}()
 	logger.WithContext(ctx).Infof("httpProxy: stream连接成功")
 	atomic.AddInt32(&c.streamCount, 1)
-	//go func() {
-	//	for {
-	//		select {
-	//		case <-hCtx.Done():
-	//			logger.WithContext(hCtx).Infof("httpProxy stream心跳停止")
-	//			return
-	//		default:
-	//			time.Sleep(Cfg.DriverGrpc.Stream.Heartbeat)
-	//			logger.WithContext(hCtx).Debugf("httpProxy stream心跳开始")
-	//			if err := stream.Send(&pb.HttpProxyResult{
-	//				Request: STREAM_HEARTBEAT,
-	//			}); err != nil {
-	//				logger.WithContext(logger.NewErrorContext(hCtx, err)).Errorf("httpProxy stream心跳发送错误")
-	//				//if err := stream.CloseSend(); err != nil {
-	//				//	errCtx := logger.NewErrorContext(ctx, err)
-	//				//	logger.WithContext(errCtx).Errorf("httpProxy stream心跳发送错误: 关闭stream错误")
-	//				//}
-	//				c.close(ctx)
-	//				return
-	//			}
-	//			select {
-	//			case <-hCtx.Done():
-	//				logger.WithContext(hCtx).Infof("httpProxy stream心跳停止")
-	//				return
-	//			case <-time.After(Cfg.DriverGrpc.Stream.Heartbeat * 3):
-	//				logger.WithContext(hCtx).Errorf("httpProxy stream心跳超时")
-	//				if err := stream.CloseSend(); err != nil {
-	//					logger.WithContext(hCtx).Errorf("httpProxy stream心跳超时: 关闭stream错误")
-	//				}
-	//				return
-	//			case <-ch:
-	//				logger.WithContext(hCtx).Debugf("httpProxy stream收到心跳响应")
-	//			}
-	//		}
-	//	}
-	//}()
 	for {
 		res, err := stream.Recv()
 		if err != nil {
@@ -1440,18 +1147,51 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 			gr.Request = res.Request
 			gr.Status = true
 			switch res.OpsType {
-			case pb.ConfigUpdateRequest_ADD_DEVICE:
-				var dev entity.Device
-				if err := json.Unmarshal(res.GetAddDeviceData().GetTableData(), &dev); err != nil {
+			case pb.ConfigUpdateRequest_EDIT_DRIVER:
+				var cfg entity.Instance
+				if err := json.Unmarshal(res.GetEditDriver().GetDriver(), &cfg); err != nil {
 					gr.Detail = err.Error()
 					gr.Status = false
 					if err := stream.Send(gr); err != nil {
-						errCtx := logger.NewErrorContext(newCtx, err)
-						logger.WithContext(errCtx).Errorf("配置更新: 请求结果返回到驱动管理错误")
+						logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("配置更新: 解析实例配置错误")
 					}
 					return
 				}
-				devM, ok := c.cacheConfigNum.Load(dev.Id)
+				c.updateDriverCache(cfg)
+			case pb.ConfigUpdateRequest_ADD_TABLE:
+				var t entity.TableCfg
+				tmp := res.GetAddTable()
+				if err := json.Unmarshal(tmp.GetTable(), &t); err != nil {
+					gr.Detail = err.Error()
+					gr.Status = false
+					if err := stream.Send(gr); err != nil {
+						logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("配置更新: 添加表解析配置错误")
+					}
+					return
+				}
+				t.Id = tmp.GetTableId()
+				c.updateTableCache(t)
+			case pb.ConfigUpdateRequest_EDIT_TABLE:
+				var t entity.TableCfg
+				tmp := res.GetEditTable()
+				if err := json.Unmarshal(tmp.GetTable(), &t); err != nil {
+					gr.Detail = err.Error()
+					gr.Status = false
+					if err := stream.Send(gr); err != nil {
+						logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("配置更新: 更新表解析配置错误")
+					}
+					return
+				}
+				t.Id = tmp.GetTableId()
+				c.updateTableCache(t)
+			case pb.ConfigUpdateRequest_DEL_TABLE:
+				t := entity.TableCfg{
+					Id:      res.GetDelTable().GetTableId(),
+					Devices: []entity.Device{},
+				}
+				c.updateTableCache(t)
+			case pb.ConfigUpdateRequest_ADD_DEVICE:
+				devM, ok := c.cacheConfigNum.Load(res.GetAddDeviceData().GetTableDataId())
 				var devI map[string]interface{}
 				if ok {
 					devI, _ = devM.(map[string]interface{})
@@ -1459,8 +1199,8 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 					devI = map[string]interface{}{}
 				}
 				devI[res.GetAddDeviceData().GetTableId()] = struct{}{}
-				c.cacheConfigNum.Store(dev.Id, devI)
-				c.cacheConfig.Store(dev.Id, res.GetAddDeviceData().GetTableId())
+				c.cacheConfigNum.Store(res.GetAddDeviceData().GetTableDataId(), devI)
+				c.cacheConfig.Store(res.GetAddDeviceData().GetTableDataId(), res.GetAddDeviceData().GetTableId())
 			case pb.ConfigUpdateRequest_DEL_DEVICE:
 				c.cacheConfigNum.Delete(res.GetDelDeviceData().GetTableDataId())
 				c.cacheConfig.Delete(res.GetDelDeviceData().GetTableDataId())
@@ -1471,9 +1211,73 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 				gr.Status = false
 			}
 			if err := stream.Send(gr); err != nil {
-				errCtx := logger.NewErrorContext(newCtx, err)
-				logger.WithContext(errCtx).Errorf("配置更新: 请求结果返回到驱动管理错误")
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("配置更新: 请求结果返回到驱动管理错误")
 			}
 		}(res)
+	}
+}
+
+func (c *Client) updateDriverCache(cfg entity.Instance) {
+	c.cacheConfigNum.Clear()
+	c.cacheConfig.Clear()
+	if cfg.Tables != nil {
+		for _, t := range cfg.Tables {
+			if t.Devices == nil {
+				continue
+			}
+			for _, device := range t.Devices {
+				devM, ok := c.cacheConfigNum.Load(device.Id)
+				var devI map[string]interface{}
+				if ok {
+					devI, _ = devM.(map[string]interface{})
+				} else {
+					devI = map[string]interface{}{}
+				}
+				devI[t.Id] = struct{}{}
+				c.cacheConfigNum.Store(device.Id, devI)
+				c.cacheConfig.Store(device.Id, t.Id)
+			}
+		}
+	}
+}
+
+func (c *Client) updateTableCache(t entity.TableCfg) {
+	c.cacheConfigNum.Range(func(key, value interface{}) bool {
+		if value == nil {
+			c.cacheConfigNum.Delete(key)
+			return true
+		}
+		devI, _ := value.(map[string]interface{})
+		delete(devI, t.Id)
+		if len(devI) == 0 {
+			c.cacheConfigNum.Delete(key)
+			return true
+		}
+		return true
+	})
+	c.cacheConfig.Range(func(key, value interface{}) bool {
+		if value == nil {
+			c.cacheConfig.Delete(key)
+			return true
+		}
+		vOk, ok := value.(string)
+		if ok && vOk == t.Id {
+			c.cacheConfig.Delete(key)
+			return true
+		}
+
+		return true
+	})
+	for _, device := range t.Devices {
+		devM, ok := c.cacheConfigNum.Load(device.Id)
+		var devI map[string]interface{}
+		if ok {
+			devI, _ = devM.(map[string]interface{})
+		} else {
+			devI = map[string]interface{}{}
+		}
+		devI[t.Id] = struct{}{}
+		c.cacheConfigNum.Store(device.Id, devI)
+		c.cacheConfig.Store(device.Id, t.Id)
 	}
 }
