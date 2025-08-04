@@ -90,6 +90,23 @@ func (c *cacheConfig) del(table string) {
 	}
 }
 
+func (c *cacheConfig) delDevice(table, device string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	tables, ok := c.data[device]
+	if !ok {
+		return
+	}
+
+	if _, ok := tables[table]; ok {
+		delete(tables, table)
+	}
+
+	if len(tables) == 0 {
+		delete(c.data, device)
+	}
+}
+
 func (c *cacheConfig) get(id string) (string, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -1252,7 +1269,7 @@ func (c *Client) ConfigUpdateStream(ctx context.Context, sessionId string) error
 				c.cacheConfig.set(res.GetAddDeviceData().GetTableId(), res.GetAddDeviceData().GetTableDataId())
 			case pb.ConfigUpdateRequest_DEL_DEVICE:
 				//c.cacheConfigNum.Delete(res.GetDelDeviceData().GetTableDataId())
-				c.cacheConfig.del(res.GetDelDeviceData().GetTableId())
+				c.cacheConfig.delDevice(res.GetDelDeviceData().GetTableId(), res.GetDelDeviceData().GetTableDataId())
 			}
 			err := c.driver.ConfigUpdate(newCtx, c.app, res)
 			if err != nil {
