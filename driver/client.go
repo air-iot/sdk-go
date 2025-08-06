@@ -13,6 +13,7 @@ import (
 	"github.com/air-iot/errors"
 	"github.com/air-iot/json"
 	"github.com/air-iot/sdk-go/v4/driver/entity"
+	"github.com/air-iot/sdk-go/v4/utils/serial"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -1128,11 +1129,25 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 				}
 			}()
 			gr := new(entity.GrpcResult)
+			var err error
 			if res.GetHeaders() != nil {
-				if err := json.Unmarshal(res.GetHeaders(), &header); err != nil {
-					gr.Error = fmt.Sprintf("httpProxy流错误:%v", err)
-					gr.Code = 400
-				} else {
+				err = json.Unmarshal(res.GetHeaders(), &header)
+			}
+			if err != nil {
+				gr.Error = fmt.Sprintf("httpProxy流错误:%v", err)
+				gr.Code = 400
+			} else {
+				switch res.GetType() {
+				case "listSerial":
+					ports, err := serial.GetSerialPorts()
+					if err != nil {
+						gr.Error = fmt.Sprintf("获取串口列表失败: %v", err)
+						gr.Code = 400
+					} else {
+						gr.Result = ports
+						gr.Code = 200
+					}
+				default:
 					runRes, err := c.driver.HttpProxy(newCtx, c.app, res.GetType(), header, res.GetData())
 					if err != nil {
 						gr.Error = err.Error()
@@ -1141,15 +1156,6 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 						gr.Result = runRes
 						gr.Code = 200
 					}
-				}
-			} else {
-				runRes, err := c.driver.HttpProxy(newCtx, c.app, res.GetType(), header, res.GetData())
-				if err != nil {
-					gr.Error = err.Error()
-					gr.Code = 400
-				} else {
-					gr.Result = runRes
-					gr.Code = 200
 				}
 			}
 			bts, _ := json.Marshal(gr)

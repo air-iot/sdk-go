@@ -235,21 +235,23 @@ func (p *TestDriver) Stop(ctx context.Context, _ driver.App) error {
 func (p *TestDriver) HttpProxy(ctx context.Context, a driver.App, t string, header http.Header, data []byte) (interface{}, error) {
 	logger.Debugln("Http代理", t, header, string(data))
 
-	var arr []Command
-	if err := a.GetCommands(ctx, "gosdk", "gosdk1", &arr); err != nil {
-		logger.Errorf("指令查询错误: %v", err)
-	}
-	logger.Debugf("查询指令：%+v", arr)
-	for _, v := range arr {
-		err := a.UpdateCommand(ctx, v.ID, entity.DriverInstruct{
-			Status:    entity.COMMAND_STATUS_SUCCESS,
-			RunResult: map[string]interface{}{"a": 1},
-		})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return Schema, nil
+	//var arr []Command
+	//if err := a.GetCommands(ctx, "gosdk", "gosdk1", &arr); err != nil {
+	//	logger.Errorf("指令查询错误: %v", err)
+	//}
+	//logger.Debugf("查询指令：%+v", arr)
+	//for _, v := range arr {
+	//	err := a.UpdateCommand(ctx, v.ID, entity.DriverInstruct{
+	//		Status:    entity.COMMAND_STATUS_SUCCESS,
+	//		RunResult: map[string]interface{}{"a": 1},
+	//	})
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//}
+	//return Schema, nil
+
+	return []string{"a", "b", "c"}, nil
 }
 
 func (p *TestDriver) ConfigUpdate(ctx context.Context, _ driver.App, data *pb.ConfigUpdateRequest) (err error) {
