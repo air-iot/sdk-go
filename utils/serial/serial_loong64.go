@@ -2,6 +2,12 @@
 
 package serial
 
+import (
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+)
+
 func GetSerialPorts() ([]string, error) {
 	// Linux系统串口设备目录
 	const devDir = "/dev"
