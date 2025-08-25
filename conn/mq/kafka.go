@@ -126,14 +126,14 @@ func (k *kafka) getConfig() (c *sarama.Config, err error) {
 	if len(k.config.Brokers) == 0 {
 		return nil, fmt.Errorf("kafka地址为空")
 	}
-	//if k.config.Version != "" {
-	//	version, err = sarama.ParseKafkaVersion(k.config.Version)
-	//	if err != nil {
-	//		return nil, fmt.Errorf("解析kafka的version错误:%w", err)
-	//	}
-	//}
 	config := sarama.NewConfig()
-	//config.Version = version
+	if k.config.Version != "" {
+		version, err := sarama.ParseKafkaVersion(k.config.Version)
+		if err != nil {
+			return nil, fmt.Errorf("解析kafka的version错误:%w", err)
+		}
+		config.Version = version
+	}
 	config.Consumer.Return.Errors = true
 	config.Producer.Return.Successes = true
 	//config.Consumer.Group.Rebalance.Timeout = 120 * time.Second
