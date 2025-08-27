@@ -548,50 +548,56 @@ func (a *app) Log(topic string, msg interface{}) {
 
 // LogDebug 写日志数据
 func (a *app) LogDebug(table, id string, msg interface{}) {
-	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
-	b, err := json.Marshal(l)
-	if err != nil {
-		return
-	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "debug", table, id}, b); err != nil {
-		return
+	if logger.IsLevelEnabled(logger.DebugLevel) {
+		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
+		b, err := json.Marshal(l)
+		if err != nil {
+			return
+		}
+		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "debug", table, id}, b); err != nil {
+			return
+		}
 	}
 }
 
 // LogInfo 写日志数据
 func (a *app) LogInfo(table, id string, msg interface{}) {
-	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
-	b, err := json.Marshal(l)
-	if err != nil {
-		return
-	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "info", table, id}, b); err != nil {
-		return
+	if logger.IsLevelEnabled(logger.InfoLevel) {
+		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
+		b, err := json.Marshal(l)
+		if err != nil {
+			return
+		}
+		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "info", table, id}, b); err != nil {
+			return
+		}
 	}
 }
 
 // LogWarn 写日志数据
 func (a *app) LogWarn(table, id string, msg interface{}) {
-	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
-	b, err := json.Marshal(l)
-	if err != nil {
-		return
+	if logger.IsLevelEnabled(logger.WarnLevel) {
+		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
+		b, err := json.Marshal(l)
+		if err != nil {
+			return
+		}
+		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "warn", table, id}, b); err != nil {
+			return
+		}
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "warn", table, id}, b); err != nil {
-		return
-	}
-	return
 }
 
 // LogError 写日志数据
 func (a *app) LogError(table, id string, msg interface{}) {
-	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
-	b, err := json.Marshal(l)
-	if err != nil {
-		return
+	if logger.IsLevelEnabled(logger.ErrorLevel) {
+		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
+		b, err := json.Marshal(l)
+		if err != nil {
+			return
+		}
+		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "error", table, id}, b); err != nil {
+			return
+		}
 	}
-	if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "error", table, id}, b); err != nil {
-		return
-	}
-	return
 }
