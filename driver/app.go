@@ -121,8 +121,8 @@ func Init() {
 
 	// api client
 	viper.SetDefault("api.liteMode", false)
-	viper.SetDefault("api.gateway", "http://localhost:3030/rest")
-	viper.SetDefault("api.gatewayGrpc", "localhost:9224")
+	viper.SetDefault("api.gateway", "http://127.0.0.1:3030/rest")
+	viper.SetDefault("api.gatewayGrpc", "127.0.0.1:9224")
 	viper.SetDefault("api.etcdConfig", "/airiot/config/pro.json")
 	viper.SetDefault("api.metadata", map[string]string{"env": "local"})
 	viper.SetDefault("api.type", "project")
