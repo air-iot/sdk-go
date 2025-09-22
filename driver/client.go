@@ -816,6 +816,7 @@ func (c *Client) RunStream(ctx context.Context, sessionId string) error {
 				gr.Code = 200
 			}
 			bts, _ := json.Marshal(gr)
+			logger.Debugf("指令执行结果RunStream bts:%s", string(bts))
 			if err := stream.Send(&pb.RunResult{
 				Request: res.Request,
 				Message: bts,
