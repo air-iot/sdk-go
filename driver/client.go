@@ -632,7 +632,10 @@ func (c *Client) SchemaStream(ctx context.Context, sessionId string) error {
 				schemaRes.Result = schema
 				schemaRes.Code = 200
 			}
-			bts, _ := json.Marshal(schemaRes)
+			bts, err := json.Marshal(schemaRes)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("schema: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.SchemaResult{
 				Request: res.Request,
 				Message: bts,
@@ -732,7 +735,10 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 			} else {
 				startRes.Code = 200
 			}
-			bts, _ := json.Marshal(startRes)
+			bts, err := json.Marshal(startRes)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("start: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.StartResult{
 				Request: res.Request,
 				Message: bts,
@@ -815,7 +821,10 @@ func (c *Client) RunStream(ctx context.Context, sessionId string) error {
 				gr.Result = runRes
 				gr.Code = 200
 			}
-			bts, _ := json.Marshal(gr)
+			bts, err := json.Marshal(gr)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("执行指令: 指令结果序列化失败")
+			}
 			if err := stream.Send(&pb.RunResult{
 				Request: res.Request,
 				Message: bts,
@@ -897,7 +906,10 @@ func (c *Client) WriteTagStream(ctx context.Context, sessionId string) error {
 				gr.Result = runRes
 				gr.Code = 200
 			}
-			bts, _ := json.Marshal(gr)
+			bts, err := json.Marshal(gr)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("写数据点: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.RunResult{
 				Request: res.Request,
 				Message: bts,
@@ -980,7 +992,10 @@ func (c *Client) BatchRunStream(ctx context.Context, sessionId string) error {
 				gr.Result = runRes
 				gr.Code = 200
 			}
-			bts, _ := json.Marshal(gr)
+			bts, err := json.Marshal(gr)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("批量执行指令: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.BatchRunResult{
 				Request: res.Request,
 				Message: bts,
@@ -1058,7 +1073,10 @@ func (c *Client) DebugStream(ctx context.Context, sessionId string) error {
 				gr.Result = runRes
 				gr.Code = 200
 			}
-			bts, _ := json.Marshal(gr)
+			bts, err := json.Marshal(gr)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("调试: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.Debug{
 				Request: res.Request,
 				Data:    bts,
@@ -1158,7 +1176,10 @@ func (c *Client) HttpProxyStream(ctx context.Context, sessionId string) error {
 					}
 				}
 			}
-			bts, _ := json.Marshal(gr)
+			bts, err := json.Marshal(gr)
+			if err != nil {
+				logger.WithContext(logger.NewErrorContext(newCtx, err)).Errorf("httpProxy: 结果序列化失败")
+			}
 			if err := stream.Send(&pb.HttpProxyResult{
 				Request: res.Request,
 				Data:    bts,
