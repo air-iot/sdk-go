@@ -1,8 +1,9 @@
 package logger
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 )
 
 func NewLogger(level string) *logrus.Logger {
@@ -13,5 +14,6 @@ func NewLogger(level string) *logrus.Logger {
 		l = logrus.ErrorLevel
 	}
 	logger.SetLevel(l)
+	logrus.SetLevel(l)
 	return logger
 }

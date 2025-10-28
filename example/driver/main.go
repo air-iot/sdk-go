@@ -2,9 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/air-iot/sdk-go/driver"
 	"math/rand"
 	"time"
+
+	"github.com/air-iot/sdk-go/driver"
 )
 
 type (
@@ -38,6 +39,182 @@ type (
 
 // TestDriver 定义测试驱动结构体
 type TestDriver struct{}
+
+var schema = `({
+  "title": "testname",
+  "key": "test1",
+  "model": {
+    "properties": {
+      "settings": {
+        "title": "设备配置",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "title": "请求数据",
+            "fieldType": "textarea"
+          },
+          "prop": {
+            "type": "object",
+            "title": "匹配属性",
+            "properties": {
+              "uid": {
+                "type": "string",
+                "title": "UID"
+              },
+              "data": {
+                "type": "string",
+                "title": "数据"
+              }
+            }
+          },
+          "interval": {
+            "type": "number",
+            "title": "采集周期"
+          },
+          "script": {
+            "type": "string",
+            "title": "脚本",
+            "fieldType": "editor"
+          }
+        }
+      },
+      "tags": {
+        "title": "数据点",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "名称"
+            },
+            "id": {
+              "type": "string",
+              "title": "标识"
+            },
+            "path": {
+              "type": "string",
+              "title": "属性路径"
+            },
+            "dataType": {
+              "type": "string",
+              "title": "数据类型",
+              "enum": [
+                "string",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "id",
+            "path"
+          ]
+        }
+      },
+      "commands": {
+        "title": "指令",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "名称"
+            }
+          }
+        }
+      }
+    }
+  },
+  "device": {
+    "properties": {
+      "settings": {
+        "title": "设备配置",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "title": "请求数据",
+            "fieldType": "textarea"
+          },
+          "prop": {
+            "type": "object",
+            "title": "匹配属性",
+            "properties": {
+              "uid": {
+                "type": "string",
+                "title": "UID"
+              },
+              "data": {
+                "type": "string",
+                "title": "数据"
+              }
+            }
+          },
+          "interval": {
+            "type": "number",
+            "title": "采集周期"
+          },
+          "script": {
+            "type": "string",
+            "title": "脚本",
+            "fieldType": "editor"
+          }
+        }
+      },
+      "tags": {
+        "title": "数据点",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "名称"
+            },
+            "id": {
+              "type": "string",
+              "title": "标识"
+            },
+            "path": {
+              "type": "string",
+              "title": "属性路径"
+            },
+            "dataType": {
+              "type": "string",
+              "title": "数据类型",
+              "enum": [
+                "string",
+                "number"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "id",
+            "path"
+          ]
+        }
+      },
+      "commands": {
+        "title": "指令",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "title": "名称"
+            }
+          }
+        }
+      }
+    }
+  }
+})
+`
 
 // Start 驱动执行，实现Driver的Start函数
 func (p *TestDriver) Start(a driver.App, models []byte) error {
@@ -73,7 +250,7 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 					ModelId:  m1.ID,
 					NodeId:   n1.ID,
 					Fields:   fields,
-					UnixTime: time.Now().UnixNano() / 10e6,
+					UnixTime: time.Now().UnixMilli(),
 				}
 				if err := a.WritePoints(point); err != nil {
 					// a.LogError(n1.Uid, "写数据错误")
@@ -89,7 +266,7 @@ func (p *TestDriver) Start(a driver.App, models []byte) error {
 }
 
 func (p *TestDriver) Schema(a driver.App) (string, error) {
-	return "测试", nil
+	return schema, nil
 }
 
 // Reload 驱动重启，实现Driver的Reload函数

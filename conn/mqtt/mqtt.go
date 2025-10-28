@@ -24,7 +24,8 @@ func NewMqtt(host string, port int, username, password string) (*Mqtt, error) {
 	opts.SetProtocolVersion(4)
 	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
 		if e != nil {
-			logrus.Errorf("消息队列连接错误,%s", e.Error())
+			logrus.Errorf("消息队列连接lost错误: %s", e.Error())
+			//panic(e)
 		}
 	})
 	opts.SetOrderMatters(false)
