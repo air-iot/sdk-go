@@ -4,10 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"strings"
 	"sync"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 
@@ -36,7 +37,8 @@ type MQTTConfig struct {
 }
 
 type TlsConfig struct {
-	InsecureSkipVerify bool `json:"insecureSkipVerify" yaml:"insecureSkipVerify"`
+	InsecureSkipVerify bool     `json:"insecureSkipVerify" yaml:"insecureSkipVerify"`
+	CipherSuites       []string `json:"cipherSuites" yaml:"cipherSuites"`
 }
 
 func (a MQTTConfig) DNS() string {
@@ -78,9 +80,18 @@ func NewMQTTClient(cfg MQTTConfig) (MQ, func(), error) {
 	if cfg.ClientIdPrefix != "" {
 		opts.SetClientID(fmt.Sprintf("%s_%s", cfg.ClientIdPrefix, primitive.NewObjectID().Hex()))
 	}
-	if cfg.TLSConfig != nil && cfg.TLSConfig.InsecureSkipVerify {
-		opts.SetTLSConfig(&tls.Config{InsecureSkipVerify: cfg.TLSConfig.InsecureSkipVerify})
-		//opts.SetTLSConfig(cfg.TLSConfig)
+	if cfg.TLSConfig != nil {
+		if cfg.TLSConfig.InsecureSkipVerify {
+			tlsConfig := &tls.Config{InsecureSkipVerify: cfg.TLSConfig.InsecureSkipVerify}
+			if cfg.TLSConfig.CipherSuites != nil && len(cfg.TLSConfig.CipherSuites) > 0 {
+				tlsConfig.CipherSuites = parseCipherSuites(cfg.TLSConfig.CipherSuites)
+			}
+			opts.SetTLSConfig(tlsConfig)
+		} else if cfg.TLSConfig.CipherSuites != nil && len(cfg.TLSConfig.CipherSuites) > 0 {
+			tlsConfig := &tls.Config{}
+			tlsConfig.CipherSuites = parseCipherSuites(cfg.TLSConfig.CipherSuites)
+			opts.SetTLSConfig(tlsConfig)
+		}
 	}
 	opts.SetOnConnectHandler(func(client MQTT.Client) {
 		logger.Infof("MQTT 已连接")
@@ -96,6 +107,24 @@ func NewMQTTClient(cfg MQTTConfig) (MQ, func(), error) {
 	}
 	mqCli.client = client
 	return mqCli, cleanFunc, nil
+}
+
+func parseCipherSuites(names []string) []uint16 {
+	var ids []uint16
+
+	// 获取 Go 支持的所有套件：包括标准的和为了兼容性保留的“不安全”套件
+	allSuites := append(tls.CipherSuites(), tls.InsecureCipherSuites()...)
+
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		for _, s := range allSuites {
+			if s.Name == name {
+				ids = append(ids, s.ID)
+				break
+			}
+		}
+	}
+	return ids
 }
 
 func (p *mqtt) Callback(cb Callback) {
