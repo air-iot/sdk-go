@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/air-iot/sdk-go/driver"
-	"github.com/sirupsen/logrus"
 	"math/rand"
 	"time"
+
+	"github.com/air-iot/sdk-go/driver"
+	"github.com/sirupsen/logrus"
 )
 
 type (
@@ -42,7 +43,7 @@ type TestDriver struct{}
 
 func (p *TestDriver) GetVersion() string {
 	//TODO implement me
-	panic("implement me")
+	return ""
 }
 
 // Start 驱动执行，实现Driver的Start函数
