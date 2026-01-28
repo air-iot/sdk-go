@@ -26,6 +26,7 @@ type MQTTConfig struct {
 	Schema          string     `json:"schema"`
 	Host            string     `json:"host" yaml:"host"`
 	Port            int        `json:"port" yaml:"port"`
+	Brokers         []string   `json:"brokers" yaml:"brokers"`
 	Username        string     `json:"username" yaml:"username"`
 	Password        string     `json:"password" yaml:"password"`
 	KeepAlive       uint       `json:"keepAlive" yaml:"keepAlive" default:"60"`
@@ -63,6 +64,9 @@ func NewMQTTClient(cfg MQTTConfig) (MQ, func(), error) {
 	mqCli.callbacks = make([]Callback, 0)
 	opts := MQTT.NewClientOptions()
 	opts.AddBroker(cfg.DNS())
+	for _, broker := range cfg.Brokers {
+		opts.AddBroker(broker)
+	}
 	opts.SetAutoReconnect(true)
 	opts.SetCleanSession(true)
 	opts.SetUsername(cfg.Username)

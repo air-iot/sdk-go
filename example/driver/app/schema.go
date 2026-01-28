@@ -99,6 +99,76 @@ var Schema = `({
 				"title": "模型配置",
 				"type": "object",
 				"properties": {
+				"server": {
+						"type": "string",
+						"title": "服务器",
+						"description": "MQTT 服务器地址. 例如: tcp://127.0.0.1:1883"
+					},
+					"username": {
+						"type": "string",
+						"title": "用户名"
+					},
+					"password": {
+						"type": "string",
+						"title": "密码",
+						"fieldType": "password"
+					},
+					"clientId": {
+						"type": "string",
+						"title": "客户端ID"
+					},
+					"topic": {
+						"type": "string",
+						"title": "主题",
+						"description": "接收数据的主题. 例如: /data/#"
+					},
+					"parseScript": {
+						"type": "string",
+						"title": "数据处理脚本",
+						"fieldType": "deviceScriptEdit",
+						"description": "消息处理脚本. 函数名必须为 'handler'",
+						"defaultScript": "/**\n" +
+							" * 数据处理脚本, 处理从 mqtt 接收到的数据.\n" +
+							" *\n" +
+							" * @param {string} topic 消息主题\n" +
+							" * @param {string} message 消息内容\n" +
+							" * @return 消息解析结果\n" +
+							" */\n" +
+							"function handler(topic, message) {\n" +
+							"\t\n" +
+							"\t// 脚本返回值必须为对象数组\n" +
+							"\t// \tid: 设备编号\n" +
+							"\t//\ttime: 时间戳(毫秒)\n" +
+							"\t//  fields: 数据点数据. 该字段为 JSON 对象, key 为数据点标识, value 为数据点的值\n" +
+							"\treturn [\n" +
+							"\t\t{\"table\": \"T10001\", \"id\": \"SN10001\", \"time\": new Date().getTime(), \"fields\": {\"key1\": \"this is a string value\", \"key2\": true, \"key3\": 123.456}}\n" +
+							"\t];\n" +
+							"}"
+					},
+					"commandScript": {
+						"type": "string",
+						"title": "指令处理脚本",
+						"fieldType": "deviceScriptEdit",
+						"description": "指令处理脚本. 函数名必须为 'handler'",
+						"defaultScript": "/**\n" +
+							" * 指令处理脚本. 发送指令时会将指令内容传递给脚本, 然后由指定返回最终要发送的信息.\n" +
+							" *\n" +
+							" * @param {string} 工作表标识\n" +
+							" * @param {string} 设备编号\n" +
+							" * @param {object} 命令内容\n" +
+							" * @return {object} 最终要发送的消息, 及目标 topic\n" +
+							" */\n" +
+							"function handler(tableId, deviceId, command) {\n" +
+							"\t\n" +
+							"\t// 脚本返回值必须为下面对象结构\n" +
+							"\t//\t\ttopic: 消息发送的目标 topic\n" +
+							"\t//\t\tpayload: 消息内容\n" +
+							"\treturn {\n" +
+							"\t\t\"topic\": \"cmd/\" + deviceId,\n" +
+							"\t\t\"payload\": \"发送内容\"\n" +
+							"\t};\n" +
+							"}"
+					},
 					"network": {
 						"type": "object",
 						"title": "通讯监控参数",

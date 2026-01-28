@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	pb "github.com/air-iot/api-client-go/v4/driver"
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
@@ -12,7 +14,7 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
-	"net/http"
+	"github.com/gin-gonic/gin"
 )
 
 // 驱动配置信息，不同的驱动生成不同的配置信息
@@ -109,71 +111,83 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 	//	return err
 	//}
 	//return nil
-	var config DriverInstanceConfig
-	err := json.Unmarshal(bts, &config)
+	var driverConfig DriverInstanceConfig
+	err := json.Unmarshal(bts, &driverConfig)
 	if err != nil {
 		return err
 	}
-	if config.Device.Settings.Server == "" {
-		return fmt.Errorf("服务器地址为空")
-	}
-	if config.Device.Settings.Topic == "" {
-		return fmt.Errorf("topic为空")
-	}
-	registry := require.NewRegistry()
-	if config.Device.Settings.ParseScript != "" {
-		vm := goja.New()
-		registry.Enable(vm)
-		console.Enable(vm)
-		if _, err := vm.RunString(config.Device.Settings.ParseScript); err != nil {
+	//if config.Device.Settings.Server == "" {
+	//	return fmt.Errorf("服务器地址为空")
+	//}
+	//if config.Device.Settings.Topic == "" {
+	//	return fmt.Errorf("topic为空")
+	//}
+	for _, tableD := range driverConfig.Tables {
+		config := tableD
+		registry := require.NewRegistry()
+		if config.Device.Settings.ParseScript != "" {
+			vm := goja.New()
+			registry.Enable(vm)
+			console.Enable(vm)
+			if _, err := vm.RunString(config.Device.Settings.ParseScript); err != nil {
+				return err
+			}
+			handler, ok := goja.AssertFunction(vm.Get("handler"))
+			if !ok {
+				return fmt.Errorf("解析脚本函数handler未找到")
+			}
+			p.parseVm = vm
+			p.parseHandler = handler
+		}
+		if config.Device.Settings.CommandScript != "" {
+			vm := goja.New()
+			registry.Enable(vm)
+			console.Enable(vm)
+			if _, err := vm.RunString(config.Device.Settings.CommandScript); err != nil {
+				return err
+			}
+			handler, ok := goja.AssertFunction(vm.Get("handler"))
+			if !ok {
+				return fmt.Errorf("指令脚本函数handler未找到")
+			}
+			p.commandVm = vm
+			p.commandHandler = handler
+		}
+		opts := MQTT.NewClientOptions()
+		opts.AddBroker(config.Device.Settings.Server)
+		opts.SetAutoReconnect(true)
+		opts.SetCleanSession(true)
+		opts.SetUsername(config.Device.Settings.Username)
+		opts.SetPassword(config.Device.Settings.Password)
+		if config.Device.Settings.ClientId != "" {
+			opts.SetClientID(config.Device.Settings.ClientId)
+		}
+		opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
+			panic(fmt.Errorf("MQTT Lost错误: %s", e.Error()))
+		})
+		client := MQTT.NewClient(opts)
+		if token := client.Connect(); token.Wait() && token.Error() != nil {
+			return token.Error()
+		}
+		p.client = client
+		if err := p.handler(a, ctx, config); err != nil {
 			return err
 		}
-		handler, ok := goja.AssertFunction(vm.Get("handler"))
-		if !ok {
-			return fmt.Errorf("解析脚本函数handler未找到")
-		}
-		p.parseVm = vm
-		p.parseHandler = handler
-	}
-	if config.Device.Settings.CommandScript != "" {
-		vm := goja.New()
-		registry.Enable(vm)
-		console.Enable(vm)
-		if _, err := vm.RunString(config.Device.Settings.CommandScript); err != nil {
-			return err
-		}
-		handler, ok := goja.AssertFunction(vm.Get("handler"))
-		if !ok {
-			return fmt.Errorf("指令脚本函数handler未找到")
-		}
-		p.commandVm = vm
-		p.commandHandler = handler
-	}
-	opts := MQTT.NewClientOptions()
-	opts.AddBroker(config.Device.Settings.Server)
-	opts.SetAutoReconnect(true)
-	opts.SetCleanSession(true)
-	opts.SetUsername(config.Device.Settings.Username)
-	opts.SetPassword(config.Device.Settings.Password)
-	if config.Device.Settings.ClientId != "" {
-		opts.SetClientID(config.Device.Settings.ClientId)
-	}
-	opts.SetConnectionLostHandler(func(client MQTT.Client, e error) {
-		panic(fmt.Errorf("MQTT Lost错误: %s", e.Error()))
-	})
-	client := MQTT.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		return token.Error()
-	}
-	p.client = client
-	if err := p.handler(a, ctx, config); err != nil {
-		return err
 	}
 	return nil
 }
 
 func (p *TestDriver) Schema(ctx context.Context, _ driver.App, locale string) (string, error) {
 	return Schema, nil
+}
+
+// RegisterRoutes 注册自定义 HTTP 路由
+func (p *TestDriver) RegisterRoutes(router *gin.Engine) {
+	// 如果需要注册自定义路由，可以在这里添加
+	// 例如:
+	// router.GET("/custom", func(c *gin.Context) {
+	//     c.JSON(200, gin.H{"message": "custom route"})
+	// })
 }
 
 // Run 执行指令，实现Driver的Run函数
@@ -259,29 +273,28 @@ func (p *TestDriver) ConfigUpdate(ctx context.Context, _ driver.App, data *pb.Co
 	return nil
 }
 
-func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig DriverInstanceConfig) error {
-	for _, t := range driverConfig.Tables {
-		if len(t.Devices) == 0 {
-			continue
-		}
-		tagMap := map[string]entity.Tag{}
-		for _, ta := range t.Device.Tags {
-			tagMap[ta.ID] = ta
-		}
-		dev1 := map[string]map[string]entity.Tag{}
-		p.tables[t.ID] = dev1
-		for _, device := range t.Devices {
-			devTagMap := map[string]entity.Tag{}
-			for k, v := range tagMap {
-				devTagMap[k] = v
-			}
-			for _, tagE := range device.Device.Tags {
-				devTagMap[tagE.ID] = tagE
-			}
-			dev1[device.ID] = devTagMap
-		}
+func (p *TestDriver) handler(a driver.App, ctx context.Context, t table) error {
+	if len(t.Devices) == 0 {
+		return fmt.Errorf("设备数量为空")
 	}
-	p.client.Subscribe(driverConfig.Device.Settings.Topic, 0, func(client MQTT.Client, message MQTT.Message) {
+	tagMap := map[string]entity.Tag{}
+	for _, ta := range t.Device.Tags {
+		tagMap[ta.ID] = ta
+	}
+	dev1 := map[string]map[string]entity.Tag{}
+	p.tables[t.ID] = dev1
+	for _, device := range t.Devices {
+		devTagMap := map[string]entity.Tag{}
+		for k, v := range tagMap {
+			devTagMap[k] = v
+		}
+		for _, tagE := range device.Device.Tags {
+			devTagMap[tagE.ID] = tagE
+		}
+		dev1[device.ID] = devTagMap
+	}
+
+	p.client.Subscribe(t.Device.Settings.Topic, 0, func(client MQTT.Client, message MQTT.Message) {
 		if p.parseHandler == nil || p.parseVm == nil {
 			logger.Errorln("解析脚本为空")
 			return
@@ -306,11 +319,13 @@ func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig Dri
 		for _, v := range arr {
 			dev, ok := p.tables[v.Table]
 			if !ok {
-				continue
+				logger.Errorf("未找到表：%s", v.Table)
+				return
 			}
 			tagM, ok := dev[v.Id]
 			if !ok {
-				continue
+				logger.Errorf("未找到设备：%s", v.Id)
+				return
 			}
 			fields := make([]entity.Field, 0)
 			for k1, v1 := range v.Fields {
@@ -323,7 +338,7 @@ func (p *TestDriver) handler(a driver.App, ctx context.Context, driverConfig Dri
 					Value: v1,
 				})
 			}
-			err := a.WritePoints(ctx, entity.Point{
+			err = a.WritePoints(ctx, entity.Point{
 				Table:    v.Table,
 				ID:       v.Id,
 				Fields:   fields,

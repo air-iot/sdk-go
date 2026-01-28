@@ -12,6 +12,7 @@ import (
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/require"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
+	"github.com/gin-gonic/gin"
 	"net/http"
 )
 
@@ -149,6 +150,15 @@ func (p *TestDriver) Start(ctx context.Context, a driver.App, bts []byte) error 
 
 func (p *TestDriver) Schema(ctx context.Context, _ driver.App, locale string) (string, error) {
 	return Schema, nil
+}
+
+// RegisterRoutes 注册自定义 HTTP 路由
+func (p *TestDriver) RegisterRoutes(router *gin.Engine) {
+	// 如果需要注册自定义路由，可以在这里添加
+	// 例如:
+	// router.GET("/custom", func(c *gin.Context) {
+	//     c.JSON(200, gin.H{"message": "custom route"})
+	// })
 }
 
 // Run 执行指令，实现Driver的Run函数

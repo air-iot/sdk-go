@@ -27,6 +27,11 @@ type Config struct {
 		Host   string `json:"host" yaml:"host"`
 		Port   string `json:"port" yaml:"port"`
 	} `json:"pprof" yaml:"pprof"`
+	HTTP struct {
+		Host string `json:"host" yaml:"host"`
+		Port string `json:"port" yaml:"port"`
+	} `json:"http" yaml:"http"`
+	DataConfig string           `json:"dataConfig" yaml:"dataConfig"` // data.json 文件路径
 	EtcdConfig string           `json:"etcdConfig" yaml:"etcdConfig"`
 	Etcd       etcd.Config      `json:"etcd" yaml:"etcd"`
 	API        apiConfig.Config `json:"api" yaml:"api"`

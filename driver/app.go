@@ -19,9 +19,12 @@ import (
 
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
+	"github.com/fsnotify/fsnotify"
+	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/air-iot/sdk-go/v4/conn/mq"
 	"github.com/air-iot/sdk-go/v4/driver/convert"
@@ -36,6 +39,8 @@ type App interface {
 	GetGroupID() string
 	GetServiceId() string
 	GetMQ() mq.MQ
+	GetRouter() *gin.RouterGroup
+	StartHTTPServer() error
 	WritePoints(context.Context, entity.Point) error
 	SavePoints(ctx context.Context, tableId string, data *entity.WritePoint) error
 	WriteEvent(context.Context, entity.Event) error
@@ -50,6 +55,7 @@ type App interface {
 	LogError(table, id string, msg interface{})
 	GetCommands(ctx context.Context, table, id string, ret interface{}) error
 	UpdateCommand(ctx context.Context, id string, data entity.DriverInstruct) error
+	saveDataConfig(config []byte) error
 }
 
 const (
@@ -62,10 +68,17 @@ const (
 
 // app 数据采集类
 type app struct {
-	mq      mq.MQ
-	stopped bool
-	cli     *Client
-	clean   func()
+	mq                mq.MQ
+	stopped           bool
+	cli               *Client
+	clean             func()
+	driver            Driver
+	httpServer        *http.Server
+	httpClean         func()
+	router            *gin.Engine
+	dataConfigMutex   sync.Mutex
+	dataConfigModTime time.Time // data.json 最后修改时间（用于区分内部/外部修改）
+	dataConfigSkip    bool      // 是否跳过文件变化监听（内部保存时设置为 true）
 
 	cacheValue sync.Map
 }
@@ -101,7 +114,7 @@ func Init() {
 	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
 
 	// driver
-	viper.SetDefault("driverGrpc.host", "driver")
+	viper.SetDefault("driverGrpc.host", "")
 	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetDefault("driverGrpc.health.requestTime", "10s")
 	viper.SetDefault("driverGrpc.health.retry", 3)
@@ -137,14 +150,14 @@ func Init() {
 	pflag.Parse()
 	viper.AddConfigPath(*cfgPath)
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
-		panic(fmt.Errorf("读取命令行参数错误: %w", err))
+		panic(fmt.Errorf("解析命令行参数失败: %w，请检查参数格式是否正确", err))
 	}
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Errorf("读取配置错误: %w", err))
+		panic(fmt.Errorf("读取配置文件失败: %w，请检查配置文件路径 %s 是否正确", err, *cfgPath))
 	}
 	decrypt.Decode()
 	if err := viper.Unmarshal(Cfg); err != nil {
-		panic(fmt.Errorf("配置解析错误: %w", err))
+		panic(fmt.Errorf("解析配置内容失败: %w，请检查配置文件格式是否正确", err))
 	}
 }
 
@@ -152,35 +165,41 @@ func Init() {
 func NewApp() App {
 	Init()
 	a := new(app)
+	if Cfg.Driver.ID == "" || Cfg.Driver.Name == "" {
+		panic("驱动配置错误: driver.id 和 driver.name 不能为空，请检查配置文件")
+	}
 	if Cfg.Project == "" {
-		panic("项目id未配置或未传参")
+		Cfg.Project = "default"
 	}
 	if Cfg.ServiceID == "" {
-		panic("服务id未配置或未传参")
+		Cfg.ServiceID = Cfg.Driver.ID + "-" + primitive.NewObjectID().Hex()
 	}
-	if Cfg.Driver.ID == "" || Cfg.Driver.Name == "" {
-		panic("驱动id或name不能为空")
-	}
+
 	Cfg.Log.Syslog.ProjectId = Cfg.Project
 	Cfg.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", Cfg.Project, Cfg.ServiceID, Cfg.Driver.ID)
 	logger.InitLogger(Cfg.Log)
 	logger.Infof("启动配置=%+v", *Cfg)
 	mqConn, clean, err := mq.NewMQ(Cfg.MQ)
 	if err != nil {
-		panic(fmt.Errorf("初始化消息队列错误: %w", err))
+		panic(fmt.Errorf("初始化消息队列失败: %w，请检查 mq 配置是否正确", err))
 	}
 	a.mq = mqConn
 	a.clean = func() {
 		clean()
 	}
 	a.cacheValue = sync.Map{}
-	if Cfg.Pprof.Enable {
+	// 启动 data 配置文件监听
+	a.watchDataConfig()
+	// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
+	if Cfg.HTTP.Host != "" && Cfg.HTTP.Port != "" {
+		a.initRouter()
+	} else if Cfg.Pprof.Enable {
+		// 只有在 HTTP 服务未启动时，才单独启动 pprof server
 		go func() {
-			//  路径/debug/pprof/
 			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
-			logger.Infof("pprof启动: 地址=%s", addr)
+			logger.Infof("pprof服务启动: 地址=%s", addr)
 			if err := http.ListenAndServe(addr, nil); err != nil {
-				logger.Errorf("pprof启动: 地址=%s. %v", addr, err)
+				logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
 				return
 			}
 		}()
@@ -188,9 +207,156 @@ func NewApp() App {
 	return a
 }
 
+// loadDataConfig 加载 data.json 配置并调用 driver.Start
+func (a *app) loadDataConfig() error {
+	if Cfg.DataConfig == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(Cfg.DataConfig)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.DataConfig)
+			return nil
+		}
+		return fmt.Errorf("读取data配置文件失败: %w", err)
+	}
+
+	// 获取文件修改时间
+	info, _ := os.Stat(Cfg.DataConfig)
+	a.dataConfigMutex.Lock()
+	a.dataConfigModTime = info.ModTime()
+	a.dataConfigMutex.Unlock()
+
+	logger.Infof("加载data配置文件: %s", Cfg.DataConfig)
+	if a.driver != nil {
+		ctx := context.Background()
+		// data.json 中的数据已经是驱动格式，直接使用
+		if err := a.driver.Start(ctx, a, data); err != nil {
+			return fmt.Errorf("使用data配置启动驱动失败: %w", err)
+		}
+		logger.Infof("使用data配置启动驱动成功")
+	}
+	return nil
+}
+
+// saveDataConfig 保存配置到 data.json
+func (a *app) saveDataConfig(config []byte) error {
+	if Cfg.DataConfig == "" {
+		return nil
+	}
+
+	// 标记为内部修改，防止触发文件监听
+	a.dataConfigMutex.Lock()
+	a.dataConfigSkip = true
+	a.dataConfigMutex.Unlock()
+
+	if err := os.WriteFile(Cfg.DataConfig, config, 0644); err != nil {
+		return fmt.Errorf("保存data配置文件失败: %w", err)
+	}
+
+	// 更新修改时间
+	info, _ := os.Stat(Cfg.DataConfig)
+	a.dataConfigMutex.Lock()
+	a.dataConfigModTime = info.ModTime()
+	a.dataConfigMutex.Unlock()
+
+	logger.Infof("保存data配置文件: %s", Cfg.DataConfig)
+	return nil
+}
+
+// watchDataConfig 监听 data.json 文件变化
+func (a *app) watchDataConfig() {
+	if Cfg.DataConfig == "" {
+		return
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		logger.Errorf("创建文件监听器失败: %v", err)
+		return
+	}
+
+	go func() {
+		defer watcher.Close()
+		for {
+			// 检查文件是否存在
+			if _, err := os.Stat(Cfg.DataConfig); err == nil {
+				// 文件存在，开始监听
+				if err := watcher.Add(Cfg.DataConfig); err == nil {
+					logger.Infof("开始监听data配置文件: %s", Cfg.DataConfig)
+					break
+				}
+			}
+			// 文件不存在或添加监听失败，等待后重试
+			time.Sleep(5 * time.Second)
+		}
+
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
+					a.dataConfigMutex.Lock()
+					skip := a.dataConfigSkip
+					a.dataConfigSkip = false
+					a.dataConfigMutex.Unlock()
+
+					if skip {
+						// 内部修改，跳过
+						continue
+					}
+
+					// 检查文件修改时间，避免重复处理
+					info, err := os.Stat(Cfg.DataConfig)
+					if err != nil {
+						continue
+					}
+
+					a.dataConfigMutex.Lock()
+					modTime := a.dataConfigModTime
+					a.dataConfigMutex.Unlock()
+
+					if info.ModTime().Equal(modTime) || info.ModTime().Before(modTime) {
+						continue
+					}
+
+					logger.Infof("检测到data配置文件变化: %s", Cfg.DataConfig)
+					if err := a.loadDataConfig(); err != nil {
+						logger.Errorf("加载变化的data配置失败: %v", err)
+					}
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				logger.Errorf("文件监听错误: %v", err)
+			}
+		}
+	}()
+}
+
 // Start 开始服务
 func (a *app) Start(driver Driver) {
 	a.stopped = false
+	a.driver = driver
+
+	// 尝试加载 data 配置文件
+	if err := a.loadDataConfig(); err != nil {
+		logger.Errorf("加载data配置文件失败: %v", err)
+	}
+
+	// 注册 driver 自定义路由
+	if a.router != nil {
+		driver.RegisterRoutes(a.router)
+		// 启动 HTTP 服务
+		if err := a.StartHTTPServer(); err != nil {
+			logger.Errorf("HTTP服务启动失败: %v", err)
+		}
+	}
+
 	cli := Client{cacheConfig: NewCacheConfig()}
 	a.cli = cli.Start(a, driver)
 	ch := make(chan os.Signal, 1)
@@ -209,6 +375,9 @@ func (a *app) Start(driver Driver) {
 // Stop 服务停止
 func (a *app) stop() {
 	a.stopped = true
+	if a.httpClean != nil {
+		a.httpClean()
+	}
 	if a.clean != nil {
 		a.clean()
 	}
@@ -237,15 +406,15 @@ func (a *app) WritePoints(ctx context.Context, p entity.Point) error {
 	if tableId == "" {
 		tableIdI, err := a.cli.cacheConfig.get(p.ID)
 		if err != nil {
-			return err
+			return fmt.Errorf("获取设备表ID失败: %w，设备ID=%s", err, p.ID)
 		}
 		tableId = tableIdI
 	}
 	if p.ID == "" {
-		return fmt.Errorf("设备id为空")
+		return fmt.Errorf("设备ID不能为空，请检查数据点采集配置")
 	}
 	if p.Fields == nil || len(p.Fields) == 0 {
-		return fmt.Errorf("采集数据有空值")
+		return fmt.Errorf("数据点字段列表为空，请检查是否正确配置了采集数据点")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
@@ -264,21 +433,9 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			newLogger.Warnf("存数据点: 设备表=%s,设备=%s. 设备数据点值为空", tableId, p.ID)
 			continue
 		}
-		//tagByte, err := json.Marshal(field.Tag)
-		//if err != nil {
-		//	newLogger.Warnf("表 %s 设备 %s 数据点序列化错误: %v", tableId, p.ID, err)
-		//	continue
-		//}
-		//
-		//tag := new(entity.Tag)
-		//err = json.Unmarshal(tagByte, tag)
-		//if err != nil {
-		//	newLogger.Errorf("表 %s 设备 %s 数据点序列化tag结构体错误: %v", tableId, p.ID, err)
-		//	continue
-		//}
 		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("存数据点: 设备表=%s,设备=%s. 设备数据点标识为空", tableId, p.ID)
+			newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点标识为空，请检查数据点配置", tableId, p.ID)
 			continue
 		}
 
@@ -286,15 +443,13 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		switch valueTmp := field.Value.(type) {
 		case float32:
 			if math.IsNaN(float64(valueTmp)) || math.IsInf(float64(valueTmp), 0) {
-				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点=%s, 值=%f (值不是合法的数字，NaN或Inf)", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat32(valueTmp)
 		case float64:
 			if math.IsNaN(valueTmp) || math.IsInf(valueTmp, 0) {
-				//fields[tag.ID] = valueTmp
-				newLogger.Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s,值=%f. 设备数据点值不合法", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点=%s, 值=%f (值不是合法的数字，NaN或Inf)", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat(valueTmp)
@@ -325,7 +480,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
 				errCtx := logger.NewErrorContext(ctx, err)
-				logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
+				logger.WithContext(errCtx).Errorf("数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 原值=%v, 错误=%v", tableId, p.ID, tag.ID, field.Value, err)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -348,7 +503,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 				valTmp, err := numberx.GetValueByType("", newVal)
 				if err != nil {
 					errCtx := logger.NewErrorContext(ctx, err)
-					logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备数据点转类型失败", tableId, p.ID, tag.ID)
+					logger.WithContext(errCtx).Errorf("数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 转换值=%v, 错误=%v", tableId, p.ID, tag.ID, newVal, err)
 				} else {
 					valTmp = convert.ValueFormat(&tag, valTmp)
 					fields[tag.ID] = valTmp
@@ -361,7 +516,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 				valTmp, err := numberx.GetValueByType("", rawVal)
 				if err != nil {
 					errCtx := logger.NewErrorContext(ctx, err)
-					logger.WithContext(errCtx).Errorf("存数据点: 设备表=%s,设备=%s,数据点=%s. 设备原始数据点转类型失败", tableId, p.ID, tag.ID)
+					logger.WithContext(errCtx).Errorf("原始数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 原始值=%v, 错误=%v", tableId, p.ID, tag.ID, rawVal, err)
 				} else {
 					fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 				}
@@ -375,12 +530,12 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		}
 	}
 	if len(fields) == 0 {
-		return errors.New("数据点为空值")
+		return errors.New("所有数据点字段均为空或无效，无法写入数据")
 	}
 	if p.UnixTime == 0 {
 		p.UnixTime = time.Now().Local().UnixMilli()
 	} else if p.UnixTime > 9999999999999 || p.UnixTime < 1000000000000 {
-		return fmt.Errorf("时间无效")
+		return fmt.Errorf("时间戳无效: %d (应为13位毫秒级时间戳，范围: 1000000000000-9999999999999)", p.UnixTime)
 	}
 	data := &entity.WritePoint{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes}
 	//b, err := json.Marshal()
@@ -393,13 +548,13 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 
 func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.WritePoint) error {
 	if tableId == "" {
-		return fmt.Errorf("table id is empty")
+		return fmt.Errorf("表ID不能为空，请检查设备表配置")
 	}
 	if data.ID == "" {
-		return fmt.Errorf("device id is empty")
+		return fmt.Errorf("设备ID不能为空，请检查数据点采集配置")
 	}
 	if len(data.Fields) == 0 {
-		return fmt.Errorf("not enough fields")
+		return fmt.Errorf("数据点字段列表为空，请检查是否正确配置了采集数据点")
 	}
 	if data.Source == "" {
 		data.Source = "device"
@@ -407,7 +562,7 @@ func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.Write
 	if data.UnixTime == 0 {
 		data.UnixTime = time.Now().UnixMilli()
 	} else if data.UnixTime > 9999999999999 || data.UnixTime < 1000000000000 {
-		return fmt.Errorf("time is either too large or too small")
+		return fmt.Errorf("时间戳无效: %d (应为13位毫秒级时间戳，范围: 1000000000000-9999999999999)", data.UnixTime)
 	}
 	b, err := json.Marshal(data)
 	if err != nil {
@@ -425,16 +580,16 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 	if tableId == "" {
 		tableIdI, err := a.cli.cacheConfig.get(w.TableDataId)
 		if err != nil {
-			return err
+			return fmt.Errorf("获取设备表ID失败: %w，设备ID=%s", err, w.TableDataId)
 		}
 		tableId = tableIdI
 	}
 	w.TableId = tableId
 	if w.TableDataId == "" {
-		return fmt.Errorf("设备id为空")
+		return fmt.Errorf("设备ID不能为空，请检查报警配置")
 	}
 	if tableId == "" {
-		return fmt.Errorf("表id为空")
+		return fmt.Errorf("表ID不能为空，请检查报警配置")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
@@ -474,13 +629,13 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 func (a *app) WriteWarningRecovery(ctx context.Context, tableId, dataId string, w entity.WarnRecovery) error {
 	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
 	if tableId == "" {
-		return fmt.Errorf("表id为空")
+		return fmt.Errorf("表ID不能为空，请检查报警恢复配置")
 	}
 	if dataId == "" {
-		return fmt.Errorf("设备id为空")
+		return fmt.Errorf("设备ID不能为空，请检查报警恢复配置")
 	}
 	if len(w.ID) == 0 {
-		return fmt.Errorf("报警id为空")
+		return fmt.Errorf("报警ID列表不能为空，请指定需要恢复的报警ID")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {

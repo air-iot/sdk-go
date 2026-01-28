@@ -133,6 +133,13 @@ func (c *Client) start() {
 	c.clean = func() {
 		cancel()
 	}
+
+	// 检查 grpc 配置是否指定
+	if Cfg.DriverGrpc.Host == "" || Cfg.DriverGrpc.Port == 0 {
+		logger.WithContext(ctx).Warnf("Driver gRPC 配置未指定，跳过 gRPC 连接")
+		return
+	}
+
 	go func() {
 		for {
 			select {
@@ -734,6 +741,10 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 				startRes.Code = 400
 			} else {
 				startRes.Code = 200
+				// 启动成功后保存配置到 data.json
+				if err := c.app.saveDataConfig(res.Config); err != nil {
+					logger.Warnf("保存data配置文件失败: %v", err)
+				}
 			}
 			bts, err := json.Marshal(startRes)
 			if err != nil {
