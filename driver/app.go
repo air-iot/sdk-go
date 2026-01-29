@@ -131,7 +131,7 @@ func Init() {
 
 	// etcd config
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
-
+	viper.SetDefault("dataConfig", "./data.json")
 	// api client
 	viper.SetDefault("api.liteMode", false)
 	viper.SetDefault("api.gateway", "http://127.0.0.1:3030/rest")

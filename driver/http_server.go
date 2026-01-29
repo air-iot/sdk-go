@@ -30,13 +30,19 @@ func (a *app) initRouter() {
 	a.router.Use(gzipMiddleware())
 
 	// 注册 HTML 静态文件服务
-	htmlDir := "./html"
+	htmlDir := "."
 	if _, err := os.Stat(htmlDir); err == nil {
-		// 设置 Next.js 静态资源服务
-		a.router.Static("/_next/static", filepath.Join(htmlDir, "_next", "static"))
-		// 为了兼容 Next.js 构建输出，也映射 /static 路径
-		a.router.Static("/static", filepath.Join(htmlDir, "_next", "static"))
-		// 根路径返回 index.html（GET 请求）
+		// 服务 bundle 静态资源（CSS 和 JS）
+		a.router.GET("/iot-config.bundle.js", func(c *gin.Context) {
+			c.File(filepath.Join(htmlDir, "iot-config.bundle.js"))
+			c.Header("Content-Type", "text/javascript")
+		})
+		// 服务 CSS 文件
+		a.router.GET("/iot-config.bundle.css", func(c *gin.Context) {
+			c.File(filepath.Join(htmlDir, "iot-config.bundle.css"))
+			c.Header("Content-Type", "text/css")
+		})
+		// 根路径返回 index.html
 		a.router.GET("/", func(c *gin.Context) {
 			c.File(filepath.Join(htmlDir, "index.html"))
 		})
@@ -239,7 +245,7 @@ func (a *app) initRouter() {
 			requestedPath := c.Request.URL.Path
 
 			// 如果是 API 请求，返回 404
-			if strings.HasPrefix(requestedPath, "/driver") {
+			if strings.HasPrefix(requestedPath, "/driver") || strings.HasPrefix(requestedPath, "/debug") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "接口不存在"})
 				return
 			}
