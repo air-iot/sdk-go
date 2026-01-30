@@ -14,6 +14,7 @@ import (
 	"github.com/air-iot/logger"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 
 	"github.com/air-iot/sdk-go/v4/driver/entity"
 )
@@ -236,6 +237,11 @@ func (a *app) initRouter() {
 			}
 			c.JSON(http.StatusOK, gin.H{"result": result})
 		})
+
+		// Realtime WebSocket 实时数据推送
+		api.GET("/ws", func(c *gin.Context) {
+			a.handleRealtimeWebSocket(c)
+		})
 	}
 
 	// SPA 路由支持：将所有未匹配的路由重定向到 index.html
@@ -309,4 +315,94 @@ func (a *app) StartHTTPServer() error {
 	}
 
 	return nil
+}
+
+// handleRealtimeWebSocket 处理实时数据 WebSocket 连接
+func (a *app) handleRealtimeWebSocket(c *gin.Context) {
+	// WebSocket 升级器配置
+	upgrader := websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			// 允许所有来源，生产环境应根据需要限制
+			return true
+		},
+	}
+
+	// 获取连接参数
+	typ := c.DefaultQuery("type", "data") // data, tag, device, model
+	table := c.DefaultQuery("table", "")
+	device := c.DefaultQuery("device", "")
+
+	// 升级 HTTP 连接到 WebSocket
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		logger.Errorf("WebSocket升级失败: %v", err)
+		return
+	}
+
+	// 创建客户端连接
+	wsConn := &websocketConn{
+		conn:   conn,
+		typ:    typ,
+		table:  table,
+		device: device,
+	}
+
+	// 注册客户端
+	a.registerWebSocketClient(wsConn)
+
+	logger.Infof("WebSocket客户端已连接: type=%s, table=%s, device=%s", typ, table, device)
+
+	// 启动读取协程（保持连接活跃，处理心跳）
+	go wsConn.readPump(a)
+}
+
+// readPump 从 WebSocket 读取消息（用于保持连接活跃、处理订阅消息和客户端断开）
+func (ws *websocketConn) readPump(a *app) {
+	conn := ws.conn.(*websocket.Conn)
+	defer func() {
+		a.unregisterWebSocketClient(ws)
+		_ = conn.Close()
+	}()
+
+	_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	// 配置 pong 消息处理
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		return nil
+	})
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				logger.Errorf("WebSocket读取错误: %v", err)
+			}
+			break
+		}
+
+		// 处理客户端发送的消息（订阅/取消订阅）
+		ws.handleMessage(message)
+	}
+}
+
+// handleMessage 处理客户端发送的消息
+func (ws *websocketConn) handleMessage(data []byte) {
+	var msg struct {
+		Table  string `json:"table"`  // 模型ID
+		Device string `json:"device"` // 设备ID
+	}
+
+	if err := json.Unmarshal(data, &msg); err != nil {
+		logger.Errorf("WebSocket消息解析失败: %v", err)
+		return
+	}
+
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+
+	ws.table = msg.Table
+	ws.device = msg.Device
+	logger.Infof("WebSocket客户端订阅: type=%s, table=%s, device=%s", ws.typ, msg.Table, msg.Device)
 }

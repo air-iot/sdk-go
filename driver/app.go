@@ -56,6 +56,7 @@ type App interface {
 	GetCommands(ctx context.Context, table, id string, ret interface{}) error
 	UpdateCommand(ctx context.Context, id string, data entity.DriverInstruct) error
 	saveDataConfig(config []byte) error
+	BroadcastRealtimeData(tableId string, data *entity.WritePoint) error
 }
 
 const (
@@ -81,6 +82,19 @@ type app struct {
 	dataConfigSkip    bool      // 是否跳过文件变化监听（内部保存时设置为 true）
 
 	cacheValue sync.Map
+
+	// WebSocket 实时数据推送
+	wsClients      map[*websocketConn]struct{}
+	wsClientsMutex sync.RWMutex
+}
+
+// websocketConn WebSocket 连接封装
+type websocketConn struct {
+	conn   any        // 实际类型为 *websocket.Conn，使用 any 避免 import 循环
+	mu     sync.Mutex // 保护并发写入
+	typ    string     // 连接类型: data, tag, device, model
+	table  string     // 订阅的表ID，为空表示订阅所有
+	device string     // 订阅的设备ID，为空表示订阅所有
 }
 
 func Init() {
@@ -188,6 +202,7 @@ func NewApp() App {
 		clean()
 	}
 	a.cacheValue = sync.Map{}
+	a.wsClients = make(map[*websocketConn]struct{})
 	// 启动 data 配置文件监听
 	a.watchDataConfig()
 	// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
@@ -571,6 +586,8 @@ func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.Write
 	if logger.IsLevelEnabled(logger.DebugLevel) {
 		logger.Debugf("存数据点: 设备表=%s,设备=%s,数据=%s. 保存数据成功", tableId, data.ID, string(b))
 	}
+	// 广播到 WebSocket 客户端
+	go a.BroadcastRealtimeData(tableId, data)
 	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, data.ID}, b)
 }
 
@@ -755,4 +772,81 @@ func (a *app) LogError(table, id string, msg interface{}) {
 			return
 		}
 	}
+}
+
+// BroadcastRealtimeData 广播实时数据到所有 WebSocket 客户端
+func (a *app) BroadcastRealtimeData(tableId string, data *entity.WritePoint) error {
+	a.wsClientsMutex.RLock()
+	defer a.wsClientsMutex.RUnlock()
+
+	if len(a.wsClients) == 0 {
+		return nil
+	}
+
+	// 构建广播消息，包含 tableId
+	msg := map[string]interface{}{
+		"table":  tableId,
+		"id":     data.ID,
+		"fields": data.Fields,
+		"time":   data.UnixTime,
+	}
+
+	// 序列化数据一次
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	// 广播到所有匹配的客户端
+	for client := range a.wsClients {
+		// 按类型过滤：只有 type=data 的客户端才接收实时数据
+		if client.typ != "data" {
+			continue
+		}
+		// 按表过滤：如果客户端指定了表ID，只推送该表的数据
+		if client.table != "" && client.table != tableId {
+			continue
+		}
+		// 按设备过滤：如果客户端指定了设备ID，只推送该设备的数据；否则推送所有设备
+		if client.device != "" && client.device != data.ID {
+			continue
+		}
+
+		// 异步推送到客户端
+		go func(c *websocketConn) {
+			if err := c.sendData(b); err != nil {
+				logger.Errorf("WebSocket推送失败: %v", err)
+				a.unregisterWebSocketClient(c)
+			}
+		}(client)
+	}
+
+	return nil
+}
+
+// registerWebSocketClient 注册 WebSocket 客户端
+func (a *app) registerWebSocketClient(conn *websocketConn) {
+	a.wsClientsMutex.Lock()
+	defer a.wsClientsMutex.Unlock()
+	a.wsClients[conn] = struct{}{}
+	logger.Infof("WebSocket客户端已连接: 当前连接数=%d", len(a.wsClients))
+}
+
+// unregisterWebSocketClient 注销 WebSocket 客户端
+func (a *app) unregisterWebSocketClient(conn *websocketConn) {
+	a.wsClientsMutex.Lock()
+	defer a.wsClientsMutex.Unlock()
+	if _, ok := a.wsClients[conn]; ok {
+		delete(a.wsClients, conn)
+		logger.Infof("WebSocket客户端已断开: 当前连接数=%d", len(a.wsClients))
+	}
+}
+
+// sendData 发送数据到 WebSocket 客户端（线程安全）
+func (ws *websocketConn) sendData(data []byte) error {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+
+	conn := ws.conn.(interface{ WriteMessage(int, []byte) error })
+	return conn.WriteMessage(1, data) // 1 = TextMessage
 }

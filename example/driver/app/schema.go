@@ -214,7 +214,7 @@ var Schema = `({
 							"type": "string",
 							"title": "名称"
 						},
-"commandType": {
+						"commandType": {
 										"type": "string",
 										"title": "指令类型",
 										"enum": ["delay", "common"],
@@ -293,7 +293,27 @@ var Schema = `({
 					}
 				},
 				"required": []
-			}
+			},
+"tags": {
+				"title": "数据点",
+				"type": "array",
+				"items": {
+					"type": "object",
+					"properties": {
+						"id": {
+							"type": "string",
+							"title": "标识",
+							"description": "数据点的标识, 用于在数据点列表中唯一标识数据点"
+						},
+						"name": {
+							"type": "string",
+							"title": "名称",
+							"description": "数据点的名称"
+						}
+					},
+					"required": ["id", "name"]
+				}
+			},
 		}
 	}
 })`
