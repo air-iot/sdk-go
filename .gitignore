@@ -3,3 +3,6 @@
 /example/driver/etc/config.yaml
 
 sdk-html
+.DS_Store
+iot-config.bundle.css
+iot-config.bundle.js
