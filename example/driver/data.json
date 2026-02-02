@@ -1,1 +1,79 @@
-{"device":{"commands":[],"settings":{}},"distributed":"all","driverType":"go-driver-mqtt-demo","groupId":"zq","id":"64f847d563d1482d33753c25","name":"测试驱动","ports":"","runMode":"one","tables":[{"id":"m1","name":"m1","device":{"driver":"modbus","groupId":"","settings":{"server":"tcp://192.168.124.52:1884","username":"admin","password":"1","topic":"test1/#","parseScript":"function handler(topic, message) {\n    let topics = topic.split(\"/\");\n    console.log(111, JSON.stringify(message));  // 修正：stringifg -> stringify\n    \n    // 处理 message - 检查类型\n    let data;\n    if (typeof message === 'string') {\n        data = JSON.parse(message);\n    } else {\n        data = message; // 如果已经是对象，直接使用\n    }\n    \n    let fields = {};\n    \n    // 处理数据 - 添加安全检查\n    if (Array.isArray(data)) {\n        data.forEach(ele => {\n            if (ele && ele.key !== undefined) {\n                fields[ele.key] = ele.value;\n            }\n        });\n    } else {\n        console.error(\"message is not an array:\", data);\n        return [];  // 返回空数组\n    }\n    \n    let ret = [{\n        \"table\": topics[1], \n        \"id\": topics[2], \n        \"time\": new Date().getTime(), \n        \"fields\": fields\n    }];\n    \n    console.log(22, JSON.stringify(ret));  // 修正：stringifg -> stringify\n    \n    // 返回格式化的数据\n    return ret;\n}"},"tags":[{"id":"p1","name":"p1"},{"id":"p2","name":"p2"}],"commands":[{"name":"cmd1","commandType":"common","ops":[{"topic":"/aa"}]}],"events":[]},"tags":[{"id":"p1","name":"p1"}],"commands":[],"events":[],"devices":[{"id":"dev1","name":"dev1","device":{"driver":"modbus","groupId":"","settings":{},"tags":[],"commands":[],"events":[]},"disable":false,"off":false}]}]}
+{
+  "device": {
+    "commands": [],
+    "settings": {}
+  },
+  "distributed": "all",
+  "driverType": "go-driver-mqtt-demo",
+  "groupId": "zq",
+  "id": "64f847d563d1482d33753c25",
+  "name": "测试驱动",
+  "ports": "",
+  "runMode": "one",
+  "tables": [
+    {
+      "id": "m1",
+      "name": "m1",
+      "device": {
+        "driver": "modbus",
+        "groupId": "",
+        "settings": {
+          "server": "tcp://192.168.124.52:1884",
+          "username": "admin",
+          "password": "1",
+          "topic": "test1/#",
+          "parseScript": "function handler(topic, message) {\n    let topics = topic.split(\"/\");\n    console.log(111, JSON.stringify(message));  // 修正：stringifg -> stringify\n    \n    // 处理 message - 检查类型\n    let data;\n    if (typeof message === 'string') {\n        data = JSON.parse(message);\n    } else {\n        data = message; // 如果已经是对象，直接使用\n    }\n    \n    let fields = {};\n    \n    // 处理数据 - 添加安全检查\n    if (Array.isArray(data)) {\n        data.forEach(ele => {\n            if (ele && ele.key !== undefined) {\n                fields[ele.key] = ele.value;\n            }\n        });\n    } else {\n        console.error(\"message is not an array:\", data);\n        return [];  // 返回空数组\n    }\n    \n    let ret = [{\n        \"table\": topics[1], \n        \"id\": topics[2], \n        \"time\": new Date().getTime(), \n        \"fields\": fields\n    }];\n    \n    console.log(22, JSON.stringify(ret));  // 修正：stringifg -> stringify\n    \n    // 返回格式化的数据\n    return ret;\n}",
+          "network": {
+            "timeout": 10
+          }
+        },
+        "tags": [
+          {
+            "id": "p1",
+            "name": "p1"
+          },
+          {
+            "id": "p2",
+            "name": "p2"
+          }
+        ],
+        "commands": [
+          {
+            "name": "cmd1",
+            "commandType": "common",
+            "ops": [
+              {
+                "topic": "/aa"
+              }
+            ]
+          }
+        ],
+        "events": []
+      },
+      "tags": [
+        {
+          "id": "p1",
+          "name": "p1"
+        }
+      ],
+      "commands": [],
+      "events": [],
+      "devices": [
+        {
+          "id": "dev1",
+          "name": "dev1",
+          "device": {
+            "driver": "modbus",
+            "groupId": "",
+            "settings": {},
+            "tags": [],
+            "commands": [],
+            "events": []
+          },
+          "disable": false,
+          "off": false
+        }
+      ]
+    }
+  ]
+}

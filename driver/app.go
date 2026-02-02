@@ -86,15 +86,28 @@ type app struct {
 	// WebSocket 实时数据推送
 	wsClients      map[*websocketConn]struct{}
 	wsClientsMutex sync.RWMutex
+
+	// 设备状态跟踪
+	deviceStatus      sync.Map // key: "table:id", value: *deviceStatusRecord
+	deviceStatusMutex sync.RWMutex
 }
 
 // websocketConn WebSocket 连接封装
 type websocketConn struct {
 	conn   any        // 实际类型为 *websocket.Conn，使用 any 避免 import 循环
 	mu     sync.Mutex // 保护并发写入
-	typ    string     // 连接类型: data, tag, device, model
+	typ    string     // 连接类型: data, tag, device, model, status
 	table  string     // 订阅的表ID，为空表示订阅所有
 	device string     // 订阅的设备ID，为空表示订阅所有
+}
+
+// deviceStatusRecord 设备状态记录
+type deviceStatusRecord struct {
+	mu            sync.Mutex // 互斥锁，保护并发访问
+	lastSeen      int64      // 最后一次上数时间（毫秒时间戳）
+	status        string     // 当前状态
+	lastStatus    string     // 上一次状态（用于检测变化）
+	statusChanged bool       // 状态是否发生变化
 }
 
 func Init() {
@@ -145,6 +158,7 @@ func Init() {
 
 	// etcd config
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
+	viper.SetDefault("mode", string(NormalMode))
 	viper.SetDefault("dataConfig", "./data.json")
 	// api client
 	viper.SetDefault("api.liteMode", false)
@@ -203,27 +217,58 @@ func NewApp() App {
 	}
 	a.cacheValue = sync.Map{}
 	a.wsClients = make(map[*websocketConn]struct{})
-	// 启动 data 配置文件监听
-	a.watchDataConfig()
-	// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
-	if Cfg.HTTP.Host != "" && Cfg.HTTP.Port != "" {
-		a.initRouter()
-	} else if Cfg.Pprof.Enable {
-		// 只有在 HTTP 服务未启动时，才单独启动 pprof server
-		go func() {
-			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
-			logger.Infof("pprof服务启动: 地址=%s", addr)
-			if err := http.ListenAndServe(addr, nil); err != nil {
-				logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
-				return
-			}
-		}()
+
+	// 根据模式决定启动哪些功能
+	if Cfg.Mode == LocalMode {
+		// 本地模式：启动 HTTP 服务器，处理 data.json 和设备状态
+		logger.Infof("本地模式: 启动 HTTP 服务器和 data.json 处理")
+
+		// 启动 data 配置文件监听
+		a.watchDataConfig()
+
+		// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
+		if Cfg.HTTP.Host != "" && Cfg.HTTP.Port != "" {
+			a.initRouter()
+		} else if Cfg.Pprof.Enable {
+			// 只有在 HTTP 服务未启动时，才单独启动 pprof server
+			go func() {
+				addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+				logger.Infof("pprof服务启动: 地址=%s", addr)
+				if err := http.ListenAndServe(addr, nil); err != nil {
+					logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
+					return
+				}
+			}()
+		}
+
+		// 启动设备状态检查器
+		a.startDeviceStatusChecker()
+	} else {
+		// 正常模式：连接 gRPC，不处理 data.json
+		logger.Infof("正常模式: 连接 gRPC 服务器")
+
+		// 如果启用 pprof，单独启动 pprof server
+		if Cfg.Pprof.Enable {
+			go func() {
+				addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+				logger.Infof("pprof服务启动: 地址=%s", addr)
+				if err := http.ListenAndServe(addr, nil); err != nil {
+					logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
+					return
+				}
+			}()
+		}
 	}
+
 	return a
 }
 
-// loadDataConfig 加载 data.json 配置并调用 driver.Start
+// loadDataConfig 加载 data.json 配置并调用 driver.Start（仅在本地模式下有效）
 func (a *app) loadDataConfig() error {
+	// 正常模式下不处理 data.json
+	if Cfg.Mode != LocalMode {
+		return nil
+	}
 	if Cfg.DataConfig == "" {
 		return nil
 	}
@@ -255,8 +300,12 @@ func (a *app) loadDataConfig() error {
 	return nil
 }
 
-// saveDataConfig 保存配置到 data.json
+// saveDataConfig 保存配置到 data.json（仅在本地模式下有效）
 func (a *app) saveDataConfig(config []byte) error {
+	// 正常模式下不处理 data.json
+	if Cfg.Mode != LocalMode {
+		return nil
+	}
 	if Cfg.DataConfig == "" {
 		return nil
 	}
@@ -280,8 +329,12 @@ func (a *app) saveDataConfig(config []byte) error {
 	return nil
 }
 
-// watchDataConfig 监听 data.json 文件变化
+// watchDataConfig 监听 data.json 文件变化（仅在本地模式下有效）
 func (a *app) watchDataConfig() {
+	// 正常模式下不处理 data.json
+	if Cfg.Mode != LocalMode {
+		return
+	}
 	if Cfg.DataConfig == "" {
 		return
 	}
@@ -358,18 +411,23 @@ func (a *app) Start(driver Driver) {
 	a.stopped = false
 	a.driver = driver
 
-	// 尝试加载 data 配置文件
-	if err := a.loadDataConfig(); err != nil {
-		logger.Errorf("加载data配置文件失败: %v", err)
-	}
-
-	// 注册 driver 自定义路由
-	if a.router != nil {
-		driver.RegisterRoutes(a.router)
-		// 启动 HTTP 服务
-		if err := a.StartHTTPServer(); err != nil {
-			logger.Errorf("HTTP服务启动失败: %v", err)
+	if Cfg.Mode == LocalMode {
+		// 本地模式：尝试加载 data 配置文件
+		if err := a.loadDataConfig(); err != nil {
+			logger.Errorf("加载data配置文件失败: %v", err)
 		}
+
+		// 注册 driver 自定义路由
+		if a.router != nil {
+			driver.RegisterRoutes(a.router)
+			// 启动 HTTP 服务
+			if err := a.StartHTTPServer(); err != nil {
+				logger.Errorf("HTTP服务启动失败: %v", err)
+			}
+		}
+	} else {
+		// 正常模式：不处理 data.json 和 HTTP 服务器
+		logger.Infof("正常模式: 跳过 data.json 和 HTTP 服务器处理")
 	}
 
 	cli := Client{cacheConfig: NewCacheConfig()}
@@ -588,6 +646,8 @@ func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.Write
 	}
 	// 广播到 WebSocket 客户端
 	go a.BroadcastRealtimeData(tableId, data)
+	// 更新设备状态
+	a.updateDeviceLastSeen(tableId, data.ID)
 	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, data.ID}, b)
 }
 
@@ -849,4 +909,285 @@ func (ws *websocketConn) sendData(data []byte) error {
 
 	conn := ws.conn.(interface{ WriteMessage(int, []byte) error })
 	return conn.WriteMessage(1, data) // 1 = TextMessage
+}
+
+// updateDeviceLastSeen 更新设备最后一次上数时间（仅在本地模式下有效）
+func (a *app) updateDeviceLastSeen(tableId, deviceId string) {
+	// 正常模式下不处理设备状态
+	if Cfg.Mode != LocalMode {
+		return
+	}
+
+	key := tableId + ":" + deviceId
+
+	// 获取或创建设备状态记录，初始状态为 offline
+	record, _ := a.deviceStatus.LoadOrStore(key, &deviceStatusRecord{
+		status:     string(entity.DeviceStatusOffline),
+		lastStatus: string(entity.DeviceStatusOffline),
+	})
+
+	now := time.Now().UnixMilli()
+	r := record.(*deviceStatusRecord)
+
+	// 加锁保护并发访问
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// 更新最后上数时间和状态
+	r.lastSeen = now
+	r.status = string(entity.DeviceStatusOnline)
+	r.lastStatus = r.status
+
+	// 直接推送状态更新
+	a.BroadcastDeviceStatus(tableId, deviceId, entity.DeviceStatusOnline, now)
+}
+
+// getDeviceTimeout 获取设备超时配置（秒）
+// 优先级: 设备 > 模型 > 驱动
+func (a *app) getDeviceTimeout(tableId, deviceId string) int {
+	// 从 data.json 读取配置获取 network.timeout
+	if Cfg.DataConfig == "" {
+		return 0
+	}
+
+	data, err := os.ReadFile(Cfg.DataConfig)
+	if err != nil {
+		return 0
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return 0
+	}
+
+	// 1. 优先查找设备级别配置: tables[].devices[].settings.network.timeout
+	tables, ok := config["tables"].([]interface{})
+	if ok {
+		for _, t := range tables {
+			table, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			tid, _ := table["id"].(string)
+			if tid != tableId {
+				continue
+			}
+
+			// 找到对应的表，查找设备
+			devices, ok := table["devices"].([]interface{})
+			if !ok {
+				break
+			}
+			for _, d := range devices {
+				device, ok := d.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				did, _ := device["id"].(string)
+				if did != deviceId {
+					continue
+				}
+
+				// 找到对应的设备，查找 settings.network.timeout
+				if timeout := getNetworkTimeout(device); timeout > 0 {
+					return timeout
+				}
+			}
+			break
+		}
+	}
+
+	// 2. 查找模型级别配置: tables[].settings.network.timeout
+	if tables != nil {
+		for _, t := range tables {
+			table, ok := t.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			tid, _ := table["id"].(string)
+			if tid == tableId {
+				// 找到对应的表，查找 settings.network.timeout
+				if timeout := getNetworkTimeout(table); timeout > 0 {
+					return timeout
+				}
+				break
+			}
+		}
+	}
+
+	// 3. 查找驱动级别配置: device.settings.network.timeout
+	if device, ok := config["device"].(map[string]interface{}); ok {
+		if timeout := getNetworkTimeout(device); timeout > 0 {
+			return timeout
+		}
+	}
+
+	// 都没有配置
+	return 0
+}
+
+// getNetworkTimeout 从配置对象中获取 network.timeout
+func getNetworkTimeout(obj map[string]interface{}) int {
+	device, ok := obj["device"].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+	settings, ok := device["settings"].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+
+	network, ok := settings["network"].(map[string]interface{})
+	if !ok {
+		return 0
+	}
+
+	timeout, ok := network["timeout"].(float64)
+	if !ok {
+		return 0
+	}
+
+	return int(timeout)
+}
+
+// checkDeviceStatus 检查所有设备状态并推送状态变化（仅在本地模式下有效）
+func (a *app) checkDeviceStatus() {
+	// 正常模式下不处理设备状态
+	if Cfg.Mode != LocalMode {
+		return
+	}
+
+	now := time.Now().UnixMilli()
+
+	a.deviceStatus.Range(func(key, value interface{}) bool {
+		record := value.(*deviceStatusRecord)
+		keyStr := key.(string)
+
+		// 解析 tableId 和 deviceId
+		parts := strings.SplitN(keyStr, ":", 2)
+		if len(parts) != 2 {
+			return true
+		}
+		tableId := parts[0]
+		deviceId := parts[1]
+
+		// 获取该设备的超时配置（设备 > 模型 > 驱动）
+		timeout := a.getDeviceTimeout(tableId, deviceId)
+		if timeout <= 0 {
+			// 未配置超时时间，跳过该设备
+			return true
+		}
+
+		timeoutMs := int64(timeout * 1000) // 转换为毫秒
+
+		// 加锁保护并发访问
+		record.mu.Lock()
+		defer record.mu.Unlock()
+
+		// 计算距离最后一次上数的时间
+		elapsed := now - record.lastSeen
+		newStatus := record.status
+
+		if elapsed > timeoutMs {
+			// 超时，判定为掉线
+			newStatus = string(entity.DeviceStatusOffline)
+		} else {
+			// 未超时，判定为在线
+			newStatus = string(entity.DeviceStatusOnline)
+		}
+
+		// 检查状态是否变化
+		if newStatus != record.lastStatus {
+			record.status = newStatus
+			record.statusChanged = true
+			record.lastStatus = newStatus
+
+			// 推送状态更新
+			a.BroadcastDeviceStatus(tableId, deviceId, entity.DeviceStatus(newStatus), record.lastSeen)
+		}
+
+		return true
+	})
+}
+
+// BroadcastDeviceStatus 广播设备状态到所有订阅 status 类型的 WebSocket 客户端
+func (a *app) BroadcastDeviceStatus(tableId, deviceId string, status entity.DeviceStatus, lastSeen int64) {
+	a.wsClientsMutex.RLock()
+	defer a.wsClientsMutex.RUnlock()
+
+	if len(a.wsClients) == 0 {
+		return
+	}
+
+	// 构建广播消息
+	msg := map[string]interface{}{
+		"table":    tableId,
+		"id":       deviceId,
+		"status":   status,
+		"lastSeen": lastSeen,
+	}
+
+	// 序列化数据
+	b, err := json.Marshal(msg)
+	if err != nil {
+		logger.Errorf("序列化设备状态消息失败: %v", err)
+		return
+	}
+
+	// 广播到所有订阅 status 类型的客户端
+	for client := range a.wsClients {
+		if client.typ != "status" {
+			continue
+		}
+
+		// 按表过滤：如果客户端指定了表ID，只推送该表的状态
+		if client.table != "" && client.table != tableId {
+			continue
+		}
+
+		// 按设备过滤：如果客户端指定了设备ID，只推送该设备的状态
+		if client.device != "" && client.device != deviceId {
+			continue
+		}
+
+		// 异步推送到客户端
+		go func(c *websocketConn) {
+			if err := c.sendData(b); err != nil {
+				logger.Errorf("WebSocket推送设备状态失败: %v", err)
+				a.unregisterWebSocketClient(c)
+			}
+		}(client)
+	}
+}
+
+// startDeviceStatusChecker 启动设备状态检查定时器
+func (a *app) startDeviceStatusChecker() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second) // 每10秒检查一次
+		defer ticker.Stop()
+
+		for range ticker.C {
+			a.checkDeviceStatus()
+		}
+	}()
+}
+
+// getTableDevices 获取指定表下的所有设备ID
+func (a *app) getTableDevices(tableId string) []string {
+	if a.cli == nil || a.cli.cacheConfig == nil {
+		return []string{}
+	}
+
+	var devices []string
+	a.cli.cacheConfig.lock.RLock()
+	defer a.cli.cacheConfig.lock.RUnlock()
+
+	// 遍历所有设备，找到属于指定表的设备
+	for deviceId, tables := range a.cli.cacheConfig.data {
+		if _, ok := tables[tableId]; ok {
+			devices = append(devices, deviceId)
+		}
+	}
+
+	return devices
 }

@@ -391,12 +391,12 @@ func (ws *websocketConn) readPump(a *app) {
 		}
 
 		// 处理客户端发送的消息（订阅/取消订阅）
-		ws.handleMessage(message)
+		ws.handleMessage(message, a)
 	}
 }
 
 // handleMessage 处理客户端发送的消息
-func (ws *websocketConn) handleMessage(data []byte) {
+func (ws *websocketConn) handleMessage(data []byte, a *app) {
 	var msg struct {
 		Table  string `json:"table"`  // 模型ID
 		Device string `json:"device"` // 设备ID

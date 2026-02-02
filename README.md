@@ -350,17 +350,17 @@ type Config struct {
     ServiceID   string       // 服务ID
     GroupID     string       // 组ID
     Project     string       // 项目ID
+    Mode        Mode         // 运行模式：local（本地模式）/ normal（正常模式）
     Driver      struct {
         ID   string // 驱动ID
         Name string // 驱动名称
     }
-    DriverGrpc  grpc.Config    // gRPC配置（可选，未配置时跳过gRPC连接）
+    DriverGrpc  grpc.Config    // gRPC配置（正常模式下使用）
     HTTP        struct {
-        Enable bool   // 是否启用HTTP服务器
         Host   string // HTTP服务器地址
         Port   string // HTTP服务器端口
     }
-    DataConfig  string       // 配置文件路径（data.json）
+    DataConfig  string       // 配置文件路径（data.json，仅在本地模式下使用）
     Log         logger.Config  // 日志配置
     MQ          mq.Config      // 消息队列配置
     Pprof       struct {
@@ -374,9 +374,24 @@ type Config struct {
 }
 ```
 
+### Mode（运行模式）
+
+SDK 支持两种运行模式：
+
+| 模式 | 说明 | 特性 |
+|------|------|------|
+| **local** | 本地模式 | • 启动 HTTP 服务器和 Web 配置界面<br>• 处理 data.json 配置文件<br>• 支持设备状态监控和 WebSocket 推送<br>• 适用于本地开发和测试 |
+| **normal** | 正常模式 | • 连接 gRPC 服务器<br>• 不处理 data.json<br>• 不启动 HTTP 服务器<br>• 适用于生产环境部署 |
+
+**默认值**: `normal`
+
+**使用场景：**
+- **local 模式**：开发测试阶段，需要使用 Web 界面配置驱动、查看设备状态等
+- **normal 模式**：生产环境，驱动连接到云平台的 gRPC 服务器
+
 ### HTTP 服务器和 Web 配置界面
 
-v4 版本新增内置 HTTP 服务器，提供可视化 Web 配置界面：
+v4 版本新增内置 HTTP 服务器，提供可视化 Web 配置界面（**仅在 local 模式下可用**）：
 
 **功能特性：**
 - 基于 Next.js + shadcn/ui 构建的现代化配置界面
@@ -385,16 +400,19 @@ v4 版本新增内置 HTTP 服务器，提供可视化 Web 配置界面：
 - 支持亮色/暗色主题切换
 - 支持中英文国际化
 - 配置自动保存到 data.json
+- 设备状态实时监控（WebSocket 推送）
 
-**HTTP 配置示例：**
+**HTTP 配置示例（local 模式）：**
 ```yaml
+mode: local
 http:
-  enable: true
   host: ""
   port: "8080"
 ```
 
 访问 `http://localhost:8080` 即可打开 Web 配置界面。
+
+**注意**：HTTP 服务器仅在 `mode: local` 时启动，`normal` 模式下不会启动 HTTP 服务。
 
 ### 本地消息队列
 
@@ -407,7 +425,12 @@ mq:
 
 ### 配置文件示例
 
+#### Local 模式配置（本地开发测试）
+
 ```yaml
+# 运行模式
+mode: local
+
 # 服务配置
 serviceId: 64f847d563d1482d33753c25
 project: zq
@@ -419,33 +442,69 @@ driver:
 
 # HTTP服务器配置（Web配置界面）
 http:
-  enable: true
   host: ""
   port: "8080"
-
-# 消息队列配置
-mq:
-  type: mqtt  # mqtt / rabbit / kafka / local
-  mqtt:
-    host: localhost
-    port: 1883
-    username: admin
-    password: public
 
 # 配置文件路径
 dataConfig: ./data.json
 
+# 消息队列配置（本地模式可使用 local 队列）
+mq:
+  type: local  # mqtt / rabbit / kafka / local
+
 # 日志配置
 log:
   level: 5      # 1:Error, 2:Warn, 3:Info, 4:Debug, 5:Trace
-  format: json  # json / console
+  format: console  # json / console
+```
 
-# gRPC配置（可选，未配置时跳过gRPC连接）
+访问 `http://localhost:8080` 即可打开 Web 配置界面。
+
+#### Normal 模式配置（生产环境）
+
+```yaml
+# 运行模式
+mode: normal
+
+# 服务配置
+serviceId: 64f847d563d1482d33753c25
+project: zq
+groupId: group-001
+
+# 驱动配置
+driver:
+  id: go-driver-mqtt-demo
+  name: 测试驱动
+
+# gRPC配置（连接云平台）
 driverGrpc:
-  host: localhost
+  host: grpc-server
   port: 9224
   healthRequestTime: 10s
   waitTime: 5s
+
+# 消息队列配置
+mq:
+  type: mqtt  # mqtt / rabbit / kafka
+  mqtt:
+    host: mqtt-server
+    port: 1883
+    username: admin
+    password: public
+
+# 日志配置
+log:
+  level: 3      # 1:Error, 2:Warn, 3:Info, 4:Debug, 5:Trace
+  format: json  # json / console
+
+# ETCD配置
+etcdConfig: /airiot/config/pro.json
+etcd:
+  endpoints:
+    - etcd-server:2379
+  dialTimeout: 60
+  username: root
+  password: ""
 ```
 
 ## 快速开始
@@ -688,7 +747,25 @@ const (
 
 ## 常见问题
 
+### Q: Local 和 Normal 模式有什么区别？
+
+A: 两种模式的主要区别：
+
+| 功能 | Local 模式 | Normal 模式 |
+|------|-----------|-------------|
+| HTTP 服务器 | ✅ 启动 | ❌ 不启动 |
+| Web 配置界面 | ✅ 可用 | ❌ 不可用 |
+| data.json 处理 | ✅ 支持 | ❌ 不处理 |
+| 设备状态监控 | ✅ 支持 | ❌ 不监控 |
+| gRPC 连接 | ❌ 不连接 | ✅ 连接云平台 |
+
+**建议**：
+- 开发测试阶段使用 `local` 模式，便于配置和调试
+- 生产环境使用 `normal` 模式，连接云平台 gRPC 服务器
+
 ### Q: 如何启用 Web 配置界面？
+
+A: Web 配置界面仅在 `local` 模式下可用。配置方法：
 
 A: 在 `config.yaml` 中配置 `http` 节点：
 ```yaml
@@ -710,7 +787,17 @@ mq:
 
 ### Q: gRPC 配置是否必需？
 
-A: 否，gRPC 配置是可选的。如果未配置 `driverGrpc.host` 或 `driverGrpc.port`，驱动会跳过 gRPC 连接，仅使用 HTTP 服务器。
+A: 这取决于运行模式：
+- **local 模式**：gRPC 配置不是必需的，驱动主要使用 HTTP 服务器提供配置界面
+- **normal 模式**：gRPC 配置是必需的，驱动需要通过 gRPC 连接云平台服务器
+
+### Q: 两种模式可以混用吗？
+
+A: 不可以。每次运行只能选择一种模式：
+- 开发测试时使用 `local` 模式，利用 Web 界面进行配置和调试
+- 生产部署时使用 `normal` 模式，连接云平台的 gRPC 服务器
+
+如需切换模式，修改配置文件后重启驱动即可。
 
 ### Q: 配置文件保存在哪里？
 
