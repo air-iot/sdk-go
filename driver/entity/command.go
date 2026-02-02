@@ -7,6 +7,14 @@ type Command struct {
 	Command  []byte `json:"command"`
 }
 
+type RequestCommand struct {
+	Table  string                 `json:"table"`
+	Id     string                 `json:"id"`
+	Name   string                 `json:"name"`
+	Ops    []interface{}          `json:"ops"`
+	Params map[string]interface{} `json:"params"`
+}
+
 type BatchCommand struct {
 	Table    string   `json:"table"`
 	Ids      []string `json:"ids"`

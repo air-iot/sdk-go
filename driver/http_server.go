@@ -168,12 +168,20 @@ func (a *app) initRouter() {
 				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "驱动服务尚未初始化，请稍后重试"})
 				return
 			}
-			var command entity.Command
+			var command entity.RequestCommand
 			if err := c.ShouldBindJSON(&command); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("请求参数格式错误: %v，请检查 JSON 格式是否正确", err)})
 				return
 			}
-			result, err := a.driver.Run(c.Request.Context(), a, &command)
+			cmdBs, _ := json.Marshal(command)
+			cmd := entity.Command{
+				Table:    command.Table,
+				Id:       command.Id,
+				SerialNo: command.Table + command.Id,
+				Command:  cmdBs,
+			}
+
+			result, err := a.driver.Run(c.Request.Context(), a, &cmd)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("执行指令失败: %v", err)})
 				return
