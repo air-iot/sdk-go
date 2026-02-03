@@ -78,8 +78,9 @@ type app struct {
 	httpClean         func()
 	router            *gin.Engine
 	dataConfigMutex   sync.Mutex
-	dataConfigModTime time.Time // data.json 最后修改时间（用于区分内部/外部修改）
-	dataConfigSkip    bool      // 是否跳过文件变化监听（内部保存时设置为 true）
+	dataConfigModTime time.Time        // data.json 最后修改时间（用于区分内部/外部修改）
+	dataConfigSkip    bool             // 是否跳过文件变化监听（内部保存时设置为 true）
+	dataConfigCache   *dataConfigCache // data.json 数据缓存
 
 	cacheValue sync.Map
 
@@ -90,6 +91,12 @@ type app struct {
 	// 设备状态跟踪
 	deviceStatus      sync.Map // key: "table:id", value: *deviceStatusRecord
 	deviceStatusMutex sync.RWMutex
+}
+
+// dataConfigCache data.json 数据缓存
+type dataConfigCache struct {
+	data    map[string]interface{} // 解析后的 JSON 数据
+	version int64                  // 版本号（用于检测变化）
 }
 
 // websocketConn WebSocket 连接封装
@@ -141,7 +148,8 @@ func Init() {
 	viper.SetDefault("mq.kafka.brokers", []string{"kafka:9092"})
 
 	// driver
-	viper.SetDefault("driverGrpc.host", "")
+	viper.SetDefault("driverGrpc.enable", true)
+	viper.SetDefault("driverGrpc.host", "driver")
 	viper.SetDefault("driverGrpc.port", 9224)
 	viper.SetDefault("driverGrpc.health.requestTime", "10s")
 	viper.SetDefault("driverGrpc.health.retry", 3)
@@ -158,8 +166,8 @@ func Init() {
 
 	// etcd config
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
-	viper.SetDefault("mode", string(NormalMode))
-	viper.SetDefault("dataConfig", "./data.json")
+
+	viper.SetDefault("dataFile.path", "data.json")
 	// api client
 	viper.SetDefault("api.liteMode", false)
 	viper.SetDefault("api.gateway", "http://127.0.0.1:3030/rest")
@@ -218,77 +226,62 @@ func NewApp() App {
 	a.cacheValue = sync.Map{}
 	a.wsClients = make(map[*websocketConn]struct{})
 
-	// 根据模式决定启动哪些功能
-	if Cfg.Mode == LocalMode {
-		// 本地模式：启动 HTTP 服务器，处理 data.json 和设备状态
-		logger.Infof("本地模式: 启动 HTTP 服务器和 data.json 处理")
-
+	// 根据 datafile.enable 决定是否启动本地文件处理功能
+	if Cfg.Datafile.Enable {
 		// 启动 data 配置文件监听
 		a.watchDataConfig()
+	}
 
-		// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
-		if Cfg.HTTP.Host != "" && Cfg.HTTP.Port != "" {
-			a.initRouter()
-		} else if Cfg.Pprof.Enable {
-			// 只有在 HTTP 服务未启动时，才单独启动 pprof server
-			go func() {
-				addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
-				logger.Infof("pprof服务启动: 地址=%s", addr)
-				if err := http.ListenAndServe(addr, nil); err != nil {
-					logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
-					return
-				}
-			}()
-		}
-
+	// 如果配置了 HTTP，则初始化 router（pprof 会自动集成到 HTTP 服务中）
+	if Cfg.HTTP.Enable && Cfg.HTTP.Host != "" && Cfg.HTTP.Port != "" {
+		a.initRouter()
 		// 启动设备状态检查器
 		a.startDeviceStatusChecker()
-	} else {
-		// 正常模式：连接 gRPC，不处理 data.json
-		logger.Infof("正常模式: 连接 gRPC 服务器")
-
-		// 如果启用 pprof，单独启动 pprof server
-		if Cfg.Pprof.Enable {
-			go func() {
-				addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
-				logger.Infof("pprof服务启动: 地址=%s", addr)
-				if err := http.ListenAndServe(addr, nil); err != nil {
-					logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
-					return
-				}
-			}()
-		}
+	} else if Cfg.Pprof.Enable {
+		// 只有在 HTTP 服务未启动时，才单独启动 pprof server
+		go func() {
+			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
+			logger.Infof("pprof服务启动: 地址=%s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
+				return
+			}
+		}()
 	}
 
 	return a
 }
 
-// loadDataConfig 加载 data.json 配置并调用 driver.Start（仅在本地模式下有效）
-func (a *app) loadDataConfig() error {
-	// 正常模式下不处理 data.json
-	if Cfg.Mode != LocalMode {
+// loadDataConfigFromFile 从文件加载 data.json 配置（仅当 datafile.enable=true 时有效）
+func (a *app) loadDataConfigFromFile() error {
+	if !Cfg.Datafile.Enable {
 		return nil
 	}
-	if Cfg.DataConfig == "" {
+	if Cfg.Datafile.Path == "" {
 		return nil
 	}
-
-	data, err := os.ReadFile(Cfg.DataConfig)
+	data, err := os.ReadFile(Cfg.Datafile.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.DataConfig)
+			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.Datafile.Path)
 			return nil
 		}
 		return fmt.Errorf("读取data配置文件失败: %w", err)
 	}
 
 	// 获取文件修改时间
-	info, _ := os.Stat(Cfg.DataConfig)
+	info, _ := os.Stat(Cfg.Datafile.Path)
 	a.dataConfigMutex.Lock()
 	a.dataConfigModTime = info.ModTime()
 	a.dataConfigMutex.Unlock()
 
-	logger.Infof("加载data配置文件: %s", Cfg.DataConfig)
+	logger.Infof("加载data配置文件: %s", Cfg.Datafile.Path)
+
+	// 更新内存缓存（供 HTTP 服务使用）
+	if err := a.updateDataConfigCache(data); err != nil {
+		logger.Warnf("更新内存缓存失败: %v", err)
+	}
+
 	if a.driver != nil {
 		ctx := context.Background()
 		// data.json 中的数据已经是驱动格式，直接使用
@@ -300,13 +293,36 @@ func (a *app) loadDataConfig() error {
 	return nil
 }
 
-// saveDataConfig 保存配置到 data.json（仅在本地模式下有效）
+// updateDataConfigCache 更新内存中的配置缓存（供 HTTP 服务查询使用）
+func (a *app) updateDataConfigCache(config []byte) error {
+	var configData map[string]interface{}
+	if err := json.Unmarshal(config, &configData); err != nil {
+		return fmt.Errorf("解析配置失败: %w", err)
+	}
+
+	a.dataConfigMutex.Lock()
+	if a.dataConfigCache == nil {
+		a.dataConfigCache = &dataConfigCache{}
+	}
+	a.dataConfigCache.data = configData
+	a.dataConfigCache.version++
+	a.dataConfigMutex.Unlock()
+
+	return nil
+}
+
+// saveDataConfig 保存配置到 data.json（如果 datafile.enable）并更新内存缓存
 func (a *app) saveDataConfig(config []byte) error {
-	// 正常模式下不处理 data.json
-	if Cfg.Mode != LocalMode {
+	// 始终更新内存缓存（供 HTTP 服务使用）
+	if err := a.updateDataConfigCache(config); err != nil {
+		logger.Warnf("更新内存缓存失败: %v", err)
+	}
+
+	// 只有启用 datafile 时才写文件
+	if !Cfg.Datafile.Enable {
 		return nil
 	}
-	if Cfg.DataConfig == "" {
+	if Cfg.Datafile.Path == "" {
 		return nil
 	}
 
@@ -315,27 +331,26 @@ func (a *app) saveDataConfig(config []byte) error {
 	a.dataConfigSkip = true
 	a.dataConfigMutex.Unlock()
 
-	if err := os.WriteFile(Cfg.DataConfig, config, 0644); err != nil {
+	if err := os.WriteFile(Cfg.Datafile.Path, config, 0644); err != nil {
 		return fmt.Errorf("保存data配置文件失败: %w", err)
 	}
 
 	// 更新修改时间
-	info, _ := os.Stat(Cfg.DataConfig)
+	info, _ := os.Stat(Cfg.Datafile.Path)
 	a.dataConfigMutex.Lock()
 	a.dataConfigModTime = info.ModTime()
 	a.dataConfigMutex.Unlock()
 
-	logger.Infof("保存data配置文件: %s", Cfg.DataConfig)
+	logger.Infof("保存data配置文件: %s", Cfg.Datafile.Path)
 	return nil
 }
 
-// watchDataConfig 监听 data.json 文件变化（仅在本地模式下有效）
+// watchDataConfig 监听 data.json 文件变化（仅在 datafile.enable 时有效）
 func (a *app) watchDataConfig() {
-	// 正常模式下不处理 data.json
-	if Cfg.Mode != LocalMode {
+	if !Cfg.Datafile.Enable {
 		return
 	}
-	if Cfg.DataConfig == "" {
+	if Cfg.Datafile.Path == "" {
 		return
 	}
 
@@ -349,10 +364,10 @@ func (a *app) watchDataConfig() {
 		defer watcher.Close()
 		for {
 			// 检查文件是否存在
-			if _, err := os.Stat(Cfg.DataConfig); err == nil {
+			if _, err := os.Stat(Cfg.Datafile.Path); err == nil {
 				// 文件存在，开始监听
-				if err := watcher.Add(Cfg.DataConfig); err == nil {
-					logger.Infof("开始监听data配置文件: %s", Cfg.DataConfig)
+				if err := watcher.Add(Cfg.Datafile.Path); err == nil {
+					logger.Infof("开始监听data配置文件: %s", Cfg.Datafile.Path)
 					break
 				}
 			}
@@ -378,7 +393,7 @@ func (a *app) watchDataConfig() {
 					}
 
 					// 检查文件修改时间，避免重复处理
-					info, err := os.Stat(Cfg.DataConfig)
+					info, err := os.Stat(Cfg.Datafile.Path)
 					if err != nil {
 						continue
 					}
@@ -391,8 +406,8 @@ func (a *app) watchDataConfig() {
 						continue
 					}
 
-					logger.Infof("检测到data配置文件变化: %s", Cfg.DataConfig)
-					if err := a.loadDataConfig(); err != nil {
+					logger.Infof("检测到data配置文件变化: %s", Cfg.Datafile.Path)
+					if err := a.loadDataConfigFromFile(); err != nil {
 						logger.Errorf("加载变化的data配置失败: %v", err)
 					}
 				}
@@ -411,11 +426,25 @@ func (a *app) Start(driver Driver) {
 	a.stopped = false
 	a.driver = driver
 
-	if Cfg.Mode == LocalMode {
-		// 本地模式：尝试加载 data 配置文件
-		if err := a.loadDataConfig(); err != nil {
+	// 1. 如果启用 datafile，加载文件配置
+	if Cfg.Datafile.Enable {
+		// 尝试加载 data 配置文件
+		if err := a.loadDataConfigFromFile(); err != nil {
 			logger.Errorf("加载data配置文件失败: %v", err)
 		}
+	}
+
+	// 2. 如果启用 HTTP 服务，注册路由并启动
+	if Cfg.HTTP.Enable {
+		// 初始化内存缓存（HTTP 服务需要）
+		a.dataConfigMutex.Lock()
+		if a.dataConfigCache == nil {
+			a.dataConfigCache = &dataConfigCache{
+				data:    make(map[string]interface{}),
+				version: 0,
+			}
+		}
+		a.dataConfigMutex.Unlock()
 
 		// 注册 driver 自定义路由
 		if a.router != nil {
@@ -425,9 +454,6 @@ func (a *app) Start(driver Driver) {
 				logger.Errorf("HTTP服务启动失败: %v", err)
 			}
 		}
-	} else {
-		// 正常模式：不处理 data.json 和 HTTP 服务器
-		logger.Infof("正常模式: 跳过 data.json 和 HTTP 服务器处理")
 	}
 
 	cli := Client{cacheConfig: NewCacheConfig()}
@@ -911,10 +937,9 @@ func (ws *websocketConn) sendData(data []byte) error {
 	return conn.WriteMessage(1, data) // 1 = TextMessage
 }
 
-// updateDeviceLastSeen 更新设备最后一次上数时间（仅在本地模式下有效）
+// updateDeviceLastSeen 更新设备最后一次上数时间（仅在 HTTP 服务启用时有效）
 func (a *app) updateDeviceLastSeen(tableId, deviceId string) {
-	// 正常模式下不处理设备状态
-	if Cfg.Mode != LocalMode {
+	if !Cfg.HTTP.Enable {
 		return
 	}
 
@@ -944,24 +969,19 @@ func (a *app) updateDeviceLastSeen(tableId, deviceId string) {
 
 // getDeviceTimeout 获取设备超时配置（秒）
 // 优先级: 设备 > 模型 > 驱动
+// 从内存缓存读取，不依赖文件
 func (a *app) getDeviceTimeout(tableId, deviceId string) int {
-	// 从 data.json 读取配置获取 network.timeout
-	if Cfg.DataConfig == "" {
-		return 0
-	}
+	// 从内存缓存读取配置
+	a.dataConfigMutex.Lock()
+	config := a.dataConfigCache
+	a.dataConfigMutex.Unlock()
 
-	data, err := os.ReadFile(Cfg.DataConfig)
-	if err != nil {
-		return 0
-	}
-
-	var config map[string]interface{}
-	if err := json.Unmarshal(data, &config); err != nil {
+	if config == nil || config.data == nil {
 		return 0
 	}
 
 	// 1. 优先查找设备级别配置: tables[].devices[].settings.network.timeout
-	tables, ok := config["tables"].([]interface{})
+	tables, ok := config.data["tables"].([]interface{})
 	if ok {
 		for _, t := range tables {
 			table, ok := t.(map[string]interface{})
@@ -1016,7 +1036,7 @@ func (a *app) getDeviceTimeout(tableId, deviceId string) int {
 	}
 
 	// 3. 查找驱动级别配置: device.settings.network.timeout
-	if device, ok := config["device"].(map[string]interface{}); ok {
+	if device, ok := config.data["device"].(map[string]interface{}); ok {
 		if timeout := getNetworkTimeout(device); timeout > 0 {
 			return timeout
 		}
@@ -1050,10 +1070,9 @@ func getNetworkTimeout(obj map[string]interface{}) int {
 	return int(timeout)
 }
 
-// checkDeviceStatus 检查所有设备状态并推送状态变化（仅在本地模式下有效）
+// checkDeviceStatus 检查所有设备状态并推送状态变化（仅在 HTTP 服务启用时有效）
 func (a *app) checkDeviceStatus() {
-	// 正常模式下不处理设备状态
-	if Cfg.Mode != LocalMode {
+	if !Cfg.HTTP.Enable {
 		return
 	}
 
@@ -1163,7 +1182,7 @@ func (a *app) BroadcastDeviceStatus(tableId, deviceId string, status entity.Devi
 // startDeviceStatusChecker 启动设备状态检查定时器
 func (a *app) startDeviceStatusChecker() {
 	go func() {
-		ticker := time.NewTicker(10 * time.Second) // 每10秒检查一次
+		ticker := time.NewTicker(1 * time.Second) // 每1秒检查一次
 		defer ticker.Stop()
 
 		for range ticker.C {

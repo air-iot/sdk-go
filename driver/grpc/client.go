@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	Enable bool   `json:"enable" yaml:"enable"`
 	Host   string `json:"host" yaml:"host"`
 	Port   int    `json:"port" yaml:"port"`
 	Health struct {

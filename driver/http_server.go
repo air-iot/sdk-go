@@ -101,7 +101,7 @@ func (a *app) initRouter() {
 		// GetConfig 获取当前驱动配置
 		api.GET("/config", func(c *gin.Context) {
 			// 从 data.json 读取当前配置
-			configData, err := os.ReadFile(Cfg.DataConfig)
+			configData, err := os.ReadFile(Cfg.Datafile.Path)
 			if err != nil {
 				if os.IsNotExist(err) {
 					// 文件不存在时返回空的驱动配置

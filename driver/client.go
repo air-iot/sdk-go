@@ -135,6 +135,10 @@ func (c *Client) start() {
 	}
 
 	// 检查 grpc 配置是否指定
+	if !Cfg.DriverGrpc.Enable {
+		logger.WithContext(ctx).Infof("Driver gRPC 未启用，跳过 gRPC 连接")
+		return
+	}
 	if Cfg.DriverGrpc.Host == "" || Cfg.DriverGrpc.Port == 0 {
 		logger.WithContext(ctx).Warnf("Driver gRPC 配置未指定，跳过 gRPC 连接")
 		return
