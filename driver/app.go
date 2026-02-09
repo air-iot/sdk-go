@@ -167,6 +167,11 @@ func Init() {
 	// etcd config
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
 
+	viper.SetDefault("http.enable", false)
+	viper.SetDefault("http.host", "0.0.0.0")
+	viper.SetDefault("http.port", 8080)
+
+	viper.SetDefault("dataFile.enable", false)
 	viper.SetDefault("dataFile.path", "data.json")
 	// api client
 	viper.SetDefault("api.liteMode", false)
