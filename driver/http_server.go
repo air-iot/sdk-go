@@ -307,7 +307,7 @@ func (a *app) StartHTTPServer() error {
 	go func() {
 		logger.Infof("HTTP服务启动: 地址=%s", addr)
 		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Errorf("HTTP服务启动失败: %v", err)
+			panic(fmt.Errorf("HTTP服务启动失败: %w", err))
 		}
 	}()
 
