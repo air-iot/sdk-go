@@ -21,9 +21,8 @@ import (
 
 // initRouter 初始化 gin Router
 func (a *app) initRouter() {
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(Cfg.HTTP.Mode)
 	a.router = gin.New()
-
 	// 自定义中间件
 	a.router.Use(recoveryMiddleware())
 	a.router.Use(loggerMiddleware())

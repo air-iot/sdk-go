@@ -168,6 +168,7 @@ func Init() {
 	viper.SetDefault("etcdConfig", "/airiot/config/pro.json")
 
 	viper.SetDefault("http.enable", false)
+	viper.SetDefault("http.mode", gin.ReleaseMode)
 	viper.SetDefault("http.host", "0.0.0.0")
 	viper.SetDefault("http.port", 8080)
 

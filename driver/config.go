@@ -29,6 +29,7 @@ type Config struct {
 	} `json:"pprof" yaml:"pprof"`
 	HTTP struct {
 		Enable bool   `json:"enable" yaml:"enable"`
+		Mode   string `json:"debug" yaml:"debug"`
 		Host   string `json:"host" yaml:"host"`
 		Port   string `json:"port" yaml:"port"`
 	} `json:"http" yaml:"http"`
