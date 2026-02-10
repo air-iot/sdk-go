@@ -33,7 +33,7 @@ type Driver interface {
 	// 在 HTTP 服务启动前调用，驱动可以注册自定义路由
 	// 参数:
 	//   - router: Gin 路由引擎实例
-	RegisterRoutes(router *gin.Engine)
+	RegisterRoutes(router *gin.RouterGroup)
 
 	// Run 执行单设备指令
 	// 向设备下发控制指令或配置命令

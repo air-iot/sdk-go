@@ -282,11 +282,11 @@ func (a *app) initRouter() {
 }
 
 // GetRouter 获取以 driver.id 为路径前缀的 RouterGroup
-func (a *app) GetRouter() *gin.RouterGroup {
+func (a *app) GetRouter() *gin.Engine {
 	if a.router == nil {
 		return nil
 	}
-	return a.router.Group("/" + Cfg.Driver.ID)
+	return a.router
 }
 
 // StartHTTPServer 启动 HTTP 服务（在注册路由后调用）

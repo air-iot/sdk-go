@@ -182,7 +182,7 @@ func (p *TestDriver) Schema(ctx context.Context, _ driver.App, locale string) (s
 }
 
 // RegisterRoutes 注册自定义 HTTP 路由
-func (p *TestDriver) RegisterRoutes(router *gin.Engine) {
+func (p *TestDriver) RegisterRoutes(router *gin.RouterGroup) {
 	// 如果需要注册自定义路由，可以在这里添加
 	// 例如:
 	// router.GET("/custom", func(c *gin.Context) {

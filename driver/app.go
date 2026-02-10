@@ -39,7 +39,7 @@ type App interface {
 	GetGroupID() string
 	GetServiceId() string
 	GetMQ() mq.MQ
-	GetRouter() *gin.RouterGroup
+	GetRouter() *gin.Engine
 	StartHTTPServer() error
 	WritePoints(context.Context, entity.Point) error
 	SavePoints(ctx context.Context, tableId string, data *entity.WritePoint) error
@@ -485,7 +485,7 @@ func (a *app) Start(driver Driver) {
 
 		// 注册 driver 自定义路由
 		if a.router != nil {
-			driver.RegisterRoutes(a.router)
+			driver.RegisterRoutes(a.GetRouter().Group(Cfg.Driver.ID))
 			// 启动 HTTP 服务
 			if err := a.StartHTTPServer(); err != nil {
 				logger.Errorf("HTTP服务启动失败: %v", err)

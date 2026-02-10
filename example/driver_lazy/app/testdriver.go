@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/http"
+
 	pb "github.com/air-iot/api-client-go/v4/driver"
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
@@ -13,7 +15,6 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 // 驱动配置信息，不同的驱动生成不同的配置信息
@@ -153,7 +154,7 @@ func (p *TestDriver) Schema(ctx context.Context, _ driver.App, locale string) (s
 }
 
 // RegisterRoutes 注册自定义 HTTP 路由
-func (p *TestDriver) RegisterRoutes(router *gin.Engine) {
+func (p *TestDriver) RegisterRoutes(router *gin.RouterGroup) {
 	// 如果需要注册自定义路由，可以在这里添加
 	// 例如:
 	// router.GET("/custom", func(c *gin.Context) {
