@@ -287,14 +287,45 @@ func (a *app) loadDataConfigFromFile() error {
 		logger.Warnf("更新内存缓存失败: %v", err)
 	}
 
-	if a.driver != nil {
-		ctx := context.Background()
-		// data.json 中的数据已经是驱动格式，直接使用
-		if err := a.driver.Start(ctx, a, data); err != nil {
-			return fmt.Errorf("使用data配置启动驱动失败: %w", err)
-		}
-		logger.Infof("使用data配置启动驱动成功")
+	// 注意：driver 可能为 nil（如果在 Start() 调用前被文件监听器触发）
+	// 如果 driver 为 nil，配置会被加载到缓存，等待 Start() 调用时启动
+	return nil
+}
+
+// loadDataAndStartDriver 加载配置文件并启动驱动（仅在 Start() 中调用，此时 driver 已确保非 nil）
+func (a *app) loadDataAndStartDriver() error {
+	if Cfg.Datafile.Path == "" {
+		return nil
 	}
+	data, err := os.ReadFile(Cfg.Datafile.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.Datafile.Path)
+			return nil
+		}
+		return fmt.Errorf("读取data配置文件失败: %w", err)
+	}
+
+	// 获取文件修改时间
+	info, _ := os.Stat(Cfg.Datafile.Path)
+	a.dataConfigMutex.Lock()
+	a.dataConfigModTime = info.ModTime()
+	a.dataConfigMutex.Unlock()
+
+	logger.Infof("加载data配置文件并启动驱动: %s", Cfg.Datafile.Path)
+
+	// 更新内存缓存（供 HTTP 服务使用）
+	if err := a.updateDataConfigCache(data); err != nil {
+		logger.Warnf("更新内存缓存失败: %v", err)
+	}
+
+	// 直接启动驱动
+	ctx := context.Background()
+	if err := a.driver.Start(ctx, a, data); err != nil {
+		return fmt.Errorf("启动驱动失败: %w", err)
+	}
+
+	logger.Infof("使用data配置启动驱动成功")
 	return nil
 }
 
@@ -431,11 +462,11 @@ func (a *app) Start(driver Driver) {
 	a.stopped = false
 	a.driver = driver
 
-	// 1. 如果启用 datafile，加载文件配置
+	// 1. 如果启用 datafile，加载文件配置并启动驱动
 	if Cfg.Datafile.Enable {
-		// 尝试加载 data 配置文件
-		if err := a.loadDataConfigFromFile(); err != nil {
-			logger.Errorf("加载data配置文件失败: %v", err)
+		// 尝试加载 data 配置文件并启动驱动
+		if err := a.loadDataAndStartDriver(); err != nil {
+			logger.Errorf("加载并启动驱动失败: %v", err)
 		}
 	}
 
