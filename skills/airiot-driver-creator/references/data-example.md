@@ -4,54 +4,58 @@
 
 ## ⚠️ CRITICAL: Required Fields Checklist
 
-**MANDATORY FIELDS - Must NOT be missing:**
+**必填字段规则（简单记忆：tables/devices/tags 需要 id+name，commands 需要 name）**
 
-| Level | Required Field | Description | Example |
-|-------|---------------|-------------|---------|
-| **tables[]** | `id` | Table identifier (REQUIRED!) | `"modbus2"` |
-| **tables[]** | `name` | Table name (REQUIRED!) | `"数据表1"` |
-| **tables[].device.tags[]** | `id` | Tag identifier (REQUIRED!) | `"tag-001"` |
-| **tables[].device.tags[]** | `name` | Tag name (REQUIRED!) | `"温度"` |
-| **tables[].device.commands[]** | `name` | Command name (REQUIRED!) | `"写入指令"` |
-| **tables[].devices[]** | `id` | Device identifier (REQUIRED!) | `"device-001"` |
-| **tables[].devices[]** | `name` | Device name (REQUIRED!) | `"设备1"` |
-| **tables[].devices[].device.tags[]** | `id` | Tag identifier (REQUIRED!) | `"tag-001"` |
-| **tables[].devices[].device.tags[]** | `name` | Tag name (REQUIRED!) | `"温度"` |
-| **tables[].devices[].device.commands[]** | `name` | Command name (REQUIRED!) | `"写入指令"` |
+| 层级 | 必填字段 | 说明 | 示例 |
+|------|----------|------|------|
+| **tables[]** | `id`, `name` | 每个table必须 | `"modbus2"`, `"数据表1"` |
+| **tables[].devices[]** | `id`, `name` | 每个device必须 | `"device-001"`, `"设备1"` |
+| **tables[].device.tags[]** | `id`, `name` | 每个tag必须 | `"tag-001"`, `"温度"` |
+| **tables[].device.commands[]** | `name` | 每个command必须 | `"写入指令"` |
+| **tables[].devices[].device.tags[]** | `id`, `name` | 每个tag必须 | `"tag-001"`, `"温度"` |
+| **tables[].devices[].device.commands[]** | `name` | 每个command必须 | `"写入指令"` |
 
-**❌ WRONG - Missing required fields**:
+**⚠️ devices数组不能为空**
+
+`tables[].devices` 数组**必须至少包含一个设备**：
+
 ```json
 {
-  "tables": [
-    {
-      // ❌ MISSING: "id" and "name"
-      "device": { ... }
-    }
-  ]
+  "tables": [{
+    "id": "table-001",
+    "name": "数据表1",
+    "device": { ... },
+    "devices": [
+      {
+        "id": "device-001",       // 必填
+        "name": "设备1",          // 必填
+        "device": {
+          "settings": { ... },
+          "tags": [],
+          "commands": []
+        }
+      }
+    ]
+  }]
 }
 ```
 
-**✅ CORRECT - All required fields present**:
+**❌ 错误示例 - devices数组为空**:
+```json
+{
+  "tables": [{
+    "devices": []    // ❌ 错误：必须包含至少一个设备
+  }]
+}
+```
+
+**❌ 错误示例 - 缺少必填字段**:
 ```json
 {
   "tables": [
     {
-      "id": "modbus2",           // ✅ REQUIRED
-      "name": "数据表1",          // ✅ REQUIRED
-      "device": {
-        "tags": [
-          {
-            "id": "tag-001",     // ✅ REQUIRED
-            "name": "温度"        // ✅ REQUIRED
-          }
-        ]
-      },
-      "devices": [
-        {
-          "id": "device-001",    // ✅ REQUIRED
-          "name": "设备1"         // ✅ REQUIRED
-        }
-      ]
+      // ❌ 缺少: "id" 和 "name"
+      "device": { ... }
     }
   ]
 }
@@ -322,10 +326,11 @@ Each device instance has its own `device` object with:
 | 1 | **根结构正确性** | 不应包含`driver`/`model`/`device`顶级键 | ❌ `{"driver": {...}}` |
 | 2 | **tables[]必需字段** | 每个table必须有`id`和`name` | ✅ `{"id": "t1", "name": "表1", ...}` |
 | 3 | **devices[]必需字段** | 每个device必须有`id`、`name`、`device` | ✅ `{"id": "d1", "name": "设备1", "device": {...}}` |
-| 4 | **tags[]必需字段** | 每个tag必须有`id`和`name` | ✅ `{"id": "tag1", "name": "温度", ...}` |
-| 5 | **commands[]必需字段** | 每个command必须有`name` | ✅ `{"name": "写入指令", ...}` |
-| 6 | **device层级正确** | `tables[].devices[]`中每个元素必须有`device`包裹 | ✅ `{"device": {"settings": {...}}}` |
-| 7 | **mapping规则遵守** | 检查schema.js各部分是否映射到正确位置 | 见下表 |
+| 4 | **devices[]非空检查** | `tables[].devices`数组必须至少包含一个设备 | ❌ `"devices": []` |
+| 5 | **tags[]必需字段** | 每个tag必须有`id`和`name` | ✅ `{"id": "tag1", "name": "温度", ...}` |
+| 6 | **commands[]必需字段** | 每个command必须有`name` | ✅ `{"name": "写入指令", ...}` |
+| 7 | **device层级正确** | `tables[].devices[]`中每个元素必须有`device`包裹 | ✅ `{"device": {"settings": {...}}}` |
+| 8 | **mapping规则遵守** | 检查schema.js各部分是否映射到正确位置 | 见下表 |
 
 ### Schema.js → data.json 转换验证示例
 
@@ -490,20 +495,25 @@ function validateDataJson(data) {
       }
     }
 
-    // 5. 检查devices
-    for (let device of table.devices || []) {
+    // 5. 检查devices非空
+    if (!table.devices || table.devices.length === 0) {
+      return `错误：devices数组不能为空，必须包含至少一个设备`;
+    }
+
+    // 6. 检查devices
+    for (let device of table.devices) {
       if (!device.id || !device.name || !device.device) {
         return `错误：device缺少id、name或device对象`;
       }
 
-      // 6. 检查device的tags
+      // 7. 检查device的tags
       for (let tag of device.device.tags || []) {
         if (!tag.id || !tag.name) {
           return `错误：device tag缺少id或name字段`;
         }
       }
 
-      // 7. 检查device的commands
+      // 8. 检查device的commands
       for (let cmd of device.device.commands || []) {
         if (!cmd.name) {
           return `错误：device command缺少name字段`;

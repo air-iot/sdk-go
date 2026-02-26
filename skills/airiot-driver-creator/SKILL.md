@@ -54,28 +54,62 @@ When users describe data collection requirements, automatically match and instal
 
 **⚠️ CRITICAL: Required Fields Checklist**
 
-Before generating data.json, ensure these MANDATORY fields are included:
+必填字段规则（简单记忆：**tables/devices/tags 需要 id+name，commands 需要 name**）：
 
-| Level | Required Field | Example |
-|-------|---------------|---------|
-| **tables[]** | `id` | `"modbus2"` |
-| **tables[]** | `name` | `"数据表1"` |
-| **tables[].device.tags[]** | `id` | `"tag-001"` |
-| **tables[].device.tags[]** | `name` | `"温度"` |
+| 层级 | 必填字段 | 示例 |
+|------|----------|------|
+| **tables[]** | `id`, `name` | `"modbus2"`, `"数据表1"` |
+| **tables[].devices[]** | `id`, `name` | `"device-001"`, `"设备1"` |
+| **tables[].device.tags[]** | `id`, `name` | `"tag-001"`, `"温度"` |
 | **tables[].device.commands[]** | `name` | `"写入指令"` |
-| **tables[].devices[]** | `id` | `"device-001"` |
-| **tables[].devices[]** | `name` | `"设备1"` |
-| **tables[].devices[].device.tags[]** | `id` | `"tag-001"` |
-| **tables[].devices[].device.tags[]** | `name` | `"温度"` |
+| **tables[].devices[].device.tags[]** | `id`, `name` | `"tag-001"`, `"温度"` |
 | **tables[].devices[].device.commands[]** | `name` | `"写入指令"` |
 
-**❌ WRONG - Missing required fields**:
+**⚠️ CRITICAL: devices Array MUST Contain Devices**
+
+`tables[].devices` 数组**不能为空**，必须至少包含一个设备：
+
+```json
+{
+  "tables": [{
+    "id": "table-001",
+    "name": "数据表1",
+    "device": { ... },
+    "devices": [
+      {
+        "id": "device-001",       // 必填
+        "name": "设备1",          // 必填
+        "device": {
+          "settings": { ... },
+          "tags": [],
+          "commands": []
+        }
+      }
+    ]
+  }]
+}
+```
+
+**❌ 错误示例 - devices数组为空**:
+```json
+{
+  "tables": [{
+    "devices": []    // ❌ 错误：必须包含至少一个设备
+  }]
+}
+```
+
+**❌ 错误示例 - 缺少必填字段**:
 ```json
 {
   "tables": [
     {
-      // ❌ MISSING: "id" and "name"
+      // ❌ 缺少: "id" 和 "name"
       "device": { ... }
+    }
+  ]
+}
+```
     }
   ]
 }
