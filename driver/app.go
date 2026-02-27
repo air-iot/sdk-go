@@ -288,6 +288,11 @@ func (a *app) loadDataConfigFromFile() error {
 		logger.Warnf("更新内存缓存失败: %v", err)
 	}
 
+	if a.driver != nil {
+		if err := a.driver.Start(context.Background(), a, data); err != nil {
+			return err
+		}
+	}
 	// 注意：driver 可能为 nil（如果在 Start() 调用前被文件监听器触发）
 	// 如果 driver 为 nil，配置会被加载到缓存，等待 Start() 调用时启动
 	return nil
