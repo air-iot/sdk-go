@@ -274,6 +274,9 @@ func (a *app) loadDataConfigFromFile() error {
 		}
 		return fmt.Errorf("读取data配置文件失败: %w", err)
 	}
+	if len(data) == 0 {
+		return nil
+	}
 
 	// 获取文件修改时间
 	info, _ := os.Stat(Cfg.Datafile.Path)
@@ -311,7 +314,9 @@ func (a *app) loadDataAndStartDriver() error {
 		}
 		return fmt.Errorf("读取data配置文件失败: %w", err)
 	}
-
+	if len(data) == 0 {
+		return nil
+	}
 	// 获取文件修改时间
 	info, _ := os.Stat(Cfg.Datafile.Path)
 	a.dataConfigMutex.Lock()
@@ -410,6 +415,10 @@ func (a *app) watchDataConfig() {
 				// 文件存在，开始监听
 				if err := watcher.Add(Cfg.Datafile.Path); err == nil {
 					logger.Infof("开始监听data配置文件: %s", Cfg.Datafile.Path)
+					// 先读取一次文件并启动驱动
+					if err := a.loadDataConfigFromFile(); err != nil {
+						logger.Errorf("加载data配置文件失败: %v", err)
+					}
 					break
 				}
 			}
