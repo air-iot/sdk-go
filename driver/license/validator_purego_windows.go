@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -221,22 +220,7 @@ func verifyLicenseRawFromLib(licensePath, driverID, data string) (*DriverLicense
 }
 
 func VerifyLicenseFromLib(licensePath, driverID, data string) (bool, *DriverLicenseInfoFromLib, error) {
-	lp := strings.TrimSpace(licensePath)
-	if lp == "" {
-		logger.Warnf("VerifyLicenseFromLib treat empty path as no license")
-		return fallbackVerifyAsNoLicense(data)
-	}
-	stat, statErr := os.Stat(lp)
-	if statErr != nil || !stat.IsDir() {
-		logger.Warnf("VerifyLicenseFromLib treat invalid path as no license, path=%s err=%v", licensePath, statErr)
-		return fallbackVerifyAsNoLicense(data)
-	}
-
 	result, err := verifyLicenseRawFromLib(licensePath, driverID, data)
-	if err != nil && shouldTreatPathAsNoLicense(err) {
-		logger.Warnf("VerifyLicenseFromLib treat invalid path as no license, path=%s err=%v", licensePath, err)
-		return fallbackVerifyAsNoLicense(data)
-	}
 	if result == nil {
 		return false, nil, err
 	}
