@@ -3,7 +3,6 @@ package driver
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/air-iot/json"
 	"github.com/air-iot/logger"
+	"github.com/air-iot/sdk-go/v4/driver/license"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
@@ -192,14 +192,14 @@ func Init() {
 	pflag.Parse()
 	viper.AddConfigPath(*cfgPath)
 	if err := viper.BindPFlags(pflag.CommandLine); err != nil {
-		panic(fmt.Errorf("解析命令行参数失败: %w，请检查参数格式是否正确", err))
+		panic(fmt.Errorf("解析命令行参数失败: %w；请检查启动参数格式（如 --config、--project）", err))
 	}
 	if err := viper.ReadInConfig(); err != nil {
-		panic(fmt.Errorf("读取配置文件失败: %w，请检查配置文件路径 %s 是否正确", err, *cfgPath))
+		panic(fmt.Errorf("读取配置文件失败: %w；请确认配置目录可访问，当前路径: %s", err, *cfgPath))
 	}
 	decrypt.Decode()
 	if err := viper.Unmarshal(Cfg); err != nil {
-		panic(fmt.Errorf("解析配置内容失败: %w，请检查配置文件格式是否正确", err))
+		panic(fmt.Errorf("解析配置内容失败: %w；请检查配置文件语法和字段类型", err))
 	}
 }
 
@@ -208,7 +208,7 @@ func NewApp() App {
 	Init()
 	a := new(app)
 	if Cfg.Driver.ID == "" || Cfg.Driver.Name == "" {
-		panic("驱动配置错误: driver.id 和 driver.name 不能为空，请检查配置文件")
+		panic("驱动配置无效: driver.id 和 driver.name 不能为空；请检查配置文件")
 	}
 	if Cfg.Project == "" {
 		Cfg.Project = "default"
@@ -220,10 +220,10 @@ func NewApp() App {
 	Cfg.Log.Syslog.ProjectId = Cfg.Project
 	Cfg.Log.Syslog.ServiceName = fmt.Sprintf("%s-%s-%s", Cfg.Project, Cfg.ServiceID, Cfg.Driver.ID)
 	logger.InitLogger(Cfg.Log)
-	logger.Infof("启动配置=%+v", *Cfg)
+	logger.Infof("启动配置已加载: project=%s, serviceId=%s, driverId=%s", Cfg.Project, Cfg.ServiceID, Cfg.Driver.ID)
 	mqConn, clean, err := mq.NewMQ(Cfg.MQ)
 	if err != nil {
-		panic(fmt.Errorf("初始化消息队列失败: %w，请检查 mq 配置是否正确", err))
+		panic(fmt.Errorf("初始化消息队列失败: %w；请检查 mq.type、地址、端口和鉴权配置", err))
 	}
 	a.mq = mqConn
 	a.clean = func() {
@@ -247,9 +247,9 @@ func NewApp() App {
 		// 只有在 HTTP 服务未启动时，才单独启动 pprof server
 		go func() {
 			addr := net.JoinHostPort(Cfg.Pprof.Host, Cfg.Pprof.Port)
-			logger.Infof("pprof服务启动: 地址=%s", addr)
+			logger.Infof("pprof 服务已启动: addr=%s（可通过 go tool pprof 连接）", addr)
 			if err := http.ListenAndServe(addr, nil); err != nil {
-				logger.Errorf("pprof服务启动失败: 地址=%s, 错误=%v", addr, err)
+				logger.Errorf("pprof 服务启动失败: addr=%s, err=%v；请检查端口占用和网络绑定配置", addr, err)
 				return
 			}
 		}()
@@ -269,10 +269,10 @@ func (a *app) loadDataConfigFromFile() error {
 	data, err := os.ReadFile(Cfg.Datafile.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.Datafile.Path)
+			logger.Infof("未找到 data 配置文件，跳过加载: path=%s（如需启用请先创建文件）", Cfg.Datafile.Path)
 			return nil
 		}
-		return fmt.Errorf("读取data配置文件失败: %w", err)
+		return fmt.Errorf("读取 data 配置文件失败: %w；请检查文件权限与路径: %s", err, Cfg.Datafile.Path)
 	}
 	if len(data) == 0 {
 		return nil
@@ -284,20 +284,47 @@ func (a *app) loadDataConfigFromFile() error {
 	a.dataConfigModTime = info.ModTime()
 	a.dataConfigMutex.Unlock()
 
-	logger.Infof("加载data配置文件: %s", Cfg.Datafile.Path)
+	logger.Infof("开始加载 data 配置文件: path=%s", Cfg.Datafile.Path)
 
 	// 更新内存缓存（供 HTTP 服务使用）
 	if err := a.updateDataConfigCache(data); err != nil {
-		logger.Warnf("更新内存缓存失败: %v", err)
+		logger.Warnf("更新 data 内存缓存失败: err=%v；配置已读取但 HTTP 查询结果可能不是最新", err)
 	}
 
-	if a.driver != nil {
-		if err := a.driver.Start(context.Background(), a, data); err != nil {
-			return err
-		}
+	if err := a.startDriverVerify(context.Background(), data); err != nil {
+		return fmt.Errorf("根据 data 配置启动驱动失败: %w；请检查 data 内容与驱动参数", err)
 	}
 	// 注意：driver 可能为 nil（如果在 Start() 调用前被文件监听器触发）
 	// 如果 driver 为 nil，配置会被加载到缓存，等待 Start() 调用时启动
+	return nil
+}
+
+func (a *app) startDriverVerify(ctx context.Context, data []byte) error {
+	if a.driver != nil {
+		var free = map[string]string{
+			"test":               "",
+			"modbus":             "",
+			"modbus_rtu":         "",
+			"db-driver":          "",
+			"driver-http-client": "",
+			"driver-mqtt-client": "",
+			"opcda":              "",
+			"modbus_rtutcp":      "",
+		}
+		if _, ok := free[Cfg.Driver.ID]; !ok {
+			ok, info, err := license.VerifyLicenseFromLib(Cfg.License, Cfg.Driver.ID, string(data))
+			if err != nil {
+				return fmt.Errorf("授权校验失败: %w；请检查 license 配置与驱动 ID", err)
+			}
+			logger.Infof("授权校验结果: %+v", info)
+			if !ok {
+				return fmt.Errorf("授权校验未通过: 点位数量超出授权范围；请减少点位数量或更新授权")
+			}
+		}
+		if err := a.driver.Start(ctx, a, data); err != nil {
+			return fmt.Errorf("驱动启动失败: %w；请检查驱动初始化参数与外部依赖", err)
+		}
+	}
 	return nil
 }
 
@@ -309,10 +336,10 @@ func (a *app) loadDataAndStartDriver() error {
 	data, err := os.ReadFile(Cfg.Datafile.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Infof("data配置文件不存在，跳过加载: %s", Cfg.Datafile.Path)
+			logger.Infof("未找到 data 配置文件，跳过加载: path=%s（如需启用请先创建文件）", Cfg.Datafile.Path)
 			return nil
 		}
-		return fmt.Errorf("读取data配置文件失败: %w", err)
+		return fmt.Errorf("读取 data 配置文件失败: %w；请检查文件权限与路径: %s", err, Cfg.Datafile.Path)
 	}
 	if len(data) == 0 {
 		return nil
@@ -323,20 +350,22 @@ func (a *app) loadDataAndStartDriver() error {
 	a.dataConfigModTime = info.ModTime()
 	a.dataConfigMutex.Unlock()
 
-	logger.Infof("加载data配置文件并启动驱动: %s", Cfg.Datafile.Path)
+	logger.Infof("开始加载 data 配置并启动驱动: path=%s", Cfg.Datafile.Path)
 
 	// 更新内存缓存（供 HTTP 服务使用）
 	if err := a.updateDataConfigCache(data); err != nil {
-		logger.Warnf("更新内存缓存失败: %v", err)
+		logger.Warnf("更新 data 内存缓存失败: err=%v；配置已读取但 HTTP 查询结果可能不是最新", err)
 	}
 
 	// 直接启动驱动
 	ctx := context.Background()
-	if err := a.driver.Start(ctx, a, data); err != nil {
-		return fmt.Errorf("启动驱动失败: %w", err)
+	//if err := a.driver.Start(ctx, a, data); err != nil {
+	//	return fmt.Errorf("启动驱动失败: %w", err)
+	//}
+	if err := a.startDriverVerify(ctx, data); err != nil {
+		return fmt.Errorf("根据 data 配置启动驱动失败: %w；请检查 data 内容与驱动参数", err)
 	}
-
-	logger.Infof("使用data配置启动驱动成功")
+	logger.Infof("已使用 data 配置启动驱动: path=%s", Cfg.Datafile.Path)
 	return nil
 }
 
@@ -344,7 +373,7 @@ func (a *app) loadDataAndStartDriver() error {
 func (a *app) updateDataConfigCache(config []byte) error {
 	var configData map[string]interface{}
 	if err := json.Unmarshal(config, &configData); err != nil {
-		return fmt.Errorf("解析配置失败: %w", err)
+		return fmt.Errorf("解析 data 配置失败: %w；请检查 JSON 格式和字段结构", err)
 	}
 
 	a.dataConfigMutex.Lock()
@@ -362,7 +391,7 @@ func (a *app) updateDataConfigCache(config []byte) error {
 func (a *app) saveDataConfig(config []byte) error {
 	// 始终更新内存缓存（供 HTTP 服务使用）
 	if err := a.updateDataConfigCache(config); err != nil {
-		logger.Warnf("更新内存缓存失败: %v", err)
+		logger.Warnf("更新 data 内存缓存失败: err=%v；配置已接收但 HTTP 查询结果可能不是最新", err)
 	}
 
 	// 只有启用 datafile 时才写文件
@@ -379,7 +408,7 @@ func (a *app) saveDataConfig(config []byte) error {
 	a.dataConfigMutex.Unlock()
 
 	if err := os.WriteFile(Cfg.Datafile.Path, config, 0644); err != nil {
-		return fmt.Errorf("保存data配置文件失败: %w", err)
+		return fmt.Errorf("保存 data 配置文件失败: %w；请检查写入权限与磁盘空间，path=%s", err, Cfg.Datafile.Path)
 	}
 
 	// 更新修改时间
@@ -388,7 +417,7 @@ func (a *app) saveDataConfig(config []byte) error {
 	a.dataConfigModTime = info.ModTime()
 	a.dataConfigMutex.Unlock()
 
-	logger.Infof("保存data配置文件: %s", Cfg.Datafile.Path)
+	logger.Infof("data 配置文件已保存: path=%s", Cfg.Datafile.Path)
 	return nil
 }
 
@@ -403,7 +432,7 @@ func (a *app) watchDataConfig() {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		logger.Errorf("创建文件监听器失败: %v", err)
+		logger.Errorf("创建文件监听器失败: err=%v；请检查系统文件句柄限制和路径权限", err)
 		return
 	}
 
@@ -414,10 +443,10 @@ func (a *app) watchDataConfig() {
 			if _, err := os.Stat(Cfg.Datafile.Path); err == nil {
 				// 文件存在，开始监听
 				if err := watcher.Add(Cfg.Datafile.Path); err == nil {
-					logger.Infof("开始监听data配置文件: %s", Cfg.Datafile.Path)
+					logger.Infof("开始监听 data 配置文件: path=%s", Cfg.Datafile.Path)
 					// 先读取一次文件并启动驱动
 					if err := a.loadDataConfigFromFile(); err != nil {
-						logger.Errorf("加载data配置文件失败: %v", err)
+						logger.Errorf("初始化加载 data 配置失败: path=%s, err=%v；请检查配置内容是否完整", Cfg.Datafile.Path, err)
 					}
 					break
 				}
@@ -457,16 +486,16 @@ func (a *app) watchDataConfig() {
 						continue
 					}
 
-					logger.Infof("检测到data配置文件变化: %s", Cfg.Datafile.Path)
+					logger.Infof("检测到 data 配置文件变化: path=%s", Cfg.Datafile.Path)
 					if err := a.loadDataConfigFromFile(); err != nil {
-						logger.Errorf("加载变化的data配置失败: %v", err)
+						logger.Errorf("重新加载 data 配置失败: path=%s, err=%v；请修正配置后重试", Cfg.Datafile.Path, err)
 					}
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
 				}
-				logger.Errorf("文件监听错误: %v", err)
+				logger.Errorf("文件监听异常: err=%v；建议检查文件系统事件是否正常", err)
 			}
 		}
 	}()
@@ -481,7 +510,7 @@ func (a *app) Start(driver Driver) {
 	if Cfg.Datafile.Enable {
 		// 尝试加载 data 配置文件并启动驱动
 		if err := a.loadDataAndStartDriver(); err != nil {
-			logger.Errorf("加载并启动驱动失败: %v", err)
+			logger.Errorf("使用 data 配置启动驱动失败: err=%v；驱动将继续运行但 data 配置未生效", err)
 		}
 	}
 
@@ -502,7 +531,7 @@ func (a *app) Start(driver Driver) {
 			driver.RegisterRoutes(a.GetRouter().Group(Cfg.Driver.ID))
 			// 启动 HTTP 服务
 			if err := a.StartHTTPServer(); err != nil {
-				logger.Errorf("HTTP服务启动失败: %v", err)
+				logger.Errorf("HTTP 服务启动失败: host=%s, port=%s, err=%v；请检查端口占用和监听地址配置", Cfg.HTTP.Host, Cfg.HTTP.Port, err)
 			}
 		}
 	}
@@ -514,11 +543,11 @@ func (a *app) Start(driver Driver) {
 	sig := <-ch
 	close(ch)
 	if err := driver.Stop(context.Background(), a); err != nil {
-		logger.Warnf("驱动停止: %v", err.Error())
+		logger.Warnf("驱动停止异常: err=%v；请检查 Stop 实现是否幂等并可安全退出", err)
 	}
 	cli.Stop()
 	a.stop()
-	logger.Debugf("关闭服务: 信号=%v", sig)
+	logger.Debugf("收到退出信号，服务关闭完成: signal=%v", sig)
 	os.Exit(0)
 }
 
@@ -556,15 +585,15 @@ func (a *app) WritePoints(ctx context.Context, p entity.Point) error {
 	if tableId == "" {
 		tableIdI, err := a.cli.cacheConfig.get(p.ID)
 		if err != nil {
-			return fmt.Errorf("获取设备表ID失败: %w，设备ID=%s", err, p.ID)
+			return fmt.Errorf("获取设备所属表失败: %w；设备ID=%s，请确认设备已绑定到表", err, p.ID)
 		}
 		tableId = tableIdI
 	}
 	if p.ID == "" {
-		return fmt.Errorf("设备ID不能为空，请检查数据点采集配置")
+		return fmt.Errorf("写入数据点失败: 设备ID为空；请检查采集配置或上报参数")
 	}
 	if p.Fields == nil || len(p.Fields) == 0 {
-		return fmt.Errorf("数据点字段列表为空，请检查是否正确配置了采集数据点")
+		return fmt.Errorf("写入数据点失败: 字段列表为空；请检查采集点配置和上报值")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
@@ -580,12 +609,12 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 	newLogger := logger.WithContext(ctx)
 	for _, field := range p.Fields {
 		if field.Value == nil {
-			newLogger.Warnf("存数据点: 设备表=%s,设备=%s. 设备数据点值为空", tableId, p.ID)
+			newLogger.Warnf("数据点值为空，已跳过: table=%s, device=%s, tag=%s；请检查设备上报或点位映射", tableId, p.ID, field.Tag.ID)
 			continue
 		}
 		tag := field.Tag
 		if strings.TrimSpace(tag.ID) == "" {
-			newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点标识为空，请检查数据点配置", tableId, p.ID)
+			newLogger.Errorf("数据点标识为空，已跳过: table=%s, device=%s；请检查点位 ID 配置", tableId, p.ID)
 			continue
 		}
 
@@ -593,13 +622,13 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		switch valueTmp := field.Value.(type) {
 		case float32:
 			if math.IsNaN(float64(valueTmp)) || math.IsInf(float64(valueTmp), 0) {
-				newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点=%s, 值=%f (值不是合法的数字，NaN或Inf)", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("数据点值非法，已跳过: table=%s, device=%s, tag=%s, value=%v（NaN/Inf）；请检查设备原始数据或转换逻辑", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat32(valueTmp)
 		case float64:
 			if math.IsNaN(valueTmp) || math.IsInf(valueTmp, 0) {
-				newLogger.Errorf("写入数据点失败: 设备表=%s, 设备=%s, 数据点=%s, 值=%f (值不是合法的数字，NaN或Inf)", tableId, p.ID, tag.ID, valueTmp)
+				newLogger.Errorf("数据点值非法，已跳过: table=%s, device=%s, tag=%s, value=%v（NaN/Inf）；请检查设备原始数据或转换逻辑", tableId, p.ID, tag.ID, valueTmp)
 				continue
 			}
 			value = decimal.NewFromFloat(valueTmp)
@@ -630,7 +659,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 			valTmp, err := numberx.GetValueByType("", field.Value)
 			if err != nil {
 				errCtx := logger.NewErrorContext(ctx, err)
-				logger.WithContext(errCtx).Errorf("数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 原值=%v, 错误=%v", tableId, p.ID, tag.ID, field.Value, err)
+				logger.WithContext(errCtx).Errorf("数据点类型转换失败: table=%s, device=%s, tag=%s, value=%v, err=%v；请检查点位类型定义与上报值格式", tableId, p.ID, tag.ID, field.Value, err)
 				continue
 			}
 			fields[tag.ID] = valTmp
@@ -653,7 +682,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 				valTmp, err := numberx.GetValueByType("", newVal)
 				if err != nil {
 					errCtx := logger.NewErrorContext(ctx, err)
-					logger.WithContext(errCtx).Errorf("数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 转换值=%v, 错误=%v", tableId, p.ID, tag.ID, newVal, err)
+					logger.WithContext(errCtx).Errorf("范围转换后类型处理失败: table=%s, device=%s, tag=%s, value=%v, err=%v；请检查范围配置与目标类型", tableId, p.ID, tag.ID, newVal, err)
 				} else {
 					valTmp = convert.ValueFormat(&tag, valTmp)
 					fields[tag.ID] = valTmp
@@ -666,7 +695,7 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 				valTmp, err := numberx.GetValueByType("", rawVal)
 				if err != nil {
 					errCtx := logger.NewErrorContext(ctx, err)
-					logger.WithContext(errCtx).Errorf("原始数据点类型转换失败: 设备表=%s, 设备=%s, 数据点=%s, 原始值=%v, 错误=%v", tableId, p.ID, tag.ID, rawVal, err)
+					logger.WithContext(errCtx).Errorf("原始数据点类型转换失败: table=%s, device=%s, tag=%s, value=%v, err=%v；请检查原始值类型和点位定义", tableId, p.ID, tag.ID, rawVal, err)
 				} else {
 					fields[fmt.Sprintf("%s__invalid", tag.ID)] = valTmp
 				}
@@ -680,12 +709,12 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 		}
 	}
 	if len(fields) == 0 {
-		return errors.New("所有数据点字段均为空或无效，无法写入数据")
+		return fmt.Errorf("写入数据点失败: 所有字段均为空或无效；请检查采集值、点位映射及类型转换配置")
 	}
 	if p.UnixTime == 0 {
 		p.UnixTime = time.Now().Local().UnixMilli()
 	} else if p.UnixTime > 9999999999999 || p.UnixTime < 1000000000000 {
-		return fmt.Errorf("时间戳无效: %d (应为13位毫秒级时间戳，范围: 1000000000000-9999999999999)", p.UnixTime)
+		return fmt.Errorf("时间戳无效: %d（应为 13 位毫秒时间戳，范围: 1000000000000-9999999999999）；请检查设备上报时间单位", p.UnixTime)
 	}
 	data := &entity.WritePoint{ID: p.ID, CID: p.CID, Source: "device", UnixTime: p.UnixTime, Fields: fields, FieldTypes: p.FieldTypes}
 	//b, err := json.Marshal()
@@ -698,13 +727,13 @@ func (a *app) writePoints(ctx context.Context, tableId string, p entity.Point) e
 
 func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.WritePoint) error {
 	if tableId == "" {
-		return fmt.Errorf("表ID不能为空，请检查设备表配置")
+		return fmt.Errorf("保存数据点失败: 表ID为空；请检查设备表配置")
 	}
 	if data.ID == "" {
-		return fmt.Errorf("设备ID不能为空，请检查数据点采集配置")
+		return fmt.Errorf("保存数据点失败: 设备ID为空；请检查采集配置")
 	}
 	if len(data.Fields) == 0 {
-		return fmt.Errorf("数据点字段列表为空，请检查是否正确配置了采集数据点")
+		return fmt.Errorf("保存数据点失败: 字段列表为空；请检查采集点配置和上报值")
 	}
 	if data.Source == "" {
 		data.Source = "device"
@@ -712,20 +741,23 @@ func (a *app) SavePoints(ctx context.Context, tableId string, data *entity.Write
 	if data.UnixTime == 0 {
 		data.UnixTime = time.Now().UnixMilli()
 	} else if data.UnixTime > 9999999999999 || data.UnixTime < 1000000000000 {
-		return fmt.Errorf("时间戳无效: %d (应为13位毫秒级时间戳，范围: 1000000000000-9999999999999)", data.UnixTime)
+		return fmt.Errorf("时间戳无效: %d（应为 13 位毫秒时间戳，范围: 1000000000000-9999999999999）；请检查设备上报时间单位", data.UnixTime)
 	}
 	b, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("序列化数据点失败: %w；请检查字段是否包含不可序列化类型", err)
 	}
 	if logger.IsLevelEnabled(logger.DebugLevel) {
-		logger.Debugf("存数据点: 设备表=%s,设备=%s,数据=%s. 保存数据成功", tableId, data.ID, string(b))
+		logger.Debugf("数据点已保存: table=%s, device=%s, payload=%s", tableId, data.ID, string(b))
 	}
 	// 广播到 WebSocket 客户端
 	go a.BroadcastRealtimeData(tableId, data)
 	// 更新设备状态
 	a.updateDeviceLastSeen(tableId, data.ID)
-	return a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, data.ID}, b)
+	if err := a.mq.Publish(ctx, []string{"data", Cfg.Project, tableId, data.ID}, b); err != nil {
+		return fmt.Errorf("发布数据点到 MQ 失败: %w；请检查 MQ 连接状态与主题权限", err)
+	}
+	return nil
 }
 
 func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
@@ -734,16 +766,16 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 	if tableId == "" {
 		tableIdI, err := a.cli.cacheConfig.get(w.TableDataId)
 		if err != nil {
-			return fmt.Errorf("获取设备表ID失败: %w，设备ID=%s", err, w.TableDataId)
+			return fmt.Errorf("获取设备所属表失败: %w；设备ID=%s，请确认设备已绑定到表", err, w.TableDataId)
 		}
 		tableId = tableIdI
 	}
 	w.TableId = tableId
 	if w.TableDataId == "" {
-		return fmt.Errorf("设备ID不能为空，请检查报警配置")
+		return fmt.Errorf("写入报警失败: 设备ID为空；请检查报警配置")
 	}
 	if tableId == "" {
-		return fmt.Errorf("表ID不能为空，请检查报警配置")
+		return fmt.Errorf("写入报警失败: 表ID为空；请检查报警配置")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
@@ -772,24 +804,27 @@ func (a *app) WriteWarning(ctx context.Context, w entity.Warn) error {
 	}
 	b, err := json.Marshal(wt)
 	if err != nil {
-		return err
+		return fmt.Errorf("序列化报警数据失败: %w；请检查报警字段格式", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
 	defer cancel()
-	return a.mq.Publish(ctx, []string{"warningStorage", Cfg.Project, tableId, w.TableDataId}, b)
+	if err := a.mq.Publish(ctx, []string{"warningStorage", Cfg.Project, tableId, w.TableDataId}, b); err != nil {
+		return fmt.Errorf("发布报警数据到 MQ 失败: %w；请检查 MQ 连接状态与主题权限", err)
+	}
+	return nil
 }
 
 // WriteWarningRecovery 报警恢复
 func (a *app) WriteWarningRecovery(ctx context.Context, tableId, dataId string, w entity.WarnRecovery) error {
 	//ctx = logger.NewModuleContext(ctx, entity.MODULE_WARN)
 	if tableId == "" {
-		return fmt.Errorf("表ID不能为空，请检查报警恢复配置")
+		return fmt.Errorf("报警恢复失败: 表ID为空；请检查报警恢复配置")
 	}
 	if dataId == "" {
-		return fmt.Errorf("设备ID不能为空，请检查报警恢复配置")
+		return fmt.Errorf("报警恢复失败: 设备ID为空；请检查报警恢复配置")
 	}
 	if len(w.ID) == 0 {
-		return fmt.Errorf("报警ID列表不能为空，请指定需要恢复的报警ID")
+		return fmt.Errorf("报警恢复失败: 报警ID列表为空；请指定需要恢复的报警ID")
 	}
 	ctx = logger.NewTableContext(ctx, tableId)
 	if Cfg.GroupID != "" {
@@ -808,11 +843,14 @@ func (a *app) WriteWarningRecovery(ctx context.Context, tableId, dataId string, 
 	}
 	b, err := json.Marshal(wt)
 	if err != nil {
-		return err
+		return fmt.Errorf("序列化报警恢复数据失败: %w；请检查恢复字段格式", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), Cfg.MQ.Timeout)
 	defer cancel()
-	return a.mq.Publish(ctx, []string{"warningUpdate", Cfg.Project, tableId, dataId}, b)
+	if err := a.mq.Publish(ctx, []string{"warningUpdate", Cfg.Project, tableId, dataId}, b); err != nil {
+		return fmt.Errorf("发布报警恢复数据到 MQ 失败: %w；请检查 MQ 连接状态与主题权限", err)
+	}
+	return nil
 }
 
 func (a *app) WriteEvent(ctx context.Context, event entity.Event) error {
@@ -848,9 +886,11 @@ func (a *app) Log(topic string, msg interface{}) {
 	l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 	b, err := json.Marshal(l)
 	if err != nil {
+		logger.Warnf("发送运行日志失败: topic=%s, err=%v；请检查日志字段是否可序列化", topic, err)
 		return
 	}
 	if err := a.mq.Publish(context.Background(), []string{"logs", topic}, b); err != nil {
+		logger.Warnf("发送运行日志失败: topic=%s, err=%v；请检查 MQ 连接状态与主题权限", topic, err)
 		return
 	}
 }
@@ -861,9 +901,11 @@ func (a *app) LogDebug(table, id string, msg interface{}) {
 		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 		b, err := json.Marshal(l)
 		if err != nil {
+			logger.Warnf("发送调试日志失败: table=%s, device=%s, err=%v；请检查日志字段是否可序列化", table, id, err)
 			return
 		}
 		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "debug", table, id}, b); err != nil {
+			logger.Warnf("发送调试日志失败: table=%s, device=%s, err=%v；请检查 MQ 连接状态与主题权限", table, id, err)
 			return
 		}
 	}
@@ -875,9 +917,11 @@ func (a *app) LogInfo(table, id string, msg interface{}) {
 		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 		b, err := json.Marshal(l)
 		if err != nil {
+			logger.Warnf("发送信息日志失败: table=%s, device=%s, err=%v；请检查日志字段是否可序列化", table, id, err)
 			return
 		}
 		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "info", table, id}, b); err != nil {
+			logger.Warnf("发送信息日志失败: table=%s, device=%s, err=%v；请检查 MQ 连接状态与主题权限", table, id, err)
 			return
 		}
 	}
@@ -889,9 +933,11 @@ func (a *app) LogWarn(table, id string, msg interface{}) {
 		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 		b, err := json.Marshal(l)
 		if err != nil {
+			logger.Warnf("发送告警日志失败: table=%s, device=%s, err=%v；请检查日志字段是否可序列化", table, id, err)
 			return
 		}
 		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "warn", table, id}, b); err != nil {
+			logger.Warnf("发送告警日志失败: table=%s, device=%s, err=%v；请检查 MQ 连接状态与主题权限", table, id, err)
 			return
 		}
 	}
@@ -903,9 +949,11 @@ func (a *app) LogError(table, id string, msg interface{}) {
 		l := map[string]interface{}{"time": time.Now().Format("2006-01-02 15:04:05"), "message": msg}
 		b, err := json.Marshal(l)
 		if err != nil {
+			logger.Warnf("发送错误日志失败: table=%s, device=%s, err=%v；请检查日志字段是否可序列化", table, id, err)
 			return
 		}
 		if err := a.mq.Publish(context.Background(), []string{"logs", Cfg.Project, "error", table, id}, b); err != nil {
+			logger.Warnf("发送错误日志失败: table=%s, device=%s, err=%v；请检查 MQ 连接状态与主题权限", table, id, err)
 			return
 		}
 	}
@@ -931,7 +979,7 @@ func (a *app) BroadcastRealtimeData(tableId string, data *entity.WritePoint) err
 	// 序列化数据一次
 	b, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("序列化实时数据失败: %w；请检查字段是否包含不可序列化类型", err)
 	}
 
 	// 广播到所有匹配的客户端
@@ -952,7 +1000,7 @@ func (a *app) BroadcastRealtimeData(tableId string, data *entity.WritePoint) err
 		// 异步推送到客户端
 		go func(c *websocketConn) {
 			if err := c.sendData(b); err != nil {
-				logger.Errorf("WebSocket推送失败: %v", err)
+				logger.Errorf("WebSocket 推送实时数据失败: type=%s, table=%s, device=%s, err=%v；连接将被移除，建议客户端重连", c.typ, c.table, c.device, err)
 				a.unregisterWebSocketClient(c)
 			}
 		}(client)
@@ -966,7 +1014,7 @@ func (a *app) registerWebSocketClient(conn *websocketConn) {
 	a.wsClientsMutex.Lock()
 	defer a.wsClientsMutex.Unlock()
 	a.wsClients[conn] = struct{}{}
-	logger.Infof("WebSocket客户端已连接: 当前连接数=%d", len(a.wsClients))
+	logger.Infof("WebSocket 客户端已连接: type=%s, table=%s, device=%s, active=%d", conn.typ, conn.table, conn.device, len(a.wsClients))
 }
 
 // unregisterWebSocketClient 注销 WebSocket 客户端
@@ -975,7 +1023,7 @@ func (a *app) unregisterWebSocketClient(conn *websocketConn) {
 	defer a.wsClientsMutex.Unlock()
 	if _, ok := a.wsClients[conn]; ok {
 		delete(a.wsClients, conn)
-		logger.Infof("WebSocket客户端已断开: 当前连接数=%d", len(a.wsClients))
+		logger.Infof("WebSocket 客户端已断开: type=%s, table=%s, device=%s, active=%d", conn.typ, conn.table, conn.device, len(a.wsClients))
 	}
 }
 
@@ -1200,7 +1248,7 @@ func (a *app) BroadcastDeviceStatus(tableId, deviceId string, status entity.Devi
 	// 序列化数据
 	b, err := json.Marshal(msg)
 	if err != nil {
-		logger.Errorf("序列化设备状态消息失败: %v", err)
+		logger.Errorf("序列化设备状态消息失败: table=%s, device=%s, err=%v；请检查状态字段是否可序列化", tableId, deviceId, err)
 		return
 	}
 
@@ -1223,7 +1271,7 @@ func (a *app) BroadcastDeviceStatus(tableId, deviceId string, status entity.Devi
 		// 异步推送到客户端
 		go func(c *websocketConn) {
 			if err := c.sendData(b); err != nil {
-				logger.Errorf("WebSocket推送设备状态失败: %v", err)
+				logger.Errorf("WebSocket 推送设备状态失败: type=%s, table=%s, device=%s, err=%v；连接将被移除，建议客户端重连", c.typ, c.table, c.device, err)
 				a.unregisterWebSocketClient(c)
 			}
 		}(client)

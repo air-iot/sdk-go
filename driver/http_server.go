@@ -152,7 +152,7 @@ func (a *app) initRouter() {
 			}
 
 			// 调用驱动 Start 方法
-			err = a.driver.Start(c.Request.Context(), a, driverConfig)
+			err = a.startDriverVerify(c.Request.Context(), driverConfig)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("启动驱动失败: %v", err)})
 				return

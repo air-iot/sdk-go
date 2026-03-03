@@ -745,10 +745,6 @@ func (c *Client) StartStream(ctx context.Context, sessionId string) error {
 				startRes.Code = 400
 			} else {
 				startRes.Code = 200
-				// 启动成功后保存配置到 data.json
-				if err := c.app.saveDataConfig(res.Config); err != nil {
-					logger.Warnf("保存data配置文件失败: %v", err)
-				}
 			}
 			bts, err := json.Marshal(startRes)
 			if err != nil {

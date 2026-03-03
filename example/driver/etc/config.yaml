@@ -26,7 +26,7 @@ log:
 
 driverGrpc:
   enable: false
-  host: v4.airiot.tech
+  host: localhost
   port: 9224
   healthRequestTime: 10s
   waitTime: 5s
@@ -39,3 +39,5 @@ http:
 dataFile:
   enable: true
   path: ./data.json
+
+license:

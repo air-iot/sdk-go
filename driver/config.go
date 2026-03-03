@@ -37,6 +37,7 @@ type Config struct {
 		Enable bool   `json:"enable" yaml:"enable"`
 		Path   string `json:"path" yaml:"path"` // data.json 文件路径
 	}
+	License string `json:"license" yaml:"license"`
 	//DataConfig string           `json:"dataConfig" yaml:"dataConfig"` // data.json 文件路径
 	EtcdConfig string           `json:"etcdConfig" yaml:"etcdConfig"`
 	Etcd       etcd.Config      `json:"etcd" yaml:"etcd"`
