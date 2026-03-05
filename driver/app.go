@@ -301,25 +301,13 @@ func (a *app) loadDataConfigFromFile() error {
 
 func (a *app) startDriverVerify(ctx context.Context, data []byte) error {
 	if a.driver != nil {
-		var free = map[string]string{
-			"test":               "",
-			"modbus":             "",
-			"modbus_rtu":         "",
-			"db-driver":          "",
-			"driver-http-client": "",
-			"driver-mqtt-client": "",
-			"opcda":              "",
-			"modbus_rtutcp":      "",
+		ok, info, err := license.VerifyLicenseFromLib(Cfg.License, Cfg.Driver.ID, string(data))
+		if err != nil {
+			return fmt.Errorf("授权校验失败: %w；请检查 license 配置与驱动 ID", err)
 		}
-		if _, ok := free[Cfg.Driver.ID]; !ok {
-			ok, info, err := license.VerifyLicenseFromLib(Cfg.License, Cfg.Driver.ID, string(data))
-			if err != nil {
-				return fmt.Errorf("授权校验失败: %w；请检查 license 配置与驱动 ID", err)
-			}
-			logger.Infof("授权校验结果: %+v", info)
-			if !ok {
-				return fmt.Errorf("授权校验未通过: 点位数量超出授权范围；请减少点位数量或更新授权")
-			}
+		logger.Infof("授权校验结果: %+v", info)
+		if !ok {
+			return fmt.Errorf("授权校验未通过: 点位数量超出授权范围；请减少点位数量或更新授权")
 		}
 		if err := a.driver.Start(ctx, a, data); err != nil {
 			return fmt.Errorf("驱动启动失败: %w；请检查驱动初始化参数与外部依赖", err)
