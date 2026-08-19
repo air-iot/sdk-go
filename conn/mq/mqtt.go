@@ -158,10 +158,16 @@ func (p *mqtt) connect() {
 
 func (p *mqtt) Publish(ctx context.Context, topicParams []string, payload []byte) error {
 	topic := strings.Join(topicParams, TOPICSEPWITHMQTT)
-	if token := p.client.Publish(topic, 0, false, string(payload)); token.Wait() && token.Error() != nil {
-		return token.Error()
+	token := p.client.Publish(topic, 0, false, string(payload))
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("MQTT 发送错误超时: %w", ctx.Err())
+	case <-token.Done():
+		if token.Error() == nil {
+			return nil
+		}
+		return fmt.Errorf("MQTT 发送错误: %w", token.Error())
 	}
-	return nil
 }
 
 func (p *mqtt) Consume(ctx context.Context, topicParams []string, splitN int, handler Handler) error {
